@@ -20,3 +20,5 @@ Progress is saved in this browser, scoped to owner, verifier and engine version.
 Download the final manifest and compiler input after all four deployments are verified. Both contain public deployment information only. Changing compiled artifacts blocks reuse of existing progress until matching artifacts are restored. The tool deliberately offers no automatic progress-reset button.
 
 `RUSH_CONSOLE_PORT` optionally changes the local port. The server rejects unknown hosts, cross-origin requests, writes and all unlisted paths. A current browser supporting Web Locks is required to avoid duplicate sends across tabs. The console uses this infrastructure package's pinned esbuild and viem dependencies.
+
+With the console running, `node console/test-console.mjs` exercises its route protection and browser flows using the root project's Playwright installation. All wallet requests and chain RPC responses are mocked in the browser suite, including a full four-contract deployment and manifest export. No real transactions are sent. Set `PLAYWRIGHT_BROWSERS_PATH` when using a shared browser installation, and `RUSH_CONSOLE_URL` if a different loopback port is selected.
