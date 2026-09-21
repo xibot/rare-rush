@@ -138,12 +138,17 @@ try {
     assert.equal(await game.locator('.rare-rush').evaluate(el => el.scrollWidth > el.clientWidth), false);
     assert(await game.locator('.start-card').evaluate(el => el.getBoundingClientRect().bottom <= document.querySelector('.arcade-bottom').getBoundingClientRect().top));
     await page.screenshot({ path: `artifacts/genesis-${width}-ready.png` });
+    const spriteBody = game.locator('.world-svg [data-genesis-body]');
+    assert.equal(await spriteBody.count(), 1, 'Genesis has a body in the ready screen');
     const beforeStart = state.ownerReads;
     await game.getByRole('button', { name: /LET’S RUSH/ }).click();
     await game.locator('[data-screen="running"]').waitFor();
     assert(state.ownerReads > beforeStart, 'Every run rechecks current ownership');
+    const firstBody = await spriteBody.getAttribute('data-genesis-body');
+    assert(firstBody && /^\d+$/.test(firstBody), 'A verified run gets a canonical body');
     await page.waitForTimeout(1500);
     await game.getByRole('button', { name: 'Pause game' }).click();
+    assert.equal(await spriteBody.getAttribute('data-genesis-body'), firstBody, 'Pause keeps the assigned body');
     const coins = Number((await game.locator('.run-score small').innerText()).match(/^\d+/)[0]);
     assert(coins > 0, 'Real game loop collects opening coins');
     assert.equal(Number((await game.locator('.token-hud strong').innerText()).replaceAll(',', '').replace('✦', '')), coins * 1000);
@@ -153,7 +158,40 @@ try {
     assert.equal(values['Demo RF prize pool'], '0', 'Free entry does not invent a pool contribution');
     await game.getByRole('button', { name: 'Close TOKEN LAB · SIMULATION', exact: true }).click();
     await game.getByRole('button', { name: /KEEP RUNNING/ }).click();
+    assert.equal(await spriteBody.getAttribute('data-genesis-body'), firstBody, 'Token Lab keeps the assigned body');
+    const motion = game.getByRole('button', { name: 'FX ON', exact: true });
+    if (await motion.count()) await motion.click();
+    const standingBottom = await spriteBody.evaluate(el => el.getBoundingClientRect().bottom);
+    if (width < 500) { const bounds = await game.getByRole('button', { name: 'Hold to slide' }).boundingBox(); await page.mouse.move(bounds.x + bounds.width / 2, bounds.y + bounds.height / 2); await page.mouse.down(); }
+    else { await game.locator('.world-svg').focus(); await page.keyboard.down('ArrowDown'); }
+    await game.locator('[data-character][data-slide="true"]').waitFor();
+    const sliding = await spriteBody.evaluate(el => {
+      const bounds = el.getBoundingClientRect(), world = document.querySelector('.world-svg').getBoundingClientRect();
+      return { height: bounds.height / (world.height / 500), bottom: bounds.bottom };
+    });
+    assert(Math.abs(sliding.height - 30) < 1, 'Genesis slide is30logicalpixels, without a second squash');
+    assert(Math.abs(sliding.bottom - standingBottom) < 2, 'Squash keeps the feet anchored');
+    assert.equal(await spriteBody.getAttribute('data-genesis-body'), firstBody, 'Slide keeps the assigned body');
+    await page.screenshot({ path: `artifacts/genesis-${width}-slide.png` });
+    if (width < 500) await page.mouse.up();
+    else await page.keyboard.up('ArrowDown');
+    if (width < 500) await game.getByRole('button', { name: 'Jump, tap twice to double jump' }).dispatchEvent('pointerdown', { pointerId: 2 });
+    else await page.keyboard.press('Space');
+    await page.waitForTimeout(150);
+    assert.equal(await spriteBody.getAttribute('data-genesis-body'), firstBody, 'Jump keeps the assigned body');
     await page.screenshot({ path: `artifacts/genesis-${width}-running.png` });
+    await game.getByRole('button', { name: /RUN IT BACK/ }).waitFor({ timeout: 70000 });
+    assert.equal(await spriteBody.getAttribute('data-genesis-body'), firstBody, 'Hits and completion keep the body until the next run');
+    if (width < 500) {
+      await game.getByRole('button', { name: /CHANGE DIFFICULTY/ }).click();
+      await game.getByRole('button', { name: 'Degen difficulty' }).click();
+      assert.equal(await spriteBody.getAttribute('data-genesis-body'), firstBody, 'Difficulty selection never rerolls the body');
+      await game.getByRole('button', { name: /LET’S RUSH/ }).click();
+    } else await game.getByRole('button', { name: /RUN IT BACK/ }).click();
+    await game.locator('[data-screen="running"]').waitFor();
+    assert.notEqual(await spriteBody.getAttribute('data-genesis-body'), firstBody, 'The next run gets a different body');
+    assert.equal(await spriteBody.locator('[data-genesis-art]').getAttribute('href'), portrait, 'Reroll preserves the original Genesis face');
+
     await page.getByRole('button', { name: 'CHANGE FRIEND', exact: true }).click();
     assert.equal(await page.locator('iframe').count(), 0);
     assert((await page.evaluate(() => window.testWallet.methods)).every(method => ['eth_accounts', 'eth_chainId'].includes(method)), 'Gameplay never asks for signatures or transactions');
@@ -179,9 +217,12 @@ try {
     const f = await fixture(); await openGame(f);
     let release; f.state.ownerGate = new Promise(resolve => { release = resolve; });
     const count = f.state.ownerReads;
+    const pendingBody = await f.game.locator('.world-svg [data-genesis-body]').getAttribute('data-genesis-body');
     await f.game.getByRole('button', { name: /LET’S RUSH/ }).click();
     await f.page.waitForFunction(() => document.querySelector('.genesis-checking'));
     while (f.state.ownerReads === count) await new Promise(resolve => setTimeout(resolve, 20));
+    assert.equal(await f.game.locator('.world-svg [data-genesis-body]').getAttribute('data-genesis-body'), pendingBody, 'Pending verification does not reroll the body');
+    assert.equal(await f.game.locator('.rare-rush').getAttribute('data-screen'), 'ready');
     f.state.owner = other;
     await f.page.evaluate(next => window.testWallet.change(next), other);
     await f.page.locator('iframe').waitFor({ state: 'detached' });

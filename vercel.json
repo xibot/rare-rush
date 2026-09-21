@@ -13,6 +13,7 @@
     { "source": "/pitch", "destination": "/pitch/", "permanent": true },
     { "source": "/arcade", "destination": "/arcade/", "permanent": true },
     { "source": "/genesis", "destination": "/genesis/", "permanent": true },
+    { "source": "/genesis-lab", "destination": "/genesis-lab/", "permanent": true },
     {
       "source": "/docs",
       "destination": "/docs/",

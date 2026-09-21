@@ -10,15 +10,16 @@
     "check": "friendsdk check games/rare-rush",
     "typecheck": "tsc --noEmit -p tsconfig.rare-rush.json",
     "typecheck:rush": "tsc --noEmit -p tsconfig.rare-rush.json",
-    "test:rush": "node --test tests/engine.test.ts tests/economy.test.ts tests/genesis-identity.test.ts",
-    "test": "node --test tests/engine.test.ts tests/economy.test.ts tests/genesis-identity.test.ts",
+    "test:rush": "node --test tests/engine.test.ts tests/economy.test.ts tests/genesis-identity.test.ts tests/genesis-bodies.test.ts",
+    "test": "node --test tests/engine.test.ts tests/economy.test.ts tests/genesis-identity.test.ts tests/genesis-bodies.test.ts",
     "test:browser": "node scripts/test-browser.mjs",
     "test:landing": "node scripts/test-rush-landing.mjs",
     "test:docs": "node scripts/test-rush-docs.mjs",
     "test:pitch": "node scripts/test-rush-pitch.mjs",
     "test:genesis": "node scripts/test-rush-genesis.mjs",
     "test:bonus": "node scripts/test-rush-bonus.mjs",
-    "test:entry": "node scripts/test-rush-entry.mjs"
+    "test:entry": "node scripts/test-rush-entry.mjs",
+    "test:genesis-lab": "node scripts/test-rush-genesis-lab.mjs"
   },
   "dependencies": {
     "@rarefriends/friendsdk": "file:rarefriends-friendsdk-0.1.2.tgz",
