@@ -17,7 +17,7 @@ The public [Rare Rush 101 guide](https://rarerush.app/docs/) explains controls, 
 
 Genesis selects one body per run from 36 compatible Generations bodies, without back-to-back repeats; slide squeezes the whole character to fit under obstacles. Bodies remain cosmetic, with unchanged collision and reward rules.
 
-The Genesis animation showcase is preserved as an unpublished draft in [drafts/genesis-lab/](drafts/genesis-lab/). It is excluded from the public build.
+The Genesis animation showcase is preserved as an unpublished draft in [darfts/genesis-prototype/](darfts/genesis-prototype/). It is excluded from the public build.
 
 **This is a simulated economy prototype.** Entry fees, the reward token and prize pool have no monetary value and do not make transactions. The game implements a working local preview of the intended diminishing reward model. Verified Genesis testers enter free and earn 100× demo tokens per coin, stacked with difficulty and flying bonuses before the shared issuance cap. Real RARERUSH minting, the RARERUSH / RAREFRIENDS pair, and prize payouts remain future integrations.
 
