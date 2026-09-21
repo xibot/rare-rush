@@ -1,8 +1,8 @@
 import { useEffect, useRef, useState } from 'react';
 import { createRoot } from 'react-dom/client';
-import { BrandMark } from '../BrandMark';
-import { GenesisRunnerSprite } from '../genesis/GenesisRunnerSprite';
-import { GENESIS_BODIES, pickGenesisBody } from '../genesis/bodies';
+import { BrandMark } from '../../games/rare-rush/BrandMark';
+import { GenesisRunnerSprite } from '../../games/rare-rush/genesis/GenesisRunnerSprite';
+import { GENESIS_BODIES, pickGenesisBody } from '../../games/rare-rush/genesis/bodies';
 import portrait from './portrait.json';
 import './style.css';
 

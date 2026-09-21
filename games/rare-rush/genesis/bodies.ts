@@ -45,7 +45,7 @@ const bodies = new Map(bodyData.bodies.map(body => [body.id, {
   frames: body.frames.map(frame => geometry(body, frame)), idle: body.idle, run: body.run,
 }]));
 
-/** Cached SVG geometry shared by the game and the public animation showcase. */
+/** Cached SVG geometry shared by the game and the archived animation showcase. */
 export function getGenesisBodyFrame(bodyId = DEFAULT_BODY_ID, frame = 0, walking = false) {
   const body = bodies.get(bodyId) ?? bodies.get(DEFAULT_BODY_ID)!;
   const index = Number.isFinite(frame) ? ((Math.floor(frame) % 8) + 8) % 8 : 0;

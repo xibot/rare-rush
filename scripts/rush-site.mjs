@@ -2,7 +2,7 @@ import { context } from 'esbuild';
 import { buildGame } from '@rarefriends/friendsdk/build';
 import { createGameServer } from '@rarefriends/friendsdk/serve';
 import { createServer } from 'node:http';
-import { mkdir, readFile, writeFile, realpath, stat, unlink } from 'node:fs/promises';
+import { mkdir, readFile, writeFile, realpath, stat, unlink, rm } from 'node:fs/promises';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -13,6 +13,8 @@ export async function buildRushSite({ outdir = path.join(project, 'dist'), watch
   outdir = path.resolve(outdir);
   if (outdir === project || project.startsWith(outdir + path.sep)) throw new Error('Choose a dedicated build output directory.');
   await mkdir(outdir, { recursive: true });
+  // Retired public showcase: also remove output left by a previous build/cache.
+  await rm(path.join(outdir, 'genesis-lab'), { recursive: true, force: true });
   const game = await buildGame(path.join(project, 'games/rare-rush'), { outdir: path.join(outdir, 'play'), watch });
   let page;
   try {
@@ -22,7 +24,7 @@ export async function buildRushSite({ outdir = path.join(project, 'dist'), watch
     if (!gameHostHTML.includes('</head>')) throw new Error('The SDK host HTML has no head for site chrome.');
     await writeFile(gameHostPath, gameHostHTML.replace('</head>', '<link rel="icon" type="image/svg+xml" sizes="any" href="/favicon.svg"><script type="module" src="/host-navigation.js"></script></head>'));
     page = await context({
-      absWorkingDir: project, entryPoints: { landing: path.join(landing, 'index.tsx'), 'host-navigation': path.join(landing, '../host-navigation.ts'), 'docs/index': path.join(landing, '../docs/index.tsx'), 'pitch/index': path.join(landing, '../pitch/index.tsx'), 'genesis/index': path.join(landing, '../genesis/index.tsx'), 'genesis/child': path.join(landing, '../genesis/child.tsx'), 'genesis-lab/index': path.join(landing, '../genesis-lab/index.tsx') }, outdir,
+      absWorkingDir: project, entryPoints: { landing: path.join(landing, 'index.tsx'), 'host-navigation': path.join(landing, '../host-navigation.ts'), 'docs/index': path.join(landing, '../docs/index.tsx'), 'pitch/index': path.join(landing, '../pitch/index.tsx'), 'genesis/index': path.join(landing, '../genesis/index.tsx'), 'genesis/child': path.join(landing, '../genesis/child.tsx') }, outdir,
       bundle: true, platform: 'browser', format: 'esm', target: 'es2022', jsx: 'automatic', minify: true,
       loader: { '.woff2': 'file' }, assetNames: 'assets/[name]-[hash]', metafile: true,
       define: { 'process.env.NODE_ENV': '"production"' }, logLevel: 'warning',
@@ -41,8 +43,6 @@ export async function buildRushSite({ outdir = path.join(project, 'dist'), watch
           await writeFile(path.join(outdir, 'genesis/index.html'), genesisHTML);
           await writeFile(path.join(outdir, 'arcade/index.html'), genesisHTML);
           await writeFile(path.join(outdir, 'genesis/game.html'), await readFile(path.join(landing, '../genesis/game.html')));
-          await mkdir(path.join(outdir, 'genesis-lab'), { recursive: true });
-          await writeFile(path.join(outdir, 'genesis-lab/index.html'), await readFile(path.join(landing, '../genesis-lab/index.html')));
           const fonts = Object.keys(result.metafile.outputs).map(file => path.relative(outdir, path.resolve(project, file)).split(path.sep).join('/')).filter(file => /^assets\/[\w-]+-[A-Z0-9]{8}\.woff2$/.test(file));
           await writeFile(path.join(outdir, '.rush-site-fonts.json'), JSON.stringify(fonts));
           const licenses = await Promise.all(['SILKSCREEN-OFL.txt', 'ARCHIVO-OFL.txt', 'SOMETYPE-MONO-OFL.txt'].map(file => readFile(path.join(landing, '../assets/fonts', file), 'utf8')));
@@ -87,10 +87,6 @@ export function createRushSiteServer(outdir) {
     ['/genesis/game.html', ['genesis/game.html', 'text/html; charset=utf-8']],
     ['/genesis/child.js', ['genesis/child.js', 'text/javascript; charset=utf-8']],
     ['/genesis/child.css', ['genesis/child.css', 'text/css; charset=utf-8']],
-    ['/genesis-lab/', ['genesis-lab/index.html', 'text/html; charset=utf-8']],
-    ['/genesis-lab/index.html', ['genesis-lab/index.html', 'text/html; charset=utf-8']],
-    ['/genesis-lab/index.js', ['genesis-lab/index.js', 'text/javascript; charset=utf-8']],
-    ['/genesis-lab/index.css', ['genesis-lab/index.css', 'text/css; charset=utf-8']],
     ['/font-licenses.txt', ['font-licenses.txt', 'text/plain; charset=utf-8']],
   ]);
   return createServer(async (request, response) => {
@@ -101,7 +97,6 @@ export function createRushSiteServer(outdir) {
       if (url.pathname === '/docs') { response.writeHead(308, { Location: '/docs/' }).end(); return; }
       if (url.pathname === '/pitch') { response.writeHead(308, { Location: '/pitch/' }).end(); return; }
       if (url.pathname === '/arcade' || url.pathname === '/genesis') { response.writeHead(308, { Location: `${url.pathname}/` }).end(); return; }
-      if (url.pathname === '/genesis-lab') { response.writeHead(308, { Location: '/genesis-lab/' }).end(); return; }
       if (url.pathname.startsWith('/play/')) {
         request.url = url.pathname.slice('/play'.length) + url.search;
         gameServer.emit('request', request, response);

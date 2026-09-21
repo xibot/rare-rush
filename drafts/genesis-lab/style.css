@@ -1,4 +1,4 @@
-@import '../fonts.css';
+@import '../../games/rare-rush/fonts.css';
 
 :root{color-scheme:dark;color:#fff;background:#000;font-family:var(--rush-font-mono);font-synthesis:none;--lab-lime:#ccff00;--lab-line:#ffffff55}
 *{box-sizing:border-box}body{margin:0}button,a{-webkit-tap-highlight-color:transparent}button{border-radius:0;cursor:pointer;font:400 11px/1.4 var(--rush-font-display);min-height:44px;padding:10px 12px;border:1px solid #fff;color:#fff;background:#000}button:hover,button[aria-pressed=true]{background:var(--lab-lime);border-color:var(--lab-lime);color:#000}button:focus-visible,a:focus-visible{outline:3px solid var(--lab-lime);outline-offset:5px}a{color:inherit;text-underline-offset:4px}a:hover{color:var(--lab-lime)}h1,h2,p{margin-top:0}svg{display:block;max-width:100%}em{font-style:normal;color:var(--lab-lime)}

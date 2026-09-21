@@ -6,7 +6,7 @@ Source artwork was decoded with `@rarefriends/friendsdk` 0.1.2, upstream commit 
 
 The Genesis portrait remains the exact image supplied by the existing identity verifier. XIBOT's composition attaches it above the body and adds the same one-pixel white outline as the approved prototype. A uniform transform fits the composition into the game's 16×16 sprite space. The game's existing parent transform handles sliding and growth. Bodies do not change physics, collision boxes, eligibility, entry fees or rewards, and do not modify either NFT.
 
-`pickGenesisBody` excludes the preceding body. The game calls it once for each accepted new run, keeping the result through pose changes, pauses and results. The library does not own run state. The public lab can call the same picker to preview the next assignment.
+`pickGenesisBody` excludes the preceding body. The game calls it once for each accepted new run, keeping the result through pose changes, pauses and results. The library does not own run state. The unpublished lab draft can call the same picker to preview the next assignment.
 
 The unit suite checks all 288 running frames plus 36 idle frames against a golden digest computed independently from FriendSDK's decoded canonical registry data, as well as distinct body/gait sequences, portrait attachment, bounds, outline pixels and picker reachability. Unusual or unsupported anatomy is deliberately excluded from this pool.
 
