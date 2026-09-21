@@ -1,0 +1,38 @@
+name: Testnet website and Doppler prototype
+on:
+  push:
+    paths: ['testnet-app/**', 'infra/doppler/**', '.github/workflows/testnet-sandbox.yml']
+  pull_request:
+    paths: ['testnet-app/**', 'infra/doppler/**', '.github/workflows/testnet-sandbox.yml']
+permissions:
+  contents: read
+jobs:
+  testnet-website:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: testnet-app
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: testnet-app/package-lock.json
+      - run: npm ci
+      - run: npm test
+      - run: npm run build
+  doppler-unit:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: infra/doppler
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: infra/doppler/package-lock.json
+      - run: npm ci --ignore-scripts
+      - run: npm run test:unit

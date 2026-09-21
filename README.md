@@ -31,6 +31,8 @@ The Rare Rush entry was submitted to the Rare Friends Vibeathon on September 20,
 
 An isolated [Robinhood testnet infrastructure workspace](infra/testnet/README.md) adds capped test-token minting, NFT run limits, entry/prize accounting, and a verifier that replays game inputs before authorizing claims. Its test assets and local wallet deployment console are separate from the submitted simulated game and excluded from the Vercel upload. See that workspace for contract tests, the local end-to-end demo, deployment instructions, and remaining integration work.
 
+The separate [testnet website](testnet-app/README.md) targets `testnet.rarerush.app`. It is built and deployed as its own Vercel project; it is excluded from the main site's upload. Contract actions remain disabled until a verified Robinhood testnet deployment is configured. The [Doppler compatibility prototype](infra/doppler/README.md) evaluates a capped token with a launch allocation and separately authorized gameplay minting on a local Robinhood mainnet fork. Fork results do not constitute public deployment or approval of our custom factory by Doppler.
+
 ## Website deployment
 
 The `rarerush` Vercel project belongs to XIBOT and serves [rarerush.app](https://rarerush.app) and [rarerush.vercel.app](https://rarerush.vercel.app). The committed configuration installs locked dependencies with `npm ci`, runs `npm run build`, and publishes only `dist/`; the package selects Node.js 22. It preserves `/pitch/`, `/docs/`, `/arcade/`, `/genesis/`, `/play/`, and the sandbox documents without a catch-all rewrite. No application environment variables or wallet secrets are required. Deployment remains separate from vibeathon submission.

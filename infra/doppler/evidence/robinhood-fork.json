@@ -1,0 +1,81 @@
+{
+  "sourceChainId": 4663,
+  "localChainId": 31337,
+  "forkBlock": 69150471,
+  "dopplerCommit": "bda077cf05c834f3bb5eb311f5b86376910d7912",
+  "airlock": "0xeb7c034704ef8dcd2d32324c1545f62fb4ad0862",
+  "initializer": "0xde8886a0019ea060b8378ee37b8a23b8117f29a3",
+  "governance": "0x85f37f74ef2478a770318bc810177a9835911ad7",
+  "migrator": "0xba2f330edb16cd8056f5988d8ce19bbc63475a0e",
+  "rf": "0x0779369854d3EcdEA927206718FFD7730C67B71f",
+  "scope": "LOCAL FORK ONLY; no public transaction, no actual Doppler approval",
+  "allocationStatus": "10% launch / 90% gameplay is only a configurable test fixture, not an approved final allocation",
+  "checks": [
+    "Pinned canonical Robinhood contracts have deployed code on the fork",
+    "Canonical RF uses 18 decimals; custom RARERUSH uses 6",
+    "Existing pool, governance and migrator modules are approved at the pinned block",
+    "Unapproved custom factory cannot launch through real Airlock",
+    "Third parties cannot consume or bypass the single-launch factory",
+    "Factory approval simulated ONLY on local fork",
+    "Airlock launches capped custom token and a real RF V3 market; second launch denied",
+    "Buy custom six-decimal RARERUSH with canonical 18-decimal RF",
+    "Sell custom RARERUSH back into the same RF pool",
+    "Launcher, attacker, Airlock contract and its owner have no reward mint privilege",
+    "Player-bound signed receipt mints once; theft, tampering and replay rejected",
+    "Newly reward-minted tokens trade in the existing RF market",
+    "Combined launch and reward issuance reaches exact 1.024B cap and cannot exceed it",
+    "Doppler lock/unlock/ownership interface works; ownership changes cannot change the minter"
+  ],
+  "codeHashes": {
+    "airlock": "0x86b37100cbe9841771c452a592985b4e921254b127a380246073b84ec953f7f8",
+    "initializer": "0xcb2f44d32c3efcec55c36bfa6f165ae29777daedaba304da7ba64d40746bc841",
+    "governance": "0x306dda9c8ef29935e569bb402c1626e8ef2048acd6b52a06bc3417bb4752c43f",
+    "migrator": "0x7bf5115543e8e0769ceabe4da9b8e23547c9e95c1cce15d24d96f164406129e3",
+    "rf": "0x957b8e4fd8881a93d6f00862c079a76955dc464b0823c4513c1345474bfe33c2"
+  },
+  "forkBlockHash": "0xdaaa6a99fcbeeeb4e23cd6ff4b54e048b2cddd1c75aed97b023ea88f399f8de0",
+  "rfSymbol": "RAREFRIENDS",
+  "airlockOwner": "0x21E2ce70511e4FE542a97708e89520471DAa7A66",
+  "approval": "Airlock owner impersonated on LOCAL fork only to set module state 1; public approval NOT obtained",
+  "launch": {
+    "token": "0x067BFBeeDDceDdCd8Ad0e47e156c5E34384C8b72",
+    "factory": "0x886a2a3abf5b79aa5dff1c73016bd07cfc817e04",
+    "claimFixture": "0xa4f9885550548c6a45b9d18c57b114c06f3c39b8",
+    "pool": "0x10d8C0fe14bD24f5f10CCCf1234792200FD509Db",
+    "transaction": "0xb7d1748be94cc96263608b07b2857266a39707d25dc1d3b32f6f3adf156d6e0b",
+    "initialSupply": "102400000",
+    "cap": "1024000000",
+    "ticks": [
+      207240,
+      230280
+    ],
+    "poolLiquidity": "378688789435133875"
+  },
+  "rfFunding": "Local-only impersonation of the RF contract transferred 1,000 existing fork RF to a disposable player; RF code/storage otherwise unmodified",
+  "trades": {
+    "spentRF": "100",
+    "boughtRARERUSH": "98906.535522",
+    "soldRARERUSH": "49453.267761",
+    "receivedRF": "49.907135757281765603"
+  },
+  "rewardClaim": {
+    "mintedRARERUSH": "2070",
+    "saleReceivedRF": "2.080002568616974671",
+    "scope": "Trusted signed-receipt fixture only, not full game replay"
+  },
+  "indexing": {
+    "airlockRecordedInitialSupply": "102400000",
+    "eventualTokenCap": "1024000000",
+    "note": "Airlock getAssetData.totalSupply is an initial-supply snapshot. SDK/indexer/FDV handling of future reward issuance still needs validation."
+  },
+  "claimScope": "Signed receipt fixture only. No physics replay, NFT ownership, quotas or existing RareRushGame adapter exercised here.",
+  "limitations": [
+    "No public deployment or Airlock approval",
+    "No public Robinhood-testnet Doppler modules in official deployments list",
+    "No production migration exercised: locked V3 market with NoOpMigrator fixture",
+    "No final launch allocation, price, fee beneficiaries or emission schedule decided",
+    "No end-to-end integration with existing RareRushGame; it currently creates its own token",
+    "Prototype is unaudited and intentionally rejects mainnet chain ID"
+  ],
+  "generatedAt": "2026-09-21T22:19:46.077Z"
+}

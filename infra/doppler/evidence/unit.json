@@ -1,0 +1,21 @@
+{
+  "scope": "LOCAL ONLY; no upstream RPC",
+  "chainId": 31337,
+  "generatedAt": "2026-09-21T22:17:41.205Z",
+  "checks": [
+    "Zero, full-cap and over-cap launch allocations rejected",
+    "Reward minter must be a contract, not an EOA",
+    "Only fixed launch allocation minted initially; six decimals and 1.024B cap",
+    "Only controller can bind token, exactly once",
+    "Token owner and arbitrary accounts cannot mint rewards",
+    "Receipt binds player, amount and trusted verifier",
+    "Receipt cannot replay across chains or verifying contracts",
+    "Expired receipt rejected",
+    "Valid claim mints once and rejects replay",
+    "Doppler pool lock blocks deposits until authorized unlock",
+    "Ownership transfer leaves immutable gameplay minter unchanged",
+    "Launch plus signed rewards can reach exact cap",
+    "Over-cap claim reverts without consuming receipt or altering supply",
+    "Factory configuration immutable and create callable only through launch envelope"
+  ]
+}

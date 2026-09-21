@@ -1,0 +1,25 @@
+{
+  "name": "rare-rush-testnet-app",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "engines": {
+    "node": "22.x"
+  },
+  "scripts": {
+    "dev": "vite --host 127.0.0.1",
+    "build": "tsc --noEmit && vite build",
+    "preview": "vite preview --host 127.0.0.1",
+    "test": "node --test test/*.test.ts",
+    "test:browser": "node test/browser.mjs"
+  },
+  "dependencies": {
+    "viem": "2.56.3"
+  },
+  "devDependencies": {
+    "@types/node": "22.20.4",
+    "playwright": "1.63.0",
+    "typescript": "6.0.3",
+    "vite": "7.3.6"
+  }
+}

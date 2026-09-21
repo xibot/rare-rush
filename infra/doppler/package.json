@@ -1,0 +1,23 @@
+{
+  "name": "rare-rush-doppler-compatibility",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "engines": {
+    "node": ">=22.18.0"
+  },
+  "scripts": {
+    "compile": "node scripts/compile.mjs",
+    "test": "npm run test:unit",
+    "test:fork": "npm run compile && node scripts/run-fork.mjs",
+    "test:unit": "npm run compile && node scripts/run-fork.mjs --unit"
+  },
+  "dependencies": {
+    "@openzeppelin/contracts": "5.6.1",
+    "viem": "2.56.3"
+  },
+  "devDependencies": {
+    "hardhat": "3.17.0",
+    "solc": "0.8.30"
+  }
+}
