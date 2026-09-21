@@ -47,7 +47,7 @@ test('real engine → verified receipt → onchain mint, and failed/fabricated r
   const f = await localFixture();
   await f.write(f.rf, f.rfArtifact.abi, 'faucet');
   await f.write(f.generations, f.nftArtifact.abi, 'mint');
-  await f.write(f.rf, f.rfArtifact.abi, 'approve', [f.game, 10n ** 18n]);
+  await f.write(f.rf, f.rfArtifact.abi, 'approve', [f.game, 110n * 10n ** 18n]);
   await f.write(f.game, f.gameArtifact.abi, 'startRun', [0, 1n, 1]);
   const run = await f.read('runs', [1n]) as any;
   const frames = recordPilot(run[2], 1);
@@ -64,7 +64,8 @@ test('real engine → verified receipt → onchain mint, and failed/fabricated r
   const balance = await f.client.readContract({ address: f.token, abi: f.tokenArtifact.abi, functionName: 'balanceOf', args: [f.player.address] });
   assert.equal(balance, expected);
   assert.ok((balance as bigint) > 0n);
-  assert.equal(await f.read('prizePoolBalance'), 10n ** 18n);
+  assert.equal(await f.read('prizePoolBalance'), 100n * 10n ** 18n);
+  assert.equal(await f.client.readContract({ address: f.rf, abi: f.rfArtifact.abi, functionName: 'balanceOf', args: [f.treasury.address] }), 10n * 10n ** 18n);
   await assert.rejects(verifyAndSign({ ...options, replay: frames }), /not claimable/);
 });
 
@@ -86,7 +87,7 @@ test('verifier refuses a wrong signing identity or an engine version different f
   const deployment = await f.mined(await f.wallet.deployContract({
     abi: f.gameArtifact.abi,
     bytecode: f.gameArtifact.bytecode,
-    args: [f.player.address, f.verifier.address, f.rf, f.genesis, f.generations, differentEngine],
+    args: [f.player.address, f.verifier.address, f.treasury.address, f.rf, f.genesis, f.generations, differentEngine],
   }));
   assert.ok(deployment.contractAddress);
   await assert.rejects(verifyAndSign({ ...options, game: deployment.contractAddress }), /Engine source differs/);

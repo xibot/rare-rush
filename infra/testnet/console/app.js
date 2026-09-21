@@ -11,10 +11,10 @@ const chain = defineChain({ id: 46630, name: 'Robinhood Chain Testnet', testnet:
   rpcUrls: { default: { http: [RPC] } }, blockExplorers: { default: { name: 'Explorer', url: EXPLORER } } });
 const client = createPublicClient({ chain, transport: http(RPC, { retryCount: 1, timeout: 15_000 }) });
 const steps = [
-  { id: 'rf', artifact: 'TestRF', title: 'Test RF', description: 'Free faucet token for test entry fees.' },
+  { id: 'rf', artifact: 'TestRF', title: 'Test RF', description: 'Free faucet: 1,100 tRF per wallet per UTC day for test entry fees.' },
   { id: 'genesis', artifact: 'TestFriends', title: 'Test Genesis', description: 'Test NFTs for free entry and the 100× reward multiplier.' },
-  { id: 'generations', artifact: 'TestFriends', title: 'Test Generations', description: 'Test NFTs for the 1 tRF entry flow.' },
-  { id: 'game', artifact: 'RareRushGame', title: 'Rare Rush Game + Token', description: 'Starts, verification, claims and prize pool. Creates tRARERUSH internally.' },
+  { id: 'generations', artifact: 'TestFriends', title: 'Test Generations', description: '110 tRF per run: 100 into the prize pool + 10 sent to the treasury.' },
+  { id: 'game', artifact: 'RareRushGame', title: 'Rare Rush Game + Token', description: 'Verified claims with a 1,024,000,000 tRARERUSH cap. Genesis enters free with 100× rewards; three starts per NFT daily.' },
 ];
 const $ = id => document.getElementById(id);
 const same = (a, b) => typeof a === 'string' && typeof b === 'string' && a.toLowerCase() === b.toLowerCase();
@@ -45,8 +45,13 @@ function loadState() {
   const stored = localStorage.getItem(key);
   if (!stored) return { fingerprint, deployments: {} };
   const parsed = JSON.parse(stored);
-  if (parsed.fingerprint !== fingerprint) throw new Error('The compiled contracts changed. Restore the matching artifacts before resuming this deployment. Progress was preserved.');
   if (!parsed.deployments || typeof parsed.deployments !== 'object') throw new Error('Saved deployment progress is invalid. Do not redeploy until the existing transactions are checked.');
+  if (parsed.fingerprint !== fingerprint) {
+    // An untouched page is safe to refresh after an economics/configuration change.
+    // Any actual or ambiguous deployment must remain visible for reconciliation.
+    if (Object.keys(parsed.deployments).length === 0) return { fingerprint, deployments: {} };
+    throw new Error('The compiled contracts or treasury changed. Existing deployment progress was preserved. Reconcile previous transactions before starting a new deployment.');
+  }
   for (const [id, value] of Object.entries(parsed.deployments)) {
     if (!steps.some(step => step.id === id) || !value || !['awaiting-wallet', 'pending', 'confirmed', 'failed'].includes(value.status) ||
       (value.hash && !validHash(value.hash)) || (value.address && !isAddress(value.address))) {
@@ -60,7 +65,7 @@ function argumentsFor(id) {
   if (id === 'rf') return [];
   if (id === 'genesis') return [true];
   if (id === 'generations') return [false];
-  return [config.owner, config.verifier, state.deployments.rf.address, state.deployments.genesis.address,
+  return [config.owner, config.verifier, config.treasury, state.deployments.rf.address, state.deployments.genesis.address,
     state.deployments.generations.address, config.engineVersion];
 }
 function deploymentData(step) {
@@ -118,17 +123,22 @@ async function verifyReceipt(step, hash, wait = false) {
     bytecodeHash: keccak256(artifacts[step.artifact].bytecode) };
   if (step.id === 'game') {
     const read = functionName => client.readContract({ address, abi: artifacts.RareRushGame.abi, functionName });
-    const [actualOwner, actualVerifier, actualEngine, token, rf, genesis, generations] = await Promise.all(
-      ['owner', 'verifier', 'engineVersion', 'token', 'rf', 'genesis', 'generations'].map(read));
-    if (!same(actualOwner, config.owner) || !same(actualVerifier, config.verifier) || !same(actualEngine, config.engineVersion) ||
+    const [actualOwner, actualVerifier, actualTreasury, actualEngine, token, rf, genesis, generations, entry, poolShare, treasuryShare] = await Promise.all(
+      ['owner', 'verifier', 'treasury', 'engineVersion', 'token', 'rf', 'genesis', 'generations', 'ENTRY_FEE', 'PRIZE_POOL_SHARE', 'TREASURY_SHARE'].map(read));
+    if (!same(actualOwner, config.owner) || !same(actualVerifier, config.verifier) || !same(actualTreasury, config.treasury) || !same(actualEngine, config.engineVersion) ||
         !same(rf, state.deployments.rf.address) || !same(genesis, state.deployments.genesis.address) || !same(generations, state.deployments.generations.address)) {
       throw new Error('The deployed game configuration does not match this console.');
+    }
+    if (entry !== 110n * 10n ** 18n || poolShare !== 100n * 10n ** 18n || treasuryShare !== 10n * 10n ** 18n) {
+      throw new Error('The deployed entry fee or treasury split does not match the reviewed economics.');
     }
     if (!isAddress(token) || !(await client.getCode({ address: token })) || await client.getCode({ address: token }) === '0x') {
       throw new Error('The game reward token has no deployed code.');
     }
     const tokenGame = await client.readContract({ address: token, abi: artifacts.RareRushToken.abi, functionName: 'game' });
     if (!same(tokenGame, address)) throw new Error('The reward token does not belong to this game.');
+    const cap = await client.readContract({ address: token, abi: artifacts.RareRushToken.abi, functionName: 'CAP' });
+    if (cap !== 1_024_000_000n * 1_000_000n) throw new Error('The reward token cap does not match the reviewed economics.');
     record.token = token;
   }
   state.deployments[step.id] = record; persist(); verified.add(step.id);
@@ -250,7 +260,8 @@ function render() {
 function downloadManifest() {
   if (!steps.every(step => verified.has(step.id))) return;
   const manifest = { formatVersion: 1, network: 'robinhood-testnet', chainId: 46630, rpcUrl: RPC, explorerUrl: EXPLORER,
-    owner: config.owner, verifier: config.verifier, engineVersion: config.engineVersion,
+    owner: config.owner, verifier: config.verifier, treasury: config.treasury, engineVersion: config.engineVersion,
+    economics: { rewardCap: '1024000000', generationsEntry: '110', prizePoolShare: '100', treasuryShare: '10', rfDecimals: 18, rewardDecimals: 6 },
     rf: state.deployments.rf.address, genesis: state.deployments.genesis.address,
     generations: state.deployments.generations.address, game: state.deployments.game.address, token: state.deployments.game.token,
     deployedAt: new Date().toISOString(), deploymentMethod: 'browser-wallet-console', deployments: state.deployments,
@@ -263,10 +274,10 @@ async function initialize() {
   const names = ['TestRF', 'TestFriends', 'RareRushGame', 'RareRushToken'];
   const readJson = async path => { const response = await fetch(path); if (!response.ok) throw new Error(`Could not load ${path}. Restart the local console after compiling.`); return response.json(); };
   [config, artifacts] = await Promise.all([readJson('/config.json'), Promise.all(names.map(async name => [name, await readJson(`/artifacts/${name}.json`)])).then(Object.fromEntries)]);
-  if (config.chainId !== 46630 || !same(config.owner, OWNER) || !isAddress(config.verifier) || !validHash(config.engineVersion)) throw new Error('Invalid public deployment configuration.');
+  if (config.chainId !== 46630 || !same(config.owner, OWNER) || !isAddress(config.verifier) || !isAddress(config.treasury) || /^0x0{40}$/i.test(config.treasury) || !validHash(config.engineVersion)) throw new Error('Invalid public deployment configuration.');
   for (const name of names) if (!Array.isArray(artifacts[name].abi) || !/^0x[0-9a-f]+$/i.test(artifacts[name].bytecode)) throw new Error(`Invalid ${name} artifact. Recompile before deployment.`);
-  $('owner').textContent = config.owner; $('verifier').textContent = config.verifier; $('engine').textContent = config.engineVersion;
-  fingerprint = keccak256(stringToHex(JSON.stringify(names.map(name => [name, artifacts[name].bytecode]))));
+  $('owner').textContent = config.owner; $('treasury').textContent = config.treasury; $('verifier').textContent = config.verifier; $('engine').textContent = config.engineVersion;
+  fingerprint = keccak256(stringToHex(JSON.stringify([config.treasury.toLowerCase(), names.map(name => [name, artifacts[name].bytecode])])));
   key = `rare-rush-testnet-deploy:${config.owner.toLowerCase()}:${config.verifier.toLowerCase()}:${config.engineVersion.toLowerCase()}`;
   state = loadState(); persist();
   await verifyProgress(); ready = true; render(); await refreshWallet();

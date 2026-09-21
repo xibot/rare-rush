@@ -10,13 +10,16 @@ try {
   const config = JSON.parse(await readFile(new URL('../operator-config.json', import.meta.url), 'utf8'));
   const chain = robinhoodTestnet;
   if (config.chainId !== chain.id) throw new Error('Operator config must target Robinhood testnet.');
-  const owner = getAddress(config.owner), verifier = getAddress(config.verifier);
+  const owner = getAddress(config.owner), verifier = getAddress(config.verifier), treasury = getAddress(config.treasury);
+  if (/^0x0{40}$/i.test(treasury)) throw new Error('A nonzero treasury address is required.');
   const version = await currentEngineVersion();
   if (version !== config.engineVersion) throw new Error('Engine changed. Prepare operator config again before deploying.');
   const transport = http(process.env.RUSH_RPC_URL ?? chain.rpcUrls.default.http[0]);
   const client = createPublicClient({ chain, transport });
   await assertChain(client, chain.id);
-  console.log(JSON.stringify({ network: chain.name, owner, verifier, engineVersion: version, assets: 'tRF / tGENESIS / tGENERATIONS / tRARERUSH; no real funds or liquidity pair' }, null, 2));
+  console.log(JSON.stringify({ network: chain.name, owner, verifier, treasury, engineVersion: version,
+    economics: { rewardCap: '1,024,000,000 tRARERUSH', generationsEntry: '110 tRF', prizePoolShare: '100 tRF', treasuryShare: '10 tRF', genesisEntry: 'free' },
+    assets: 'tRF / tGENESIS / tGENERATIONS / tRARERUSH; no real funds or liquidity pair' }, null, 2));
   if (!process.argv.includes('--broadcast')) {
     console.log('Preflight complete. For browser-wallet deployment use npm run console. CLI broadcast additionally requires RUSH_DEPLOYER_PRIVATE_KEY and --broadcast.');
   } else {
@@ -51,7 +54,7 @@ try {
     const rf = await deploy('TestRF', 'rf', []);
     const genesis = await deploy('TestFriends', 'genesis', [true]);
     const generations = await deploy('TestFriends', 'generations', [false]);
-    const game = await deploy('RareRushGame', 'game', [owner, verifier, rf, genesis, generations, version]);
+    const game = await deploy('RareRushGame', 'game', [owner, verifier, treasury, rf, genesis, generations, version]);
     const { abi } = await artifact('RareRushGame');
     manifest.contracts.rewardToken = { address: await client.readContract({ address: game, abi, functionName: 'token' }) };
     await writeFile(path, JSON.stringify(manifest, null, 2) + '\n');

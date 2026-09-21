@@ -24,10 +24,13 @@ interface IGenerations is IERC721 {
 ///      Public seeds provide reproducible courses, not unpredictable randomness or bot protection.
 ///      The owner can pause, invalidate pending runs by rotating the verifier, and award
 ///      the tRF prize pool. There is no liquidity pool or real-NFT ownership bridge.
+///      Each paid entry reserves 100 tRF for prizes and forwards 10 tRF to a fixed treasury.
 contract RareRushGame is Ownable2Step, Pausable, ReentrancyGuard, EIP712, TestnetOnly {
     using SafeERC20 for IERC20;
 
-    uint256 public constant ENTRY_FEE = 1 ether;
+    uint256 public constant PRIZE_POOL_SHARE = 100 ether;
+    uint256 public constant TREASURY_SHARE = 10 ether;
+    uint256 public constant ENTRY_FEE = PRIZE_POOL_SHARE + TREASURY_SHARE;
     uint256 public constant INITIAL_COIN_REWARD = 10 * 1e6;
     uint256 public constant HALVING_INTERVAL = 10_000;
     uint256 public constant MAX_DAILY_RUNS = 3;
@@ -52,6 +55,7 @@ contract RareRushGame is Ownable2Step, Pausable, ReentrancyGuard, EIP712, Testne
 
     RareRushToken public immutable token;
     IERC20 public immutable rf;
+    address public immutable treasury;
     IERC721 public immutable genesis;
     IGenerations public immutable generations;
     bytes32 public immutable engineVersion;
@@ -76,6 +80,7 @@ contract RareRushGame is Ownable2Step, Pausable, ReentrancyGuard, EIP712, Testne
     error DailyRunLimitReached();
     error NftRunActive(uint256 runId);
     error IncorrectEntryFeeReceived();
+    error IncorrectTreasuryFeeReceived();
     error UnknownRun();
     error NotRunPlayer();
     error RunFinalized();
@@ -110,23 +115,36 @@ contract RareRushGame is Ownable2Step, Pausable, ReentrancyGuard, EIP712, Testne
         bytes32 replayHash
     );
     event RunAbandoned(uint256 indexed runId, address indexed player);
+    event EntryFeePaid(
+        uint256 indexed runId,
+        address indexed player,
+        uint256 totalFee,
+        uint256 prizePoolShare,
+        uint256 treasuryShare,
+        address indexed treasury
+    );
     event VerifierChanged(address indexed oldVerifier, address indexed newVerifier, uint256 epoch);
     event PrizeAwarded(bytes32 indexed awardId, address indexed recipient, uint256 amount);
 
     constructor(
         address initialOwner,
         address initialVerifier,
+        address treasuryAddress,
         address rfAddress,
         address genesisAddress,
         address generationsAddress,
         bytes32 version
     ) Ownable(initialOwner) EIP712("RareRushTestnet", "1") {
-        if (initialVerifier == address(0)) revert InvalidAddress();
+        if (
+            initialVerifier == address(0) || treasuryAddress == address(0)
+                || treasuryAddress == address(this)
+        ) revert InvalidAddress();
         if (version == bytes32(0)) revert InvalidEngineVersion();
         _requireContract(rfAddress);
         _requireContract(genesisAddress);
         _requireContract(generationsAddress);
         verifier = initialVerifier;
+        treasury = treasuryAddress;
         rf = IERC20(rfAddress);
         genesis = IERC721(genesisAddress);
         generations = IGenerations(generationsAddress);
@@ -137,6 +155,7 @@ contract RareRushGame is Ownable2Step, Pausable, ReentrancyGuard, EIP712, Testne
     /// @param collection 0 = test Generations; 1 = test Genesis.
     /// @param difficulty 0 = Easy; 1 = Normal; 2 = Degen.
     /// @dev A paid or free start consumes one daily attempt even if abandoned or lost.
+    ///      Generations pays 110 tRF; Genesis starts are free. Fee splits settle atomically.
     function startRun(uint8 collection, uint256 tokenId, uint8 difficulty)
         external
         nonReentrant
@@ -178,10 +197,20 @@ contract RareRushGame is Ownable2Step, Pausable, ReentrancyGuard, EIP712, Testne
         if (collection == 0) {
             uint256 balanceBefore = rf.balanceOf(address(this));
             rf.safeTransferFrom(msg.sender, address(this), ENTRY_FEE);
-            if (rf.balanceOf(address(this)) - balanceBefore != ENTRY_FEE) {
+            if (rf.balanceOf(address(this)) != balanceBefore + ENTRY_FEE) {
                 revert IncorrectEntryFeeReceived();
             }
-            prizePoolBalance += ENTRY_FEE;
+            prizePoolBalance += PRIZE_POOL_SHARE;
+            uint256 treasuryBalanceBefore = rf.balanceOf(treasury);
+            rf.safeTransfer(treasury, TREASURY_SHARE);
+            // Reject transfer taxes on either side of the split so the pool remains funded.
+            if (
+                rf.balanceOf(treasury) != treasuryBalanceBefore + TREASURY_SHARE
+                    || rf.balanceOf(address(this)) != balanceBefore + PRIZE_POOL_SHARE
+            ) revert IncorrectTreasuryFeeReceived();
+            emit EntryFeePaid(
+                runId, msg.sender, ENTRY_FEE, PRIZE_POOL_SHARE, TREASURY_SHARE, treasury
+            );
         }
 
         emit RunStarted(

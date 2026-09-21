@@ -15,6 +15,7 @@ export async function localFixture() {
   const mnemonic = 'test test test test test test test test test test test junk';
   const player = mnemonicToAccount(mnemonic, { addressIndex: 0 });
   const verifier = mnemonicToAccount(mnemonic, { addressIndex: 2 });
+  const treasury = mnemonicToAccount(mnemonic, { addressIndex: 3 });
   const verifierKey = toHex(verifier.getHdKey().privateKey!);
   const wallet = createWalletClient({ account: player, chain, transport });
   const gameArtifact = await artifact('RareRushGame');
@@ -34,9 +35,9 @@ export async function localFixture() {
   const genesis = await deploy(nftArtifact, [true]);
   const generations = await deploy(nftArtifact, [false]);
   const version = await currentEngineVersion();
-  const game = await deploy(gameArtifact, [player.address, verifier.address, rf, genesis, generations, version]);
+  const game = await deploy(gameArtifact, [player.address, verifier.address, treasury.address, rf, genesis, generations, version]);
   const read = (functionName: string, args: unknown[] = []) => client.readContract({ address: game, abi: gameArtifact.abi, functionName, args });
   const write = async (address: `0x${string}`, abi: any, functionName: string, args: unknown[] = []) => mined(await wallet.writeContract({ address, abi, functionName, args }));
   const token = await read('token') as `0x${string}`;
-  return { client, wallet, player, verifier, verifierKey, game, rf, genesis, generations, token, version, gameArtifact, rfArtifact, nftArtifact, tokenArtifact, read, write, mined };
+  return { client, wallet, player, verifier, treasury, verifierKey, game, rf, genesis, generations, token, version, gameArtifact, rfArtifact, nftArtifact, tokenArtifact, read, write, mined };
 }

@@ -7,7 +7,7 @@ import {TestnetOnly} from "./TestnetOnly.sol";
 /// @notice Valueless testnet stand-in for RAREFRIENDS, not the real token.
 /// @dev The per-address faucet is deliberately not Sybil-resistant.
 contract TestRF is ERC20, TestnetOnly {
-    uint256 public constant FAUCET_AMOUNT = 100 ether;
+    uint256 public constant FAUCET_AMOUNT = 1_100 ether;
     mapping(address => uint256) public lastFaucetDayPlusOne;
 
     error FaucetAlreadyUsed();

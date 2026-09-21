@@ -4,9 +4,9 @@ An isolated contract and verifier prototype for **test assets only**. The public
 
 ## What works
 
-- `RareRushToken`: six-decimal `tRARERUSH`, fixed lifetime cap of 200,000, minted only through its deploying game; no burn or adjustable cap.
+- `RareRushToken`: six-decimal `tRARERUSH`, fixed lifetime cap of **1,024,000,000**, minted only through its deploying game; no burn or adjustable cap.
 - `RareRushGame`: NFT-gated starts, three starts per NFT per UTC day, one active run per NFT, signed single-use claims, emergency pause, two-step ownership, verifier rotation, and owner-administered prize awards.
-- `TestRF`: a valueless `tRF` faucet, 100 per wallet per UTC day.
+- `TestRF`: a valueless `tRF` faucet, 1,100 per wallet per UTC day (ten paid test entries).
 - `TestFriends`: separate, freely mintable test Genesis and test Generations collections. These do **not** represent real Rare Friends ownership.
 - A verifier that replays the existing 120 Hz game engine, reconstructs pickups, and signs only runs that survive the timer with at least one heart. Client scores, coins, seeds, and state overrides are never accepted.
 - A local browser-wallet deployment console, CLI deployment/preflight, compiler verification input, and an end-to-end local mint demo.
@@ -40,6 +40,8 @@ Sources: [Robinhood network settings](https://docs.robinhood.com/chain/add-netwo
 
 Every contract constructor rejects chains other than `46630` and local `31337`. Deployment and signing tools independently check the actual RPC chain. The canonical mainnet NFT/RF addresses have no code at those addresses on this testnet; changing an RPC URL cannot migrate them.
 
+The [official asset/faucet check](docs/ASSET_DISCOVERY.md) found no documented Rare Friends NFT/RF faucet deployment for chain 46630 in the vibeathon, FriendSDK, or Rare Friends web repositories. SDK mock contracts are automated-test fixtures. Our faucets are explicitly Rare Rush test assets, not official Rare Friends NFTs or a mainnet ownership bridge.
+
 ## Deploy with your browser wallet
 
 From `infra/testnet/`:
@@ -54,13 +56,17 @@ Open `http://127.0.0.1:4174` in your wallet-enabled desktop browser. The console
 
 `prepare:operator` creates a dedicated verifier key in ignored `.env.testnet` with owner-only filesystem permissions and emits an ignored `operator-config.json` containing public addresses only. It reuses an existing local key and never prints it. Back up the secret securely before operating the verifier; never commit it, put it in a browser bundle, or use this test signer for assets with value. The console cannot serve the secret file. This is a local operator setup, not a hosted secrets-management system.
 
+The optional second address argument to `prepare:operator` selects the treasury; it defaults to the owner wallet for this testnet setup. The deployment page displays it before signing. The constructor fixes that address permanently, and every paid start forwards 10 tRF to it atomically. Changing game ownership does not redirect the treasury. A different treasury or revised immutable economics requires a new game deployment. Refresh the console after recompiling; if any earlier package has a pending or confirmed deployment, it preserves and blocks that progress for reconciliation instead of silently deploying again.
+
 The optional CLI `npm run deploy` performs read-only preflight. CLI broadcasting requires an explicitly configured `RUSH_DEPLOYER_PRIVATE_KEY` and `npm run deploy -- --broadcast`; there is no default public-network key. The browser route avoids exporting your wallet key. CLI deployments checkpoint each transaction into `deployments/`; inspect a partial manifest before attempting another broadcast. Explorer verification uses `artifacts/standard-input.json`, Solidity `v0.8.30+commit.73712a01`, optimization 200, Cancun, and constructor arguments from the manifest.
 
 ## Entry and reward rules
 
 | Rule | Testnet prototype |
 | --- | --- |
-| Generations entry | `1 tRF`, entirely credited to the prize pool |
+| Generations entry | **110 tRF** per run |
+| Prize-pool share | **100 tRF** retained in the game per paid start |
+| Treasury share | **10 tRF** transferred directly to the immutable treasury per paid start |
 | Genesis entry | Free |
 | Daily allowance | Three **starts**, per collection + token ID, UTC reset |
 | Easy / Normal / Degen | 120 / 90 / 60 seconds; 0.75× / 1× / 2× rewards |
@@ -68,11 +74,13 @@ The optional CLI `npm run deploy` performs read-only preflight. CLI broadcasting
 | Flying bonus coin | One pickup, 10× reward |
 | Initial ordinary Normal reward | 10 tRARERUSH |
 | Global reduction | Right-shift base reward once per 10,000 successful claimed pickups |
-| Shared cap | 200,000 tRARERUSH; final reward clips to remaining supply |
+| Shared cap | **1,024,000,000 tRARERUSH**; final reward clips to remaining supply |
 | Claim window | Run duration + 15 minutes from start |
 | Verifier receipt validity | Up to five minutes, never beyond the run's claim window |
 
-These are **test parameters**, not finalized launch economics. In particular, the Genesis boost can consume the small test supply rapidly.
+The cap matches RF's **initial** supply amount from the [official RF docs](https://rarefriends.com/docs/rarefriends). RF itself is issued initially with no later minting; tRARERUSH starts at zero and mints verified rewards, so the issuance models differ. These remain **test parameters**, not finalized launch economics.
+
+The cap is a maximum, not a promise to emit every token. The original 10-token base and 10,000-pickup halving interval remain unchanged. Even the mathematical upper bound in which every pickup earns all three maximum multipliers (2× Degen, 10× bonus, 100× Genesis) is **399,999,840 tokens** across the whole schedule; actual gameplay yields less. Reaching the full 1.024 billion would require a separately agreed emission schedule.
 
 The daily counter belongs to the NFT, so transferring it does not reset its allowance. A lost or abandoned run consumes its start and entry fee. Call `abandonRun` to clear that NFT's active slot immediately; otherwise the slot clears when its claim window expires. Only the original player, still owning the NFT, can claim. Transferring the NFT while a run is pending can therefore prevent a claim.
 
@@ -106,6 +114,6 @@ It checks the fixed chain, confirmed contract state, current NFT owner, verifier
 
 The verifier and owner are trusted operators. EIP-712 binds a receipt to chain, contract, run, player, seed/configuration, engine, ordered pickups, replay hash, deadline, and verifier epoch. The contract does **not** replay game physics. A compromised verifier, or an owner assigning a malicious verifier, can approve invented results up to the remaining cap and per-NFT entry limits. Public mock NFTs/faucets are intentionally easy to obtain and offer no Sybil resistance. Two RPC confirmations are a basic consistency delay, not finality or reorg protection by themselves.
 
-The owner can pause starts/claims/payouts and rotate the verifier; rotation invalidates all pending runs from old epochs. `abandonRun` remains available while paused. Prize awards are explicit owner transactions bounded by collected fees and unique award IDs. Direct token donations are outside pool accounting. There is no discretionary token-mint function on the game, but verifier authority remains a minting trust assumption.
+The owner can pause starts/claims/payouts and rotate the verifier; rotation invalidates all pending runs from old epochs. `abandonRun` remains available while paused. Prize awards are explicit owner transactions bounded by the **100 tRF prize share** and unique award IDs. Treasury funds have already left the game and cannot be spent by `awardPrize`. Incoming payments and the outgoing treasury transfer are checked exactly; any failure rolls back both transfers, the run and its daily attempt. Genesis starts pay neither share. Direct token donations are outside pool accounting. There is no discretionary token-mint function on the game, but verifier authority remains a minting trust assumption.
 
 Before inviting public gameplay: connect a separate testnet host to these contracts, implement wallet-authenticated/rate-limited verifier requests with durable run/replay storage, maintain a server-owned RPC and signer, and rehearse outage/rotation recovery. Real Genesis/Generations holder access requires freshly checked mainnet ownership and a carefully scoped cross-chain attestation system (or another explicit eligibility design). Do not treat the freely minted test NFTs as real-holder verification. A future token pair requires separately chosen exchange contracts and funded liquidity; deploying the reward token creates neither.

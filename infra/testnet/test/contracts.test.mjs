@@ -10,6 +10,7 @@ import {
   keccak256,
   parseEther,
   stringToHex,
+  toHex,
   zeroAddress,
   zeroHash,
 } from 'viem';
@@ -70,6 +71,29 @@ async function reverts(contract, functionName, args, account, expectedError) {
     },
     `${functionName} should revert with ${expectedError}`,
   );
+}
+
+async function revertedTransaction(contract, functionName, args, account, expectedError) {
+  await reverts(contract, functionName, args, account, expectedError);
+  // Submit with explicit gas so the node actually executes and rolls back the
+  // transaction; a rejected simulation alone cannot prove state rollback.
+  const before = await publicClient.getBlock({ blockTag: 'latest' });
+  let hash;
+  try {
+    hash = await wallet.writeContract({ ...contract, functionName, args, account, gas: 1_000_000n });
+  } catch (error) {
+    // Hardhat reports mined reverts as RPC errors. Recover that newly mined
+    // transaction from its block, then require a real failed receipt below.
+    const decoded = error.walk?.((cause) => cause?.data?.errorName)?.data?.errorName;
+    assert.equal(decoded, expectedError, error.shortMessage ?? error.message);
+    const block = await publicClient.getBlock({ blockTag: 'latest', includeTransactions: true });
+    assert.equal(block.number, before.number + 1n, 'Failure must be a mined transaction');
+    const transaction = block.transactions.find((tx) => tx.from.toLowerCase() === account.toLowerCase() && tx.to?.toLowerCase() === contract.address.toLowerCase());
+    assert.ok(transaction, 'Failed entry transaction must be present in the new block');
+    hash = transaction.hash;
+  }
+  const receipt = await publicClient.waitForTransactionReceipt({ hash });
+  assert.equal(receipt.status, 'reverted', `${functionName} must revert onchain`);
 }
 
 async function advance(seconds) {
@@ -145,16 +169,16 @@ async function finish(run, pickups = '0x00', options = {}) {
 before(async () => {
   const actualChainId = await publicClient.getChainId();
   assert.equal(actualChainId, 31337, 'Contract tests only run on the disposable local chain');
-  const [owner, , player, other] = await wallet.getAddresses();
+  const [owner, , player, other, , treasury] = await wallet.getAddresses();
   const rf = await deployed('TestRF', [], owner);
   const genesis = await deployed('TestFriends', [true], owner);
   const generations = await deployed('TestFriends', [false], owner);
-  const game = await deployed('RareRushGame', [owner, verifier.address, rf.address, genesis.address, generations.address, engineVersion], owner);
+  const game = await deployed('RareRushGame', [owner, verifier.address, treasury, rf.address, genesis.address, generations.address, engineVersion], owner);
   const token = { address: await read(game, 'token'), abi: (await artifact('RareRushToken')).abi };
-  f = { owner, player, other, rf, genesis, generations, game, token };
+  f = { owner, player, other, treasury, rf, genesis, generations, game, token };
   for (const playerAccount of [player, other]) {
     await send(rf, 'faucet', [], playerAccount);
-    await send(rf, 'approve', [game.address, parseEther('100')], playerAccount);
+    await send(rf, 'approve', [game.address, parseEther('10000')], playerAccount);
     await send(generations, 'mint', [], playerAccount);
     await send(genesis, 'mint', [], playerAccount);
   }
@@ -171,11 +195,24 @@ beforeEach(async () => {
 });
 
 describe('test economy and custody', () => {
-  it('charges Generations exactly one tRF into the prize pool and emits a reproducible run', async () => {
-    const run = await start();
-    assert.equal(await read(f.rf, 'balanceOf', [f.player]), parseEther('99'));
-    assert.equal(await read(f.rf, 'balanceOf', [f.game.address]), parseEther('1'));
-    assert.equal(await read(f.game, 'prizePoolBalance'), parseEther('1'));
+  it('charges Generations 110 tRF, sends 100 to the prize pool and 10 to the separate treasury', async () => {
+    assert.notEqual(f.treasury.toLowerCase(), f.owner.toLowerCase());
+    assert.notEqual(f.treasury.toLowerCase(), f.player.toLowerCase());
+    const receipt = await send(f.game, 'startRun', [0, 1n, 1], f.player);
+    const run = event(receipt, f.game, 'RunStarted');
+    const fee = event(receipt, f.game, 'EntryFeePaid');
+    assert.equal(fee.runId, run.runId);
+    assert.equal(fee.totalFee, parseEther('110'));
+    assert.equal(fee.prizePoolShare, parseEther('100'));
+    assert.equal(fee.treasuryShare, parseEther('10'));
+    assert.equal(fee.treasury.toLowerCase(), f.treasury.toLowerCase());
+    assert.equal(await read(f.rf, 'balanceOf', [f.player]), parseEther('990'));
+    assert.equal(await read(f.rf, 'balanceOf', [f.game.address]), parseEther('100'));
+    assert.equal(await read(f.rf, 'balanceOf', [f.treasury]), parseEther('10'));
+    assert.equal(await read(f.game, 'prizePoolBalance'), parseEther('100'));
+    assert.equal(await read(f.game, 'ENTRY_FEE'), parseEther('110'));
+    assert.equal(await read(f.game, 'PRIZE_POOL_SHARE'), parseEther('100'));
+    assert.equal(await read(f.game, 'TREASURY_SHARE'), parseEther('10'));
     assert.equal(run.player.toLowerCase(), f.player.toLowerCase());
     assert.equal(run.collection, 0);
     assert.equal(run.difficulty, 1);
@@ -191,7 +228,9 @@ describe('test economy and custody', () => {
     const result = await finish(run, '0x0001');
     assert.equal(result.reward, 22_000n * 1_000_000n);
     assert.equal(await read(f.token, 'balanceOf', [f.player]), result.reward);
-    assert.equal(await read(f.rf, 'balanceOf', [f.player]), parseEther('100'));
+    assert.equal(await read(f.rf, 'balanceOf', [f.player]), parseEther('1100'));
+    assert.equal(await read(f.rf, 'balanceOf', [f.game.address]), 0n);
+    assert.equal(await read(f.rf, 'balanceOf', [f.treasury]), 0n);
     assert.equal(await read(f.game, 'prizePoolBalance'), 0n);
     assert.equal(await read(f.token, 'decimals'), 6);
     assert.equal(await read(f.token, 'symbol'), 'tRARERUSH');
@@ -209,7 +248,10 @@ describe('test economy and custody', () => {
 
   it('halves the global reward across a pickup boundary, including inside one claim', async () => {
     for (let i = 0; i < 19; i++) {
-      if (i > 0 && i % 3 === 0) await advance(86_400);
+      if (i > 0 && i % 3 === 0) {
+        await advance(86_400);
+        await send(f.rf, 'faucet', [], f.player);
+      }
       await finish(await start(), `0x${'00'.repeat(512)}`);
     }
     assert.equal(await read(f.game, 'claimedPickups'), 9_728n);
@@ -220,14 +262,27 @@ describe('test economy and custody', () => {
   });
 
   it('clips rewards at the shared cap and never mints above it across claims', async () => {
-    const first = await finish(await start(1, 2), `0x${'01'.repeat(9)}`);
-    assert.equal(first.reward, 180_000n * 1_000_000n);
-    const second = await finish(await start(1, 2), '0x0101');
-    assert.equal(second.reward, 20_000n * 1_000_000n);
+    const cap = await read(f.token, 'CAP');
+    assert.equal(cap, 1_024_000_000n * 1_000_000n);
+    // Local-only boundary fixture: impersonate the authorized game minter to
+    // approach the cap. The halving schedule cannot reach this supply naturally.
+    // This uses the real mint guard, without altering contract storage or rates.
+    await publicClient.request({ method: 'hardhat_impersonateAccount', params: [f.game.address] });
+    await publicClient.request({ method: 'hardhat_setBalance', params: [f.game.address, toHex(parseEther('1'))] });
+    try {
+      await send(f.token, 'mint', [f.other, cap - 25_000n * 1_000_000n], f.game.address);
+    } finally {
+      await publicClient.request({ method: 'hardhat_stopImpersonatingAccount', params: [f.game.address] });
+    }
+    const first = await finish(await start(1, 2), '0x01');
+    assert.equal(first.reward, 20_000n * 1_000_000n);
+    const second = await finish(await start(1, 2), '0x01');
+    assert.equal(second.reward, 5_000n * 1_000_000n);
     const third = await finish(await start(1, 2), '0x01');
     assert.equal(third.reward, 0n);
-    assert.equal(await read(f.token, 'totalSupply'), await read(f.token, 'CAP'));
-    assert.equal(await read(f.game, 'claimedPickups'), 12n);
+    assert.equal(await read(f.token, 'totalSupply'), cap);
+    assert.equal(await read(f.token, 'balanceOf', [f.player]), 25_000n * 1_000_000n);
+    assert.equal(await read(f.game, 'claimedPickups'), 3n);
   });
 
   it('lets only the game mint and independently enforces the token cap', async () => {
@@ -236,19 +291,40 @@ describe('test economy and custody', () => {
     // A separately deployed token models the game as its deployer for this unit boundary.
     const token = await deployed('RareRushToken', [], f.owner);
     const cap = await read(token, 'CAP');
+    assert.equal(cap, 1_024_000_000n * 1_000_000n);
     await send(token, 'mint', [f.player, cap], f.owner);
     await reverts(token, 'mint', [f.player, 1n], f.owner, 'SupplyCapExceeded');
     assert.equal(await read(token, 'totalSupply'), cap);
   });
 
-  it('rejects a paid start without allowance without charging or consuming a daily attempt', async () => {
-    await send(f.rf, 'approve', [f.game.address, 0n], f.player);
-    // The underlying ERC20 custom error is decoded using its ABI as well.
-    await reverts({ ...f.game, abi: [...f.game.abi, ...f.rf.abi] }, 'startRun', [0, 1n, 1], f.player, 'ERC20InsufficientAllowance');
+  it('requires all 110 tRF of allowance and reverts without charging or consuming an attempt', async () => {
+    // Approval for the pool's 100 alone must not authorize the full entry.
+    await send(f.rf, 'approve', [f.game.address, parseEther('100')], f.player);
+    await revertedTransaction({ ...f.game, abi: [...f.game.abi, ...f.rf.abi] }, 'startRun', [0, 1n, 1], f.player, 'ERC20InsufficientAllowance');
     const key = await read(f.game, 'nftKey', [0, 1n]);
     assert.equal(await read(f.game, 'runCount'), 0n);
     assert.equal(await read(f.game, 'dailyStarts', [key, (await now()) / 86_400n]), 0n);
+    assert.equal(await read(f.game, 'activeRunByNft', [key]), 0n);
     assert.equal(await read(f.game, 'prizePoolBalance'), 0n);
+    assert.equal(await read(f.rf, 'balanceOf', [f.player]), parseEther('1100'));
+    assert.equal(await read(f.rf, 'balanceOf', [f.game.address]), 0n);
+    assert.equal(await read(f.rf, 'balanceOf', [f.treasury]), 0n);
+    assert.equal(await read(f.rf, 'allowance', [f.player, f.game.address]), parseEther('100'));
+  });
+
+  it('requires all 110 tRF of balance and leaves fee, allowance and daily accounting unchanged on failure', async () => {
+    await send(f.rf, 'transfer', [f.other, parseEther('991')], f.player);
+    await send(f.rf, 'approve', [f.game.address, parseEther('110')], f.player);
+    await revertedTransaction({ ...f.game, abi: [...f.game.abi, ...f.rf.abi] }, 'startRun', [0, 1n, 1], f.player, 'ERC20InsufficientBalance');
+    const key = await read(f.game, 'nftKey', [0, 1n]);
+    assert.equal(await read(f.game, 'runCount'), 0n);
+    assert.equal(await read(f.game, 'dailyStarts', [key, (await now()) / 86_400n]), 0n);
+    assert.equal(await read(f.game, 'activeRunByNft', [key]), 0n);
+    assert.equal(await read(f.game, 'prizePoolBalance'), 0n);
+    assert.equal(await read(f.rf, 'balanceOf', [f.player]), parseEther('109'));
+    assert.equal(await read(f.rf, 'balanceOf', [f.game.address]), 0n);
+    assert.equal(await read(f.rf, 'balanceOf', [f.treasury]), 0n);
+    assert.equal(await read(f.rf, 'allowance', [f.player, f.game.address]), parseEther('110'));
   });
 });
 
@@ -258,7 +334,7 @@ describe('NFT eligibility and run lifecycle', () => {
     await reverts(f.game, 'startRun', [1, 1n, 1], f.other, 'NotNftOwner');
     await reverts(f.game, 'startRun', [2, 1n, 1], f.player, 'InvalidCollection');
     await reverts(f.game, 'startRun', [0, 1n, 3], f.player, 'InvalidDifficulty');
-    const mismatch = await deployed('RareRushGame', [f.owner, verifier.address, f.rf.address, f.genesis.address, f.genesis.address, engineVersion], f.owner);
+    const mismatch = await deployed('RareRushGame', [f.owner, verifier.address, f.treasury, f.rf.address, f.genesis.address, f.genesis.address, engineVersion], f.owner);
     await reverts(mismatch, 'startRun', [0, 1n, 1], f.player, 'NotHardwiredGenerations');
     assert.equal(await read(f.game, 'runCount'), 0n);
   });
@@ -272,7 +348,8 @@ describe('NFT eligibility and run lifecycle', () => {
     await advance(90);
     await reverts(f.game, 'claim', await signed(run), f.player, 'RunFinalized');
     await start();
-    assert.equal(await read(f.game, 'prizePoolBalance'), parseEther('2'));
+    assert.equal(await read(f.game, 'prizePoolBalance'), parseEther('200'));
+    assert.equal(await read(f.rf, 'balanceOf', [f.treasury]), parseEther('20'));
     const key = await read(f.game, 'nftKey', [0, 1n]);
     assert.equal(await read(f.game, 'dailyStarts', [key, run.startedAt / 86_400n]), 2n);
   });
@@ -412,31 +489,39 @@ describe('administration and emergency controls', () => {
     assert.equal(await read(f.token, 'balanceOf', [f.player]), 10_000_000n);
   });
 
-  it('allows only bounded, non-replayable prize payouts by the owner', async () => {
+  it('allows bounded, non-replayable prize payouts but cannot spend the separate treasury share', async () => {
     await start();
     const award = digest('tournament-1');
-    await reverts(f.game, 'awardPrize', [award, f.other, parseEther('1')], f.player, 'OwnableUnauthorizedAccount');
-    await reverts(f.game, 'awardPrize', [award, f.other, parseEther('2')], f.owner, 'PrizePoolInsufficient');
+    await reverts(f.game, 'awardPrize', [award, f.other, parseEther('100')], f.player, 'OwnableUnauthorizedAccount');
+    await reverts(f.game, 'awardPrize', [award, f.other, parseEther('110')], f.owner, 'PrizePoolInsufficient');
     await reverts(f.game, 'awardPrize', [zeroHash, f.other, 1n], f.owner, 'InvalidAward');
     await reverts(f.game, 'awardPrize', [award, zeroAddress, 1n], f.owner, 'InvalidAward');
     await reverts(f.game, 'awardPrize', [award, f.game.address, 1n], f.owner, 'InvalidAward');
     await reverts(f.game, 'awardPrize', [award, f.other, 0n], f.owner, 'InvalidAward');
-    const receipt = await send(f.game, 'awardPrize', [award, f.other, parseEther('0.6')], f.owner);
-    assert.equal(event(receipt, f.game, 'PrizeAwarded').amount, parseEther('0.6'));
-    assert.equal(await read(f.rf, 'balanceOf', [f.other]), parseEther('100.6'));
-    assert.equal(await read(f.rf, 'balanceOf', [f.game.address]), parseEther('0.4'));
-    assert.equal(await read(f.game, 'prizePoolBalance'), parseEther('0.4'));
+    const receipt = await send(f.game, 'awardPrize', [award, f.other, parseEther('60')], f.owner);
+    assert.equal(event(receipt, f.game, 'PrizeAwarded').amount, parseEther('60'));
+    assert.equal(await read(f.rf, 'balanceOf', [f.other]), parseEther('1160'));
+    assert.equal(await read(f.rf, 'balanceOf', [f.game.address]), parseEther('40'));
+    assert.equal(await read(f.game, 'prizePoolBalance'), parseEther('40'));
+    assert.equal(await read(f.rf, 'balanceOf', [f.treasury]), parseEther('10'));
+    await reverts(f.game, 'awardPrize', [digest('overdraw-after-payout'), f.other, parseEther('41')], f.owner, 'PrizePoolInsufficient');
     await reverts(f.game, 'awardPrize', [award, f.other, 1n], f.owner, 'InvalidAward');
     assert.equal(await read(f.game, 'prizeAwards', [award]), true);
   });
 
-  it('requires two steps for ownership transfer', async () => {
+  it('requires two steps for ownership transfer and keeps the treasury destination immutable', async () => {
     await send(f.game, 'transferOwnership', [f.other], f.owner);
     assert.equal((await read(f.game, 'owner')).toLowerCase(), f.owner.toLowerCase());
     await reverts(f.game, 'acceptOwnership', [], f.player, 'OwnableUnauthorizedAccount');
     await send(f.game, 'acceptOwnership', [], f.other);
     await reverts(f.game, 'pause', [], f.owner, 'OwnableUnauthorizedAccount');
     await send(f.game, 'pause', [], f.other);
+    await send(f.game, 'unpause', [], f.other);
+    assert.equal((await read(f.game, 'treasury')).toLowerCase(), f.treasury.toLowerCase());
+    await start();
+    assert.equal(await read(f.rf, 'balanceOf', [f.treasury]), parseEther('10'));
+    assert.equal(await read(f.rf, 'balanceOf', [f.owner]), 0n);
+    assert.equal(await read(f.rf, 'balanceOf', [f.other]), parseEther('1100'));
   });
 
   it('keeps the tRF faucet limited to one claim per address per UTC day', async () => {
@@ -444,6 +529,6 @@ describe('administration and emergency controls', () => {
     await reverts(f.rf, 'faucet', [], f.player, 'FaucetAlreadyUsed');
     await advance(86_400);
     await send(f.rf, 'faucet', [], f.player);
-    assert.equal(await read(f.rf, 'balanceOf', [f.player]), parseEther('300'));
+    assert.equal(await read(f.rf, 'balanceOf', [f.player]), parseEther('3300'));
   });
 });

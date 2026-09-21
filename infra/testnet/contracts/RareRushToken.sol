@@ -7,7 +7,7 @@ import {TestnetOnly} from "./TestnetOnly.sol";
 /// @notice Testnet reward token. Only its deploying game can mint, up to the fixed cap.
 /// @dev No owner minting, supply-cap changes, burns, or production-chain deployment.
 contract RareRushToken is ERC20, TestnetOnly {
-    uint256 public constant CAP = 200_000 * 1e6;
+    uint256 public constant CAP = 1_024_000_000 * 1e6;
     address public immutable game;
 
     error OnlyGame();

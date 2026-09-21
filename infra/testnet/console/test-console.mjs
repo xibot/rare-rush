@@ -15,14 +15,15 @@ const blockHash = '0x' + 'b'.repeat(64);
 const browser = await chromium.launch({ headless: true });
 let count = 0;
 async function scenario(mode, run, rpcChain = '0xb626') {
+  const deploymentMode = ['success', 'wrong-treasury', 'wrong-cap', 'wrong-split'].includes(mode);
   const context = await browser.newContext({ viewport: { width: 390, height: 844 } });
   const page = await context.newPage();
   const errors = []; page.on('pageerror', error => errors.push(error.message));
   await page.route('https://rpc.testnet.chain.robinhood.com/**', async route => {
     const body = route.request().postDataJSON();
-    const transactions = mode === 'success' ? await page.evaluate(() => window.__transactions ?? []) : [];
+    const transactions = deploymentMode ? await page.evaluate(() => window.__transactions ?? []) : [];
     const resultFor = request => {
-      if (mode === 'success') {
+      if (deploymentMode) {
         const index = transactions.findIndex(value => value.hash === request.params?.[0]);
         if (request.method === 'eth_blockNumber') return '0x64';
         if (request.method === 'eth_getCode') return '0x60006000f3';
@@ -39,8 +40,12 @@ async function scenario(mode, run, rpcChain = '0xb626') {
         if (request.method === 'eth_call') {
           const call = request.params[0], abi = call.to.toLowerCase() === addressFor(4) ? tokenArtifact.abi : gameArtifact.abi;
           const { functionName } = decodeFunctionData({ abi, data: call.data });
-          const values = { owner, verifier: deploymentConfig.verifier, engineVersion: deploymentConfig.engineVersion,
+          const values = { owner, treasury: deploymentConfig.treasury, verifier: deploymentConfig.verifier, engineVersion: deploymentConfig.engineVersion,
+            ENTRY_FEE: 110n * 10n ** 18n, PRIZE_POOL_SHARE: 100n * 10n ** 18n, TREASURY_SHARE: 10n * 10n ** 18n, CAP: 1_024_000_000n * 1_000_000n,
             token: addressFor(4), rf: addressFor(0), genesis: addressFor(1), generations: addressFor(2), game: addressFor(3) };
+          if (mode === 'wrong-treasury') values.treasury = addressFor(9);
+          if (mode === 'wrong-cap') values.CAP = 200_000n * 1_000_000n;
+          if (mode === 'wrong-split') values.PRIZE_POOL_SHARE = 110n * 10n ** 18n;
           return encodeFunctionResult({ abi, functionName, result: values[functionName] });
         }
       }
@@ -48,7 +53,7 @@ async function scenario(mode, run, rpcChain = '0xb626') {
     };
     const respond = request => ({ jsonrpc: '2.0', id: request.id,
       ...(request.method === 'eth_getTransactionReceipt'
-        && mode !== 'success'
+        && !deploymentMode
         ? { error: { code: -32000, message: 'Transaction receipt not found' } }
         : { result: resultFor(request) }) });
     await route.fulfill({ contentType: 'application/json', body: JSON.stringify(Array.isArray(body) ? body.map(respond) : respond(body)) });
@@ -69,7 +74,7 @@ async function scenario(mode, run, rpcChain = '0xb626') {
         if (method === 'eth_chainId') return window.__walletChain;
         if (method === 'wallet_switchEthereumChain') { window.__walletChain = '0xb626'; return null; }
         if (method === 'eth_sendTransaction') {
-          if (window.__walletMode === 'success') {
+          if (['success', 'wrong-treasury', 'wrong-cap', 'wrong-split'].includes(window.__walletMode)) {
             const hash = '0x' + (window.__transactions.length + 1).toString(16).padStart(64, '0');
             window.__transactions.push({ hash, data: params[0].data }); return hash;
           }
@@ -107,7 +112,7 @@ try {
     req.on('error', reject); req.end();
   }), 403);
   const config = await (await fetch(base + '/config.json')).json();
-  assert.deepEqual(Object.keys(config).sort(), ['chainId', 'engineVersion', 'owner', 'verifier']);
+  assert.deepEqual(Object.keys(config).sort(), ['chainId', 'engineVersion', 'owner', 'treasury', 'verifier']);
   count++;
   await scenario('declined-connect', async page => {
     await page.waitForFunction(() => !document.getElementById('connect').disabled);
@@ -161,10 +166,22 @@ try {
     await page.waitForFunction(() => !document.getElementById('connect').disabled);
     await page.evaluate(() => {
       const key = Object.keys(localStorage)[0], state = JSON.parse(localStorage.getItem(key));
+      state.deployments.rf = { status: 'pending', hash: '0x' + 'a'.repeat(64) };
       state.fingerprint = 'old-artifact'; localStorage.setItem(key, JSON.stringify(state));
     });
-    await page.reload(); await page.waitForFunction(() => document.getElementById('wallet-status').textContent.includes('compiled contracts changed'));
+    await page.reload(); await page.waitForFunction(() => document.getElementById('wallet-status').textContent.includes('compiled contracts or treasury changed'));
     assert.equal(await page.getByRole('button', { name: 'CONNECT WALLET ↗', exact: true }).isDisabled(), true);
+  });
+  await scenario('empty-package-refresh', async page => {
+    await page.waitForFunction(() => !document.getElementById('connect').disabled);
+    await page.evaluate(() => {
+      const key = Object.keys(localStorage)[0], state = JSON.parse(localStorage.getItem(key));
+      state.fingerprint = 'old-artifact'; localStorage.setItem(key, JSON.stringify(state));
+    });
+    await page.reload();
+    await page.waitForFunction(() => !document.getElementById('connect').disabled);
+    assert.deepEqual(await page.evaluate(() => window.__walletCalls), [], 'An untouched older console can update without sending anything');
+    assert.equal(await page.locator('#treasury').textContent(), deploymentConfig.treasury);
   });
   await scenario('wrong-rpc', async page => {
     await page.waitForFunction(() => document.getElementById('wallet-status').textContent.includes('wrong chain'));
@@ -185,7 +202,21 @@ try {
     assert.equal(manifest.chainId, 46630);
     assert.equal(manifest.game.toLowerCase(), addressFor(3));
     assert.equal(manifest.token.toLowerCase(), addressFor(4));
+    assert.equal(manifest.treasury, deploymentConfig.treasury);
+    assert.deepEqual(manifest.economics, { rewardCap: '1024000000', generationsEntry: '110', prizePoolShare: '100', treasuryShare: '10', rfDecimals: 18, rewardDecimals: 6 });
     assert.equal(Object.keys(manifest.deployments).length, 4);
   });
+  for (const [mode, error] of [['wrong-treasury', 'configuration does not match'], ['wrong-cap', 'cap does not match'], ['wrong-split', 'split does not match']]) {
+    await scenario(mode, async page => {
+      await connected(page);
+      for (const title of ['TEST RF', 'TEST GENESIS', 'TEST GENERATIONS', 'RARE RUSH GAME + TOKEN']) {
+        await page.getByRole('button', { name: `DEPLOY ${title} ↗`, exact: true }).click();
+        await page.waitForFunction(() => !document.getElementById('refresh').disabled);
+      }
+      await page.waitForFunction(text => document.getElementById('wallet-status').textContent.includes(text), error);
+      assert.equal(await page.getByRole('button', { name: 'DOWNLOAD MANIFEST ↓', exact: true }).isDisabled(), true, 'Mismatched deployment must not export as verified');
+      assert.equal((await page.evaluate(() => window.__walletCalls)).filter(value => value === 'eth_sendTransaction').length, 4);
+    });
+  }
   console.log(`PASS ${count} console safety/browser scenarios. Wallet and chain RPC calls were mocked; no transactions sent.`);
 } finally { await browser.close(); }
