@@ -1,7 +1,7 @@
 # Validation — September 20, 2026
 
 - `npm run typecheck:rush`: passed. This scoped check keeps Rare Rush separate from other games being developed in this shared workspace.
-- `npm run test:rush`: 81 tests passed (38 engine, 30 economy, 13 Genesis identity).
+- `npm run test:rush`: 83 tests passed (38 engine, 30 economy, 15 Genesis identity).
 - `npm run check`: FriendSDK game boundary and definition validation passed. Reported chance-game rewards are unused compatibility values, not runner emissions.
 - `npm run build`: passed; complete static output is in `dist/`.
 - `npm run test:browser`: Normal passed at 1100×820, 390×844 and 360×640; Easy passed at 390×844 and Degen at 360×640. Every case checks all selector options before starting its chosen mode.
@@ -52,3 +52,18 @@ The local game server listens at port 4173. The test browser was installed under
 - `npm run test:pitch`: passed at 1440×1000, 768×1024, 390×844 and 360×640. Checks cover visible navigation from home, docs and arcade; bundled Silkscreen; no horizontal overflow; BY XIBOT; real autoplay pickups; manual Friend changes; pause/resume; offscreen suspension; and play links through the collection selector to the real SDK ownership gate. No browser errors, failed assets or external requests occurred in these cases.
 - Reduced motion starts the preview paused and allows explicit opt-in. `/pitch` redirects to `/pitch/`; generated pitch assets are served while source, environment and package files remain unavailable.
 - Desktop and small-phone screenshots were visually inspected. The pitch reuses canonical Rare Friends artwork and the existing game preview. Current local demo accounting is distinguished from planned minting, run validation, liquidity and prize payouts.
+
+## Public source review
+
+- Before making the GitHub repository public, reviewed all five commits, 101 unique history blobs and the 230-file SDK archive for credentials or unintended private data. No real credentials, private keys, auth files or personal wallet data were found. High-entropy matches were dependency integrity hashes and public development fixtures.
+- SDK and font licenses/notices remain bundled. Canonical artwork sources and Rare Friends ownership credits remain distinct from XIBOT’s original game code.
+- The Git author contact was already visible on the builder’s public GitHub profile. There were no workflow runs, wiki, issues or forks exposed by the visibility change.
+
+## Collection entry and artwork cards
+
+- The shared canonical bear-token favicon is served at `/favicon.svg` and linked from landing, docs, pitch, collection choice, Genesis and the SDK host.
+- `npm run test:entry`: passed at 1440×1000, 390×844 and 360×640. The Generations entry matches the Genesis branding, and Back sits to the left of Connect wallet. Keyboard return to collection choice, no-wallet entry, refused connection, disconnect/reconnect, real canonical sprite previews, fresh SDK ownership verification, sandbox flags and opening/closing both selector and wallet menus passed. Decorative page chrome is removed when gameplay resumes.
+- `npm run test:genesis`: passed all three viewport cases and existing ownership-transfer, wallet-race, network, disconnect, delayed-read, failure and direct-entry cases. Picker cards display the original canonical portrait before selection; artwork reads do not grant entry or replace the fresh ownership check.
+- Thumbnail queues, deadlines and caches are bounded; a slow or unavailable preview leaves the Friend selectable. Genesis caches are scoped to the wallet revision, and Generations only decorates the SDK’s currently listed owned Friends. Unit tests explicitly reject active SVG metadata and establish that a public portrait cannot authorize entry.
+- TypeScript, all 83 unit tests and FriendSDK validation passed. Desktop Generations and small-phone Generations/Genesis picker screenshots were visually inspected.
+- Landing, docs and pitch browser suites passed again after updating their wallet-gate checks to the new visible connection controls.

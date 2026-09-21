@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import { zeroAddress, type Address } from 'viem';
-import { GENESIS_DEPLOYMENT, readOwnedGenesis, readGenesisEligibility, readGenesisIdentity, type GenesisClient } from '../games/rare-rush/genesis/identity.ts';
+import { GENESIS_DEPLOYMENT, readOwnedGenesis, readGenesisEligibility, readGenesisIdentity, readGenesisPortrait, type GenesisClient } from '../games/rare-rush/genesis/identity.ts';
 
 const ACCOUNT = '0x1111111111111111111111111111111111111111' as Address;
 const OTHER = '0x2222222222222222222222222222222222222222' as Address;
@@ -142,6 +142,23 @@ test('identity preserves canonical SVG, uses a trusted label, and serializes wit
   assert.equal(result.blockNumber, '99');
   assert.doesNotThrow(() => JSON.stringify(result));
   assert.ok(calls.findIndex(call => call.name === 'ownerOf') < calls.findIndex(call => call.name === 'tokenURI'));
+});
+
+test('picker portraits are public pinned-block artwork, never ownership authorization', async () => {
+  const { client, calls } = mock({ owner: OTHER });
+  assert.equal(await readGenesisPortrait(client, 1n), IMAGE);
+  assert.deepEqual(calls.map(call => call.name), ['getChainId', 'getBlockNumber', 'tokenURI', 'getChainId']);
+  // Successfully previewing art must not let the connected account enter with someone else's NFT.
+  await assert.rejects(readGenesisIdentity(client, 1n, ACCOUNT), /no longer owned/);
+});
+
+test('picker artwork rejects active SVG and discards a cancelled metadata result', async () => {
+  const activeImage = data('image/svg+xml', '<svg xmlns="http://www.w3.org/2000/svg" onload="alert(1)"></svg>');
+  await assert.rejects(readGenesisPortrait(mock({ uri: uriFor(activeImage) }).client, 1n), /supported static portrait/);
+  const controller = new AbortController();
+  const during = mock({ onRead(name) { if (name === 'tokenURI') controller.abort(); } });
+  await assert.rejects(readGenesisPortrait(during.client, 1n, { signal: controller.signal }), { name: 'AbortError' });
+  assert.equal(during.calls.filter(call => call.name === 'getChainId').length, 1);
 });
 
 test('rejects malformed metadata and noncanonical or active image payloads', async () => {

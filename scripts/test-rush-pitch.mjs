@@ -68,7 +68,7 @@ try {
     assert.equal(await page.locator('.collection-cards a[href="/genesis/"]').count(), 1);
     await page.locator('.collection-cards a[href="/play/"]').click();
     await page.waitForURL(`${origin}/play/`);
-    await page.locator('.rf-runtime-status').waitFor();
+    await page.getByRole('button', { name: 'Check for wallet', exact: true }).waitFor();
     assert.equal(await page.locator('iframe').count(), 0, 'Pitch CTA preserves the real SDK ownership gate');
     assert.deepEqual(errors, []); assert.deepEqual(external, []); assert.deepEqual(failures, []);
     await page.close();

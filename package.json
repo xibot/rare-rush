@@ -17,7 +17,8 @@
     "test:docs": "node scripts/test-rush-docs.mjs",
     "test:pitch": "node scripts/test-rush-pitch.mjs",
     "test:genesis": "node scripts/test-rush-genesis.mjs",
-    "test:bonus": "node scripts/test-rush-bonus.mjs"
+    "test:bonus": "node scripts/test-rush-bonus.mjs",
+    "test:entry": "node scripts/test-rush-entry.mjs"
   },
   "dependencies": {
     "@rarefriends/friendsdk": "file:rarefriends-friendsdk-0.1.2.tgz",

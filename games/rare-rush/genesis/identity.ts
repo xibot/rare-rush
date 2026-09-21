@@ -189,6 +189,20 @@ function readImage(uri: unknown): string {
   return image as string;
 }
 
+/** Read-only picker artwork. A portrait is never proof of ownership or permission to play. */
+export function readGenesisPortrait(client: GenesisClient, id: bigint, options: ReadOptions = {}): Promise<string> {
+  return safeRead(options, async () => {
+    validateId(id);
+    const blockNumber = await freshBlock(client, options);
+    const uri = await client.readContract({ address: GENESIS_DEPLOYMENT.contract, abi: ABI,
+      functionName: 'tokenURI', args: [id], blockNumber });
+    active(options);
+    const image = readImage(uri);
+    await checkChain(client, options);
+    return image;
+  });
+}
+
 /** Owner and art are read at one fresh block. This serializable result contains no wallet authority. */
 export function readGenesisIdentity(client: GenesisClient, id: bigint, account: Address, options: ReadOptions = {}): Promise<GenesisIdentity> {
   return safeRead(options, async () => {

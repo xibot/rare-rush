@@ -16,14 +16,20 @@ export async function buildRushSite({ outdir = path.join(project, 'dist'), watch
   const game = await buildGame(path.join(project, 'games/rare-rush'), { outdir: path.join(outdir, 'play'), watch });
   let page;
   try {
+    // Add site chrome to the SDK host without changing its runtime or sandbox document.
+    const gameHostPath = path.join(outdir, 'play/index.html');
+    const gameHostHTML = await readFile(gameHostPath, 'utf8');
+    if (!gameHostHTML.includes('</head>')) throw new Error('The SDK host HTML has no head for site chrome.');
+    await writeFile(gameHostPath, gameHostHTML.replace('</head>', '<link rel="icon" type="image/svg+xml" sizes="any" href="/favicon.svg"><script type="module" src="/host-navigation.js"></script></head>'));
     page = await context({
-      absWorkingDir: project, entryPoints: { landing: path.join(landing, 'index.tsx'), 'docs/index': path.join(landing, '../docs/index.tsx'), 'pitch/index': path.join(landing, '../pitch/index.tsx'), 'genesis/index': path.join(landing, '../genesis/index.tsx'), 'genesis/child': path.join(landing, '../genesis/child.tsx') }, outdir,
+      absWorkingDir: project, entryPoints: { landing: path.join(landing, 'index.tsx'), 'host-navigation': path.join(landing, '../host-navigation.ts'), 'docs/index': path.join(landing, '../docs/index.tsx'), 'pitch/index': path.join(landing, '../pitch/index.tsx'), 'genesis/index': path.join(landing, '../genesis/index.tsx'), 'genesis/child': path.join(landing, '../genesis/child.tsx') }, outdir,
       bundle: true, platform: 'browser', format: 'esm', target: 'es2022', jsx: 'automatic', minify: true,
       loader: { '.woff2': 'file' }, assetNames: 'assets/[name]-[hash]', metafile: true,
       define: { 'process.env.NODE_ENV': '"production"' }, logLevel: 'warning',
       plugins: [{ name: 'landing-html', setup(build) {
         build.onEnd(async result => {
           if (result.errors.length) return;
+          await writeFile(path.join(outdir, 'favicon.svg'), await readFile(path.join(landing, '../assets/favicon.svg')));
           await writeFile(path.join(outdir, 'index.html'), await readFile(path.join(landing, 'index.html')));
           await mkdir(path.join(outdir, 'docs'), { recursive: true });
           await writeFile(path.join(outdir, 'docs/index.html'), await readFile(path.join(landing, '../docs/index.html')));
@@ -60,6 +66,8 @@ export function createRushSiteServer(outdir) {
   const publicFiles = new Map([
     ['/', ['index.html', 'text/html; charset=utf-8']],
     ['/index.html', ['index.html', 'text/html; charset=utf-8']],
+    ['/favicon.svg', ['favicon.svg', 'image/svg+xml']],
+    ['/host-navigation.js', ['host-navigation.js', 'text/javascript; charset=utf-8']],
     ['/landing.js', ['landing.js', 'text/javascript; charset=utf-8']],
     ['/landing.css', ['landing.css', 'text/css; charset=utf-8']],
     ['/docs/', ['docs/index.html', 'text/html; charset=utf-8']],

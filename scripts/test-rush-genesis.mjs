@@ -96,7 +96,13 @@ try {
     assert.equal(await page.locator('body').evaluate(el => el.scrollWidth > innerWidth), false);
     await page.screenshot({ path: `artifacts/genesis-${width}-collections.png`, fullPage: true });
     await page.getByRole('link', { name: /PLAY GENESIS/ }).click();
-    await page.getByRole('button', { name: /Genesis #1 FREE ENTRY/ }).waitFor();
+    const friendCard = page.getByRole('button', { name: /Genesis #1 FREE ENTRY/ });
+    await friendCard.waitFor();
+    await friendCard.scrollIntoViewIfNeeded();
+    await friendCard.locator('.genesis-portrait img').waitFor();
+    assert.equal(await friendCard.locator('img').getAttribute('src'), portrait, 'Picker displays the original canonical Genesis portrait');
+    await page.waitForFunction(() => { const image = document.querySelector('.genesis-portrait img'); return image?.complete && image.naturalWidth > 0; });
+    assert.equal(await friendCard.isEnabled(), true, 'Preview artwork does not disable Friend selection');
     await page.screenshot({ path: `artifacts/genesis-${width}-picker.png`, fullPage: true });
     await page.getByRole('button', { name: /Genesis #1 FREE ENTRY/ }).click();
     await game.getByRole('button', { name: /LET’S RUSH/ }).waitFor();

@@ -97,7 +97,7 @@ try {
     assert.equal(await page.locator('.collection-cards a[href="/genesis/"]').count(), 1, 'Guide offers the Genesis tester route');
     await page.locator('.collection-cards a[href="/play/"]').click();
     await page.waitForURL(`${origin}/play/`);
-    await page.locator('.rf-runtime-status').waitFor();
+    await page.getByRole('button', { name: 'Check for wallet', exact: true }).waitFor();
     assert.equal(await page.locator('iframe').count(), 0, 'Guide CTA reaches real ownership gate');
     await page.close();
     console.log(`${width}px: navigation, fonts, layout, growth, reward curve, shared difficulty, FAQ, collection choice and SDK entry passed`);

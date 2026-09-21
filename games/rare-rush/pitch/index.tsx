@@ -87,7 +87,7 @@ function Pitch() {
       <section className="pitch-endcap" aria-labelledby="endcap-title"><span className="pitch-kicker">05 / LESS PITCH. MORE PLAY.</span><Coin size={90}/><h2 id="endcap-title">ONE FRIEND.<br/><em>ONE MORE RUN.</em></h2><p>Give your Rare Friend a minute in the spotlight.<br/>See how far you can take it.</p><div className="pitch-final-actions"><a className="pitch-button" href="/arcade/">PLAY RARE RUSH <span aria-hidden="true">↗</span></a><a className="pitch-text-link" href="/docs/">EXPLORE RARE RUSH 101 ↗</a></div><small>Choose Genesis or Generations. On mobile, open the arcade in your wallet’s browser.</small></section>
     </main>
 
-    <footer className="pitch-footer"><div><b>RARE RUSH / BY XIBOT</b><span>A PLAYABLE VIBEATHON BUILD</span></div><div><a href="https://github.com/spokesz/friendsdk">BUILT WITH FRIENDSDK ↗</a><a href="https://rarefriends.com/">ART & WORLD BY RARE FRIENDS ↗</a><a href="#top">BACK TO TOP ↑</a></div></footer>
+    <footer className="pitch-footer"><div><b>RARE RUSH / BY XIBOT</b><span>A PLAYABLE VIBEATHON BUILD</span></div><div><a href="https://github.com/xibot/rare-rush">EXPLORE THE SOURCE ↗</a><a href="https://github.com/spokesz/friendsdk">BUILT WITH FRIENDSDK ↗</a><a href="https://rarefriends.com/">ART & WORLD BY RARE FRIENDS ↗</a><a href="#top">BACK TO TOP ↑</a></div></footer>
   </div>;
 }
 

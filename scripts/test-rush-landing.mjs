@@ -90,8 +90,8 @@ try {
     assert.equal(await page.locator('.collection-cards a[href="/play/"]').count(), 1, 'Collection choice preserves Generations SDK entry');
     await page.locator('.collection-cards a[href="/play/"]').click();
     await page.waitForURL(`${origin}/play/`);
-    await page.locator('.rf-runtime-status').waitFor();
-    assert.match(await page.locator('.rf-runtime-status').innerText(), /wallet/i, 'Play CTA reaches the real SDK wallet gate');
+    await page.getByRole('button', { name: 'Check for wallet', exact: true }).waitFor();
+    assert.match(await page.locator('.rf-runtime-connection').innerText(), /wallet/i, 'Play CTA reaches the real SDK wallet gate');
     assert.equal(await page.locator('iframe').count(), 0, 'No game is admitted without wallet eligibility');
     assert.deepEqual(errors, [], 'No uncaught browser errors');
     await page.close();

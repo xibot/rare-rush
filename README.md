@@ -1,6 +1,6 @@
 # Rare Rush
 
-By XIBOT · [Private source repository](https://github.com/xibot/rare-rush)
+By XIBOT · [Public source repository](https://github.com/xibot/rare-rush)
 
 A retro SVG arcade runner **by XIBOT**, using canonical Rare Friends artwork. A public landing page shows a random Friend jumping, sliding and growing through an autoplay run. Choose Easy (120s), Normal (90s) or Degen (60s), with tougher obstacles, more scattered coins and higher demo rewards in harder modes. Surprise bear coins fly in at double size for 10× the current mode's demo coin reward, within the shared emission cap.
 
@@ -9,7 +9,7 @@ npm ci
 npm run dev
 ```
 
-Open http://localhost:4173 for the landing page and wallet-free autoplay preview. The play button opens http://localhost:4173/arcade/ to choose a collection. Genesis holders use `/genesis/` with fresh ownership checks and their original artwork; eligible hardwired Generations holders (generation ≥1) use the unchanged FriendSDK route at `/play/`. Both need a browser wallet on Robinhood mainnet (4663). Phone controls are built in; open https://rarerush.app in your wallet’s browser for HTTPS wallet play.
+Open http://localhost:4173 for the landing page and wallet-free autoplay preview. The play button opens http://localhost:4173/arcade/ to choose a collection. Genesis holders use `/genesis/` with fresh ownership checks and their original artwork; eligible hardwired Generations holders (generation ≥1) use the unchanged FriendSDK route at `/play/`. Both need a browser wallet on Robinhood mainnet (4663). Their matching entry pages show original artwork on Friend selection cards, and Generations includes a Back control beside the wallet actions. Phone controls are built in; open https://rarerush.app in your wallet’s browser for HTTPS wallet play.
 
 The visual [Rare Rush pitch](https://rarerush.app/pitch/) introduces the playable character experience, its game loop, the current demo economy and the planned token integrations. It includes a wallet-free autoplay run and links directly to the arcade.
 
@@ -19,9 +19,9 @@ The public [Rare Rush 101 guide](https://rarerush.app/docs/) explains controls, 
 
 See [game instructions and exact rules](games/rare-rush/README.md), [economy design](docs/ECONOMY.md), and [submission draft](docs/SUBMISSION.md).
 
-Run `npm run typecheck:rush`, `npm run test:rush`, `npm run check`, `npm run build`, `npm run test:browser`, `npm run test:landing`, `npm run test:docs`, `npm run test:pitch`, `npm run test:genesis`, and `npm run test:bonus` to validate Rare Rush. The unmodified FriendSDK v0.1.2 package is included for reproducibility. `dist/` is the static hosting output, with the landing page at its root, the public guide in `docs/`, the judge-facing pitch in `pitch/`, collection choice in `arcade/`, the Genesis tester host in `genesis/`, and the SDK game inside `play/`.
+Run `npm run typecheck:rush`, `npm run test:rush`, `npm run check`, `npm run build`, `npm run test:browser`, `npm run test:landing`, `npm run test:docs`, `npm run test:pitch`, `npm run test:entry`, `npm run test:genesis`, and `npm run test:bonus` to validate Rare Rush. The unmodified FriendSDK v0.1.2 package is included for reproducibility. `dist/` is the static hosting output, with the landing page at its root, the public guide in `docs/`, the judge-facing pitch in `pitch/`, collection choice in `arcade/`, the Genesis tester host in `genesis/`, and the SDK game inside `play/`.
 
-The vibeathon submission remains a draft until the builder is happy with the playtest.
+The vibeathon submission remains a draft. Publishing the site and source does not submit the entry.
 
 ## Deployment
 

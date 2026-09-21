@@ -59,6 +59,7 @@ npm run test:browser
 npm run test:landing
 npm run test:docs
 npm run test:pitch
+npm run test:entry
 npm run test:genesis
 npm run test:bonus
 ```
