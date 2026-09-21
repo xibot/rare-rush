@@ -1,0 +1,6 @@
+node_modules
+dist
+artifacts
+.git
+.env*
+games/*/.friendsdk

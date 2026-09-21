@@ -1,0 +1,8 @@
+node_modules/
+dist/
+games/*/.friendsdk/
+artifacts/
+.vercel/
+.DS_Store
+.env*
+!.env.example
