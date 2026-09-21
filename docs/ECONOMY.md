@@ -53,6 +53,8 @@ Changing a scenario resets the player's earned token balance, restores the 100 s
 
 The initial entry proposal for **Genesis holders is free play**, but the present SDK ownership gate requires a hardwired Generations NFT, generation 1 or higher, on Robinhood mainnet (chain 4663), including previews. Genesis-only access and fee exemptions require a separate verified entitlement integration. This prototype implements the Generations demo entry fee only. See the [SDK identity and economy API](https://github.com/spokesz/friendsdk/blob/main/API.md).
 
+The proposed Genesis reward boost is **100× tokens per collected coin**, stacked with difficulty and the 10× flying bonus, then limited to the remaining shared issuance cap. It does not multiply physical pickups, growth, or arcade score. At the launch rate on Normal, that would mean 1,000 tokens for an ordinary coin or 10,000 for a flying bonus. This boost and Genesis gameplay access are not active in the arcade. The public `/docs/` calculator illustrates the proposal separately from the existing Generations demo. A 100× boost materially accelerates cap exhaustion, so the final supply and emission schedule need to be evaluated together before production.
+
 ## Future real token integration
 
 The intended token would pair with RAREFRIENDS through separately funded liquidity. A pairing is not automatic backing, guaranteed redemption, or a guaranteed exchange rate. No pair, liquidity deposit, token contract, or trading feature is implemented here.

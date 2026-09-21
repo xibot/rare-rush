@@ -17,7 +17,7 @@ export async function buildRushSite({ outdir = path.join(project, 'dist'), watch
   let page;
   try {
     page = await context({
-      absWorkingDir: project, entryPoints: [path.join(landing, 'index.tsx')], outfile: path.join(outdir, 'landing.js'),
+      absWorkingDir: project, entryPoints: { landing: path.join(landing, 'index.tsx'), 'docs/index': path.join(landing, '../docs/index.tsx') }, outdir,
       bundle: true, platform: 'browser', format: 'esm', target: 'es2022', jsx: 'automatic', minify: true,
       loader: { '.woff2': 'file' }, assetNames: 'assets/[name]-[hash]', metafile: true,
       define: { 'process.env.NODE_ENV': '"production"' }, logLevel: 'warning',
@@ -25,6 +25,8 @@ export async function buildRushSite({ outdir = path.join(project, 'dist'), watch
         build.onEnd(async result => {
           if (result.errors.length) return;
           await writeFile(path.join(outdir, 'index.html'), await readFile(path.join(landing, 'index.html')));
+          await mkdir(path.join(outdir, 'docs'), { recursive: true });
+          await writeFile(path.join(outdir, 'docs/index.html'), await readFile(path.join(landing, '../docs/index.html')));
           const fonts = Object.keys(result.metafile.outputs).map(file => path.relative(outdir, path.resolve(project, file)).split(path.sep).join('/')).filter(file => /^assets\/[\w-]+-[A-Z0-9]{8}\.woff2$/.test(file));
           await writeFile(path.join(outdir, '.rush-site-fonts.json'), JSON.stringify(fonts));
           const licenses = await Promise.all(['SILKSCREEN-OFL.txt', 'ARCHIVO-OFL.txt', 'SOMETYPE-MONO-OFL.txt'].map(file => readFile(path.join(landing, '../assets/fonts', file), 'utf8')));
@@ -43,7 +45,7 @@ export async function buildRushSite({ outdir = path.join(project, 'dist'), watch
   } catch (error) { await page?.dispose(); await game.close(); throw error; }
 }
 
-/** Only landing outputs and the SDK's own allowlisted game outputs are served. */
+/** Only public site outputs and the SDK's own allowlisted game outputs are served. */
 export function createRushSiteServer(outdir) {
   const directory = path.resolve(outdir);
   const gameServer = createGameServer(path.join(directory, 'play'));
@@ -52,6 +54,10 @@ export function createRushSiteServer(outdir) {
     ['/index.html', ['index.html', 'text/html; charset=utf-8']],
     ['/landing.js', ['landing.js', 'text/javascript; charset=utf-8']],
     ['/landing.css', ['landing.css', 'text/css; charset=utf-8']],
+    ['/docs/', ['docs/index.html', 'text/html; charset=utf-8']],
+    ['/docs/index.html', ['docs/index.html', 'text/html; charset=utf-8']],
+    ['/docs/index.js', ['docs/index.js', 'text/javascript; charset=utf-8']],
+    ['/docs/index.css', ['docs/index.css', 'text/css; charset=utf-8']],
     ['/font-licenses.txt', ['font-licenses.txt', 'text/plain; charset=utf-8']],
   ]);
   return createServer(async (request, response) => {
@@ -59,6 +65,7 @@ export function createRushSiteServer(outdir) {
     try {
       const url = new URL(request.url, 'http://localhost');
       if (url.pathname === '/play') { response.writeHead(308, { Location: '/play/' }).end(); return; }
+      if (url.pathname === '/docs') { response.writeHead(308, { Location: '/docs/' }).end(); return; }
       if (url.pathname.startsWith('/play/')) {
         request.url = url.pathname.slice('/play'.length) + url.search;
         gameServer.emit('request', request, response);
@@ -82,7 +89,7 @@ async function main() {
   const command = process.argv[2] ?? 'dev';
   if (!['dev', 'build'].includes(command)) throw new Error('Usage: node scripts/rush-site.mjs dev|build');
   const built = await buildRushSite({ watch: command === 'dev' });
-  if (command === 'build') { console.log(`Built landing page and SDK game in ${built.outdir}`); return; }
+  if (command === 'build') { console.log(`Built landing page, docs, and SDK game in ${built.outdir}`); return; }
   const server = createRushSiteServer(built.outdir);
   server.listen(4173, '0.0.0.0', () => console.log('Rare Rush: http://localhost:4173/ · game: http://localhost:4173/play/'));
   const stop = () => { server.close(); void built.close().finally(() => process.exit(0)); };

@@ -14,6 +14,7 @@
     "test": "node --test tests/engine.test.ts tests/economy.test.ts",
     "test:browser": "node scripts/test-browser.mjs",
     "test:landing": "node scripts/test-rush-landing.mjs",
+    "test:docs": "node scripts/test-rush-docs.mjs",
     "test:bonus": "node scripts/test-rush-bonus.mjs"
   },
   "dependencies": {

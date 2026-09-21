@@ -6,6 +6,11 @@
   "outputDirectory": "dist",
   "redirects": [
     {
+      "source": "/docs",
+      "destination": "/docs/",
+      "permanent": true
+    },
+    {
       "source": "/play",
       "destination": "/play/",
       "permanent": true
