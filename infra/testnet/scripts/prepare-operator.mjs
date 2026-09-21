@@ -2,8 +2,10 @@ import { readFile, writeFile, chmod } from 'node:fs/promises';
 import { getAddress } from 'viem';
 import { generatePrivateKey, privateKeyToAccount } from 'viem/accounts';
 import { currentEngineVersion } from '../src/engine-version.ts';
+import { AUTHORIZED_OWNER, LAUNCH_ALLOCATION, publicConfig } from '../src/deployment-config.mjs';
 
-const owner = getAddress(process.argv[2] ?? '');
+const owner = getAddress(process.argv[2] ?? AUTHORIZED_OWNER);
+if (owner !== getAddress(AUTHORIZED_OWNER)) throw new Error('This test deployment is authorized only for the configured XIBOT wallet.');
 if (/^0x0{40}$/i.test(owner)) throw new Error('A nonzero owner address is required.');
 const treasury = getAddress(process.argv[3] ?? owner);
 if (/^0x0{40}$/i.test(treasury)) throw new Error('A nonzero treasury address is required.');
@@ -19,7 +21,7 @@ try {
   await writeFile(envFile, `# Local testnet verifier secret. Never share or commit this file.\nRUSH_CHAIN_ID=46630\nRUSH_RPC_URL=https://rpc.testnet.chain.robinhood.com\nRUSH_VERIFIER_PRIVATE_KEY=${key}\n`, { flag: 'wx', mode: 0o600 });
 }
 await chmod(envFile, 0o600);
-const config = { chainId: 46630, owner, treasury, verifier: privateKeyToAccount(key).address, engineVersion: await currentEngineVersion() };
+const config = publicConfig({ chainId: 46630, owner, treasury, verifier: privateKeyToAccount(key).address, engineVersion: await currentEngineVersion(), launchRecipient: owner, launchAllocation: LAUNCH_ALLOCATION.toString() });
 await writeFile(new URL('../operator-config.json', import.meta.url), JSON.stringify(config, null, 2) + '\n');
 console.log(JSON.stringify(config, null, 2));
 console.log('Verifier secret saved in the ignored, permission-restricted .env.testnet file. The wallet console receives only the public config above.');

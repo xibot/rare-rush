@@ -45,9 +45,13 @@ const report = {
   network: 'Isolated local EVM — not public Robinhood testnet', chainId: 31337,
   game: f.game, token: f.token, engineVersion: f.version, runs: results,
   supplyCap: formatUnits(await f.client.readContract({ address: f.token, abi: f.tokenArtifact.abi, functionName: 'CAP' }) as bigint, 6) + ' tRARERUSH',
+  launchReserve: formatUnits(f.launchAllocation, 6) + ' tRARERUSH',
+  gameplayBudget: formatUnits(await f.client.readContract({ address: f.token, abi: f.tokenArtifact.abi, functionName: 'rewardAllocation' }) as bigint, 6) + ' tRARERUSH',
+  verifiedRewardMinter: await f.client.readContract({ address: f.token, abi: f.tokenArtifact.abi, functionName: 'rewardMinter' }) as `0x${string}`,
   treasuryAddress: f.treasury.address,
   treasuryBalance: formatUnits(await balanceOf(f.treasury.address), 18) + ' tRF',
   prizePool: formatUnits(await f.read('prizePoolBalance') as bigint, 18) + ' tRF',
 };
 await writeFile(new URL('../artifacts/demo-result.json', import.meta.url), JSON.stringify(report, null, 2) + '\n');
-console.log(`Prize pool: ${report.prizePool}; separate treasury: ${report.treasuryBalance}; supply cap: ${report.supplyCap}. Evidence saved to artifacts/demo-result.json.`);
+assert.equal(report.verifiedRewardMinter.toLowerCase(), f.game.toLowerCase());
+console.log(`Prize pool: ${report.prizePool}; separate treasury: ${report.treasuryBalance}; supply cap: ${report.supplyCap}; launch reserve: ${report.launchReserve}; gameplay budget: ${report.gameplayBudget}. Evidence saved to artifacts/demo-result.json.`);

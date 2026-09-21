@@ -2,23 +2,18 @@ import { createServer } from 'node:http';
 import { readFile } from 'node:fs/promises';
 import { fileURLToPath } from 'node:url';
 import { build } from 'esbuild';
-import { isAddress } from 'viem';
+import { publicConfig } from '../src/deployment-config.mjs';
+import { currentEngineVersion } from '../src/engine-version.ts';
 
 const root = new URL('../', import.meta.url);
-const owner = '0x6fD155b9D52F80E8A73a8A2537268602978486e2';
 const port = Number(process.env.RUSH_CONSOLE_PORT ?? 4174);
 if (!Number.isInteger(port) || port < 1024 || port > 65535) throw new Error('Invalid RUSH_CONSOLE_PORT');
 
 // Explicitly select public fields. Never serve the config file itself, any
 // arbitrary path, environment variables, keystores, or signing material.
 const raw = JSON.parse(await readFile(new URL('operator-config.json', root), 'utf8'));
-if (raw.chainId !== 46630 || typeof raw.owner !== 'string' || raw.owner.toLowerCase() !== owner.toLowerCase() ||
-    !isAddress(raw.verifier) || /^0x0{40}$/i.test(raw.verifier) ||
-    !isAddress(raw.treasury) || /^0x0{40}$/i.test(raw.treasury) ||
-    !/^0x[0-9a-f]{64}$/i.test(raw.engineVersion) || /^0x0{64}$/i.test(raw.engineVersion)) {
-  throw new Error('operator-config.json must contain the authorized owner, a verifier, treasury, engineVersion, and chainId 46630');
-}
-const config = { owner, treasury: raw.treasury, verifier: raw.verifier, engineVersion: raw.engineVersion, chainId: 46630 };
+const config = publicConfig(raw);
+if (config.engineVersion !== await currentEngineVersion()) throw new Error('Engine changed. Prepare the operator config again.');
 const bundle = await build({ entryPoints: [fileURLToPath(new URL('console/app.js', root))], bundle: true,
   write: false, platform: 'browser', target: 'es2022', format: 'esm', minify: true });
 const files = new Map([

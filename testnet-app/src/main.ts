@@ -1,7 +1,7 @@
 import { createPublicClient, createWalletClient, custom, defineChain, formatUnits, getAddress, http, isAddress, isHash, type Address, type EIP1193Provider, type Hash, type TransactionReceipt } from 'viem';
 import { tokenAbi, nftAbi, gameAbi } from './abi.ts';
 import { mintedIds, type PendingMint } from './receipts.ts';
-import { CHAIN_ID, CONTRACT_KEYS, EXPLORER_URL, FAUCET_URL, REWARD_CAP, RPC_URL, actionBlockReason, assertWalletContext, escapeHtml as e, faucetReady, parseConfig, type PublicConfig } from './safety.ts';
+import { CHAIN_ID, CONTRACT_KEYS, EXPLORER_URL, FAUCET_URL, RPC_URL, actionBlockReason, assertRewardEconomics, assertWalletContext, escapeHtml as e, faucetReady, parseConfig, type PublicConfig } from './safety.ts';
 import './style.css';
 
 type BrowserProvider = EIP1193Provider & { on?: (event: string, listener: (...args: unknown[]) => void) => void };
@@ -65,8 +65,8 @@ function render() {
           </div>
           ${state.friends.length ? `<div class="minted-panel"><span class="eyebrow">FRESHLY MINTED IN THIS SESSION</span><div class="minted-list">${state.friends.map(friend => `<a href="${EXPLORER_URL}/token/${contracts![friend.collection]}/instance/${friend.tokenId}" target="_blank" rel="noopener noreferrer"><img src="/assets/rare-friend.svg" width="36" height="36" alt=""/><span>TEST ${friend.collection.toUpperCase()}<strong>#${friend.tokenId} ↗</strong></span></a>`).join('')}</div><p>IDs come from confirmed mint receipts. The balances above include all test NFTs currently in your wallet.</p></div>` : ''}
         </section>
-        <section class="rules-section" aria-labelledby="rules-title"><div class="section-heading"><div><span class="eyebrow">02 / KNOW THE RULES</span><h2 id="rules-title">SAME RUSH.<br><span>NEW POSSIBILITIES.</span></h2></div><p>Contract rules prepared for testing.<br>Browser runs and verified claims are next.</p></div><div class="rules-grid"><article><span class="tiny">GENERATIONS ENTRY</span><strong>110 <small>tRF</small></strong><p>100 to the prize pool.<br>10 to the treasury.</p></article><article><span class="tiny">GENESIS ENTRY</span><strong>FREE</strong><p>100× gameplay rewards.<br>A big rush for the originals.</p></article><article><span class="tiny">DAILY ATTEMPTS</span><strong>3 <small>/ NFT</small></strong><p>Three starts per UTC day.<br>Across all difficulties.</p></article><article><span class="tiny">TEST REWARD CAP</span><strong>1.024B</strong><p>tRARERUSH maximum supply.<br>Emission design is under review.</p></article></div><div class="mode-strip"><span>EASY <b>120s · 0.75×</b></span><span>NORMAL <b>90s · 1×</b></span><span>DEGEN <b>60s · 2×</b></span></div></section>
-        <section class="next-section" aria-labelledby="next-title"><div><span class="eyebrow">03 / WHAT WE’RE BUILDING</span><h2 id="next-title">EARN THE RUSH.</h2><p>Collect coins. Survive the timer. Verify the run. Mint your reward.</p></div><ol class="progress-list"><li><span>01</span><div><strong>TEST ECONOMY</strong><p>Contracts and local transaction tests are built. Public deployment unlocks the test kit.</p></div><b>${state.verified ? 'DEPLOYED' : 'IN PROGRESS'}</b></li><li><span>02</span><div><strong>PLAY TO MINT</strong><p>Connect the browser game to testnet starts and a hosted run verifier.</p></div><b>NEXT</b></li><li><span>03</span><div><strong>RARERUSH / RF</strong><p>Launch, swaps and signed reward minting verified locally. Public factory approval and full game integration are pending. No public pool is live.</p></div><b>LOCAL FORK<br>PASSED</b></li></ol><div class="play-callout"><p>Can’t wait to jump in?<br><strong>The original arcade is ready for a run.</strong></p><a href="https://rarerush.app" class="primary-link">PLAY THE ARCADE ↗</a><small>Uses real NFT identity with simulated rewards.</small></div></section>
+        <section class="rules-section" aria-labelledby="rules-title"><div class="section-heading"><div><span class="eyebrow">02 / KNOW THE RULES</span><h2 id="rules-title">SAME RUSH.<br><span>NEW POSSIBILITIES.</span></h2></div><p>Contract rules prepared for testing.<br>Browser runs and verified claims are next.</p></div><div class="rules-grid"><article><span class="tiny">GENERATIONS ENTRY</span><strong>110 <small>tRF</small></strong><p>100 to the prize pool.<br>10 to the treasury.</p></article><article><span class="tiny">GENESIS ENTRY</span><strong>FREE</strong><p>100× gameplay rewards.<br>A big rush for the originals.</p></article><article><span class="tiny">DAILY ATTEMPTS</span><strong>3 <small>/ NFT</small></strong><p>Three starts per UTC day.<br>Across all difficulties.</p></article><article><span class="tiny">TEST TOKEN CAP</span><strong>1.024B</strong><p>102.4M launch reserve.<br>921.6M gameplay rewards.</p></article></div><div class="mode-strip"><span>EASY <b>120s · 0.75×</b></span><span>NORMAL <b>90s · 1×</b></span><span>DEGEN <b>60s · 2×</b></span></div></section>
+        <section class="next-section" aria-labelledby="next-title"><div><span class="eyebrow">03 / WHAT WE’RE BUILDING</span><h2 id="next-title">EARN THE RUSH.</h2><p>Collect coins. Survive the timer. Verify the run. Mint your reward.</p></div><ol class="progress-list"><li><span>01</span><div><strong>TEST ECONOMY</strong><p>Contracts and local transaction tests are built. Public deployment unlocks the test kit.</p></div><b>${state.verified ? 'DEPLOYED' : 'IN PROGRESS'}</b></li><li><span>02</span><div><strong>PLAY TO MINT</strong><p>Connect the browser game to testnet starts and a hosted run verifier.</p></div><b>NEXT</b></li><li><span>03</span><div><strong>RARERUSH / RF</strong><p>Launch, swaps and signed reward minting verified locally. Public factory approval and liquidity deployment are pending. No public pool is live.</p></div><b>LOCAL FORK<br>PASSED</b></li></ol><div class="play-callout"><p>Can’t wait to jump in?<br><strong>The original arcade is ready for a run.</strong></p><a href="https://rarerush.app" class="primary-link">PLAY THE ARCADE ↗</a><small>Uses real NFT identity with simulated rewards.</small></div></section>
         <section class="contracts-section" aria-labelledby="contracts-title"><div class="section-heading"><div><span class="eyebrow">OPEN LAB / PUBLIC ADDRESSES</span><h2 id="contracts-title">CHECK THE CHAIN.</h2></div><a href="${EXPLORER_URL}" target="_blank" rel="noopener noreferrer">TESTNET EXPLORER ↗</a></div>${contracts ? `<dl class="contract-list">${CONTRACT_KEYS.map(key => `<div><dt>${{ game: 'Game', rf: 'Test RF', genesis: 'Test Genesis', generations: 'Test Generations', rewardToken: 'Test RARERUSH' }[key]}</dt><dd><a href="${EXPLORER_URL}/address/${contracts[key]}" target="_blank" rel="noopener noreferrer">${contracts[key]} ↗</a></dd></div>`).join('')}</dl>` : '<div class="empty-contracts"><span class="status-square"></span><p><strong>Contracts awaiting deployment.</strong><br>Verified addresses will appear here when the testnet deployment is ready.</p></div>'}${state.config?.deploymentConsoleUrl ? '<a class="outline-link deploy-link" href="/deploy/">OPERATOR DEPLOYMENT CONSOLE ↗</a>' : ''}</section>
       </main><footer><span>RARE RUSH <b>BY XIBOT</b></span><span>TEST IDEAS. KEEP IT RARE.</span><a href="https://github.com/xibot/rare-rush" target="_blank" rel="noopener noreferrer">SOURCE ↗</a></footer>
     </div>`;
@@ -137,28 +137,40 @@ async function verifyContracts() {
   const contracts = state.config?.contracts;
   if (!contracts) return;
   if (await client.getChainId() !== CHAIN_ID) throw new Error('RPC network mismatch. Contract actions are disabled.');
-  const code = await Promise.all(CONTRACT_KEYS.map(key => client.getBytecode({ address: contracts[key] })));
+  // Compare supply and minted counters from one block, even when another player claims mid-read.
+  const blockNumber = await client.getBlockNumber({ cacheTime: 0 });
+  const code = await Promise.all(CONTRACT_KEYS.map(key => client.getBytecode({ address: contracts[key], blockNumber })));
   if (code.some(value => !value || value === '0x')) throw new Error('A configured contract is not deployed. Contract actions are disabled.');
-  const [rf, genesis, generations, rewardToken, fee, prize, treasury, daily, cap, game, decimals, amount, isGenesis, isGenerations] = await Promise.all([
-    client.readContract({ address: contracts.game, abi: gameAbi, functionName: 'rf' }),
-    client.readContract({ address: contracts.game, abi: gameAbi, functionName: 'genesis' }),
-    client.readContract({ address: contracts.game, abi: gameAbi, functionName: 'generations' }),
-    client.readContract({ address: contracts.game, abi: gameAbi, functionName: 'token' }),
-    client.readContract({ address: contracts.game, abi: gameAbi, functionName: 'ENTRY_FEE' }),
-    client.readContract({ address: contracts.game, abi: gameAbi, functionName: 'PRIZE_POOL_SHARE' }),
-    client.readContract({ address: contracts.game, abi: gameAbi, functionName: 'TREASURY_SHARE' }),
-    client.readContract({ address: contracts.game, abi: gameAbi, functionName: 'MAX_DAILY_RUNS' }),
-    client.readContract({ address: contracts.rewardToken, abi: tokenAbi, functionName: 'CAP' }),
-    client.readContract({ address: contracts.rewardToken, abi: tokenAbi, functionName: 'game' }),
-    client.readContract({ address: contracts.rewardToken, abi: tokenAbi, functionName: 'decimals' }),
-    client.readContract({ address: contracts.rf, abi: tokenAbi, functionName: 'FAUCET_AMOUNT' }),
-    client.readContract({ address: contracts.genesis, abi: nftAbi, functionName: 'isGenesis' }),
-    client.readContract({ address: contracts.generations, abi: nftAbi, functionName: 'isGenesis' }),
+  const [rf, genesis, generations, rewardToken, fee, prize, treasury, daily, cap, minter, decimals, amount, isGenesis, isGenerations,
+    launch, expectedLaunch, gameplay, minted, supply, initial, minimum, interval] = await Promise.all([
+    client.readContract({ address: contracts.game, abi: gameAbi, functionName: 'rf', blockNumber }),
+    client.readContract({ address: contracts.game, abi: gameAbi, functionName: 'genesis', blockNumber }),
+    client.readContract({ address: contracts.game, abi: gameAbi, functionName: 'generations', blockNumber }),
+    client.readContract({ address: contracts.game, abi: gameAbi, functionName: 'token', blockNumber }),
+    client.readContract({ address: contracts.game, abi: gameAbi, functionName: 'ENTRY_FEE', blockNumber }),
+    client.readContract({ address: contracts.game, abi: gameAbi, functionName: 'PRIZE_POOL_SHARE', blockNumber }),
+    client.readContract({ address: contracts.game, abi: gameAbi, functionName: 'TREASURY_SHARE', blockNumber }),
+    client.readContract({ address: contracts.game, abi: gameAbi, functionName: 'MAX_DAILY_RUNS', blockNumber }),
+    client.readContract({ address: contracts.rewardToken, abi: tokenAbi, functionName: 'CAP', blockNumber }),
+    client.readContract({ address: contracts.rewardToken, abi: tokenAbi, functionName: 'rewardMinter', blockNumber }),
+    client.readContract({ address: contracts.rewardToken, abi: tokenAbi, functionName: 'decimals', blockNumber }),
+    client.readContract({ address: contracts.rf, abi: tokenAbi, functionName: 'FAUCET_AMOUNT', blockNumber }),
+    client.readContract({ address: contracts.genesis, abi: nftAbi, functionName: 'isGenesis', blockNumber }),
+    client.readContract({ address: contracts.generations, abi: nftAbi, functionName: 'isGenesis', blockNumber }),
+    client.readContract({ address: contracts.rewardToken, abi: tokenAbi, functionName: 'launchAllocation', blockNumber }),
+    client.readContract({ address: contracts.game, abi: gameAbi, functionName: 'expectedLaunchAllocation', blockNumber }),
+    client.readContract({ address: contracts.rewardToken, abi: tokenAbi, functionName: 'rewardAllocation', blockNumber }),
+    client.readContract({ address: contracts.rewardToken, abi: tokenAbi, functionName: 'rewardsMinted', blockNumber }),
+    client.readContract({ address: contracts.rewardToken, abi: tokenAbi, functionName: 'totalSupply', blockNumber }),
+    client.readContract({ address: contracts.game, abi: gameAbi, functionName: 'INITIAL_COIN_REWARD', blockNumber }),
+    client.readContract({ address: contracts.game, abi: gameAbi, functionName: 'MIN_COIN_REWARD', blockNumber }),
+    client.readContract({ address: contracts.game, abi: gameAbi, functionName: 'HALVING_INTERVAL', blockNumber }),
   ]);
   const same = (a: Address, b: Address) => a.toLowerCase() === b.toLowerCase();
-  if (!same(rf, contracts.rf) || !same(genesis, contracts.genesis) || !same(generations, contracts.generations) || !same(rewardToken, contracts.rewardToken) || !same(game, contracts.game) || fee !== 110n * 10n ** 18n || prize !== 100n * 10n ** 18n || treasury !== 10n * 10n ** 18n || daily !== 3n || cap !== REWARD_CAP || decimals !== 6 || amount !== 1100n * 10n ** 18n || !isGenesis || isGenerations) {
+  if (!same(rf, contracts.rf) || !same(genesis, contracts.genesis) || !same(generations, contracts.generations) || !same(rewardToken, contracts.rewardToken) || fee !== 110n * 10n ** 18n || prize !== 100n * 10n ** 18n || treasury !== 10n * 10n ** 18n || daily !== 3n || amount !== 1100n * 10n ** 18n || !isGenesis || isGenerations) {
     throw new Error('The deployed contracts do not match this test kit. Actions are disabled.');
   }
+  assertRewardEconomics({ cap, decimals, minter, game: contracts.game, launch, expectedLaunch, gameplay, minted, supply, initial, minimum, interval });
   state.verified = true;
 }
 

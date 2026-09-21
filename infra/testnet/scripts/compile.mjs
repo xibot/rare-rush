@@ -7,6 +7,13 @@ const sources = {};
 for (const name of (await readdir(new URL('contracts/', root))).filter(name => name.endsWith('.sol')).sort()) {
   sources[`contracts/${name}`] = { content: await readFile(new URL(`contracts/${name}`, root), 'utf8') };
 }
+// Include this exact shared implementation, rather than a copied token or a general filesystem importer.
+sources['doppler/contracts/RareRushDopplerPrototype.sol'] = {
+  content: await readFile(new URL('../doppler/contracts/RareRushDopplerPrototype.sol', root), 'utf8'),
+};
+sources['test/fixtures/BindingCandidate.sol'] = {
+  content: await readFile(new URL('test/fixtures/BindingCandidate.sol', root), 'utf8'),
+};
 const input = {
   language: 'Solidity', sources,
   settings: {
@@ -25,7 +32,7 @@ for (const error of output.errors ?? []) console.error(error.formattedMessage);
 if (output.errors?.some(error => error.severity === 'error')) process.exit(1);
 await mkdir(new URL('artifacts/', root), { recursive: true });
 for (const [source, contracts] of Object.entries(output.contracts)) {
-  if (!source.startsWith('contracts/')) continue;
+  if (!source.startsWith('contracts/') && source !== 'test/fixtures/BindingCandidate.sol') continue;
   for (const [name, artifact] of Object.entries(contracts)) {
     if (!artifact.evm.bytecode.object) continue;
     const bytes = artifact.evm.deployedBytecode.object.length / 2;

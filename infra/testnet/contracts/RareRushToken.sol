@@ -1,29 +1,16 @@
 // SPDX-License-Identifier: MIT
-pragma solidity ^0.8.28;
+pragma solidity ^0.8.30;
 
-import {ERC20} from "@openzeppelin/contracts/token/ERC20/ERC20.sol";
-import {TestnetOnly} from "./TestnetOnly.sol";
+import {RareRushDopplerPrototype} from "doppler/contracts/RareRushDopplerPrototype.sol";
 
-/// @notice Testnet reward token. Only its deploying game can mint, up to the fixed cap.
-/// @dev No owner minting, supply-cap changes, burns, or production-chain deployment.
-contract RareRushToken is ERC20, TestnetOnly {
-    uint256 public constant CAP = 1_024_000_000 * 1e6;
-    address public immutable game;
+/// @notice Testnet token using the exact implementation exercised by the Doppler fork proof.
+/// @dev Only the display name changes. The separately deployed game is the immutable minter;
+///      the launch reserve is minted once, and gameplay consumes the remaining fixed budget.
+contract RareRushToken is RareRushDopplerPrototype {
+    constructor(address recipient, address initialOwner, address game, uint256 launchAmount)
+        RareRushDopplerPrototype(recipient, initialOwner, game, launchAmount)
+    {}
 
-    error OnlyGame();
-    error SupplyCapExceeded();
-
-    constructor() ERC20("Rare Rush Testnet", "tRARERUSH") {
-        game = msg.sender;
-    }
-
-    function decimals() public pure override returns (uint8) {
-        return 6;
-    }
-
-    function mint(address recipient, uint256 amount) external {
-        if (msg.sender != game) revert OnlyGame();
-        if (amount > CAP - totalSupply()) revert SupplyCapExceeded();
-        _mint(recipient, amount);
-    }
+    function name() public pure override returns (string memory) { return "Rare Rush Testnet"; }
+    function symbol() public pure override returns (string memory) { return "tRARERUSH"; }
 }

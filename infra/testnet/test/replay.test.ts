@@ -87,11 +87,11 @@ test('verifier refuses a wrong signing identity or an engine version different f
   const deployment = await f.mined(await f.wallet.deployContract({
     abi: f.gameArtifact.abi,
     bytecode: f.gameArtifact.bytecode,
-    args: [f.player.address, f.verifier.address, f.treasury.address, f.rf, f.genesis, f.generations, differentEngine],
+    args: [f.player.address, f.verifier.address, f.treasury.address, f.rf, f.genesis, f.generations, differentEngine, f.launchAllocation],
   }));
   assert.ok(deployment.contractAddress);
   await assert.rejects(verifyAndSign({ ...options, game: deployment.contractAddress }), /Engine source differs/);
-  assert.equal(await f.client.readContract({ address: f.token, abi: f.tokenArtifact.abi, functionName: 'totalSupply' }), 0n);
+  assert.equal(await f.client.readContract({ address: f.token, abi: f.tokenArtifact.abi, functionName: 'totalSupply' }), f.launchAllocation);
 });
 
 test('verifier checks current NFT custody, pause, revocation and expiry before signing a valid replay', { skip: !process.env.RUSH_TEST_RPC }, async () => {

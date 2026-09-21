@@ -1,7 +1,7 @@
 # Rare Rush × Doppler compatibility prototype
 
 **Status: locally validated; not deployed or approved on a public network.**
-This isolated experiment asks whether a custom six-decimal, capped, play-to-mint token can launch an RF-denominated market through Robinhood's deployed Doppler contracts. It does not change the live game or `infra/testnet` contracts.
+This isolated experiment asks whether a custom six-decimal, capped, play-to-mint token can launch an RF-denominated market through Robinhood's deployed Doppler contracts. It does not change the live game. The isolated `infra/testnet` reward token now inherits this token implementation and its game binds the reward token once before runs can start.
 
 ## What passed
 
@@ -50,7 +50,7 @@ Replace `BLOCK_FROM_EVIDENCE` with the `forkBlock` number in the saved report. A
 
 ## Fixture economics are not final tokenomics
 
-This test chooses **10% launch / 90% gameplay**, a roughly 0.001 RF starting price per RARERUSH, a 0.3% V3 trading fee, ten liquidity positions, an 80% bonding-curve share and fee beneficiaries. These are configurable test inputs—not an accepted allocation, public launch price, commitment or forecast.
+This test chooses **10% launch / 90% gameplay**, a roughly 0.001 RF starting price per RARERUSH, a 0.3% V3 trading fee, ten liquidity positions, an 80% bonding-curve share and fee beneficiaries. These were local fixture inputs. The user subsequently selected 10% launch / 90% gameplay for the first standalone testnet deployment; the price, V3 fee, positions and pool settings remain unselected for public deployment. None of these are final mainnet economics or forecasts.
 
 The pool is funded initially with the launch RARERUSH allocation. Buyers supply RF when they buy. **“Instant market” does not mean free RF liquidity.** Reward tokens can only sell against RF that has actually entered the pool. The test buys first, then sells and then sells a newly minted reward.
 
@@ -70,8 +70,8 @@ Robinhood mainnet is in the official deployment list; Robinhood testnet is not c
 
 ## Still required before integration
 
-1. Decide final launch/gameplay allocation, fee recipients, RF funding assumptions and gameplay emissions. This prototype does not alter the current halving schedule.
-2. Refactor/adapt `RareRushGame` to bind an externally factory-created reward token. It currently constructs its own token. Preserve verified replay, ownership checks, difficulty/Genesis multipliers, three starts per NFT daily, entry-fee split and cap accounting. Test the actual integrated game, not just this receipt fixture.
+1. Decide final mainnet launch/gameplay allocation, fee recipients, RF funding assumptions and emissions. The standalone game testnet uses the agreed 10% reserve / 90% gameplay split and a provisional 1-token base floor; this fork prototype does not decide final launch economics.
+2. The standalone `RareRushGame` now binds an external token using this same token implementation, preserving verified replay, ownership checks, multipliers, daily starts, fees and cap accounting. Its integrated local game tests and replay demo are in `infra/testnet`. A complete game → canonical factory launch → claim → swap fork rehearsal remains separate from this prototype's receipt-fixture proof.
 3. Obtain public factory approval, verify the final factory/token bytecode and choose the actual launch route. This prototype deliberately cannot deploy to mainnet.
 4. Provide testnet contract deployments, a durable verifier service and a wallet-connected play/claim interface. No public deployment is performed by these scripts.
 5. Review economic effects of ongoing issuance and Genesis ×100. Contract compatibility does not establish sustainable liquidity, an emission timeline or resistance to gameplay bots.

@@ -1,11 +1,13 @@
 import {
-  createPublicClient, createWalletClient, custom, defineChain, encodeDeployData,
-  formatEther, http, isAddress, keccak256, stringToHex,
+  createPublicClient, createWalletClient, custom, defineChain, encodeDeployData, encodeFunctionData,
+  formatEther, http, isAddress, keccak256,
 } from 'viem';
+import { ARTIFACT_NAMES, AUTHORIZED_OWNER, LAUNCH_ALLOCATION, GAMEPLAY_ALLOCATION, REWARD_CAP,
+  same, validHash, json, economics, publicConfig, artifactFingerprint, constructorArgs } from '../src/deployment-config.mjs';
 
 const RPC = 'https://rpc.testnet.chain.robinhood.com';
 const EXPLORER = 'https://explorer.testnet.chain.robinhood.com';
-const OWNER = '0x6fd155b9d52f80e8a73a8a2537268602978486e2';
+const OWNER = AUTHORIZED_OWNER;
 const chain = defineChain({ id: 46630, name: 'Robinhood Chain Testnet', testnet: true,
   nativeCurrency: { name: 'Test Ether', symbol: 'ETH', decimals: 18 },
   rpcUrls: { default: { http: [RPC] } }, blockExplorers: { default: { name: 'Explorer', url: EXPLORER } } });
@@ -14,11 +16,11 @@ const steps = [
   { id: 'rf', artifact: 'TestRF', title: 'Test RF', description: 'Free faucet: 1,100 tRF per wallet per UTC day for test entry fees.' },
   { id: 'genesis', artifact: 'TestFriends', title: 'Test Genesis', description: 'Test NFTs for free entry and the 100× reward multiplier.' },
   { id: 'generations', artifact: 'TestFriends', title: 'Test Generations', description: '110 tRF per run: 100 into the prize pool + 10 sent to the treasury.' },
-  { id: 'game', artifact: 'RareRushGame', title: 'Rare Rush Game + Token', description: 'Verified claims with a 1,024,000,000 tRARERUSH cap. Genesis enters free with 100× rewards; three starts per NFT daily.' },
+  { id: 'game', artifact: 'RareRushGame', title: 'Rare Rush Game', description: 'Verified runs, three NFT starts daily, Genesis 100× rewards. Gameplay stays disabled until its token is bound.' },
+  { id: 'rewardToken', artifact: 'RareRushToken', title: 'Reward Token', description: '1.024B cap: 102.4M launch reserve to your owner wallet + 921.6M reserved for verified gameplay. Test allocation; no liquidity pool is deployed.' },
+  { id: 'bind', artifact: 'RareRushGame', title: 'Bind Reward Token', description: 'One-time connection of this reward token to this game. The game is the only authorized reward minter.' },
 ];
 const $ = id => document.getElementById(id);
-const same = (a, b) => typeof a === 'string' && typeof b === 'string' && a.toLowerCase() === b.toLowerCase();
-const validHash = value => typeof value === 'string' && /^0x[0-9a-f]{64}$/i.test(value);
 let config, artifacts, key, fingerprint, state, account, walletChain, busy = false, ready = false;
 const verified = new Set();
 const estimates = new Map();
@@ -42,6 +44,13 @@ function rejected(error) {
   return false;
 }
 function loadState() {
+  // Detect older engine/verifier-scoped records rather than hiding progress behind a new key.
+  for (const existingKey of Object.keys(localStorage)) {
+    if (existingKey === key || !existingKey.startsWith(`rare-rush-testnet-deploy:${config.owner.toLowerCase()}`)) continue;
+    let older;
+    try { older = JSON.parse(localStorage.getItem(existingKey)); } catch { throw new Error('Older deployment progress is unreadable. It has been preserved for reconciliation.'); }
+    if (Object.keys(older?.deployments ?? {}).length) throw new Error('An older deployment has saved transactions. Existing progress was preserved; reconcile it before using this updated package.');
+  }
   const stored = localStorage.getItem(key);
   if (!stored) return { fingerprint, deployments: {} };
   const parsed = JSON.parse(stored);
@@ -50,7 +59,7 @@ function loadState() {
     // An untouched page is safe to refresh after an economics/configuration change.
     // Any actual or ambiguous deployment must remain visible for reconciliation.
     if (Object.keys(parsed.deployments).length === 0) return { fingerprint, deployments: {} };
-    throw new Error('The compiled contracts or treasury changed. Existing deployment progress was preserved. Reconcile previous transactions before starting a new deployment.');
+    throw new Error('The compiled contracts or public configuration changed. Existing deployment progress was preserved. Reconcile previous transactions before starting a new deployment.');
   }
   for (const [id, value] of Object.entries(parsed.deployments)) {
     if (!steps.some(step => step.id === id) || !value || !['awaiting-wallet', 'pending', 'confirmed', 'failed'].includes(value.status) ||
@@ -60,17 +69,34 @@ function loadState() {
   }
   return parsed;
 }
-function persist() { localStorage.setItem(key, JSON.stringify(state)); }
-function argumentsFor(id) {
-  if (id === 'rf') return [];
-  if (id === 'genesis') return [true];
-  if (id === 'generations') return [false];
-  return [config.owner, config.verifier, config.treasury, state.deployments.rf.address, state.deployments.genesis.address,
-    state.deployments.generations.address, config.engineVersion];
-}
+function persist() { localStorage.setItem(key, json(state)); }
+function argumentsFor(id) { return constructorArgs(id, config, state.deployments); }
 function deploymentData(step) {
   const artifact = artifacts[step.artifact];
+  if (step.id === 'bind') return encodeFunctionData({ abi: artifact.abi, functionName: 'bindRewardToken', args: argumentsFor('bind') });
   return encodeDeployData({ abi: artifact.abi, bytecode: artifact.bytecode, args: argumentsFor(step.id) });
+}
+function destinationFor(step) { return step.id === 'bind' ? state.deployments.game.address : undefined; }
+async function validateGame(address, requireBound = false) {
+  const names = ['owner', 'verifier', 'treasury', 'engineVersion', 'token', 'rf', 'genesis', 'generations', 'ENTRY_FEE', 'PRIZE_POOL_SHARE', 'TREASURY_SHARE', 'expectedLaunchAllocation', 'MAX_DAILY_RUNS', 'INITIAL_COIN_REWARD', 'MIN_COIN_REWARD', 'HALVING_INTERVAL'];
+  const values = await Promise.all(names.map(functionName => client.readContract({ address, abi: artifacts.RareRushGame.abi, functionName })));
+  const result = Object.fromEntries(names.map((name, index) => [name, values[index]]));
+  if (!same(result.owner, config.owner) || !same(result.verifier, config.verifier) || !same(result.treasury, config.treasury) || !same(result.engineVersion, config.engineVersion) ||
+      !same(result.rf, state.deployments.rf.address) || !same(result.genesis, state.deployments.genesis.address) || !same(result.generations, state.deployments.generations.address)) {
+    throw new Error('The deployed game configuration does not match this console.');
+  }
+  if (result.ENTRY_FEE !== 110n * 10n ** 18n || result.PRIZE_POOL_SHARE !== 100n * 10n ** 18n || result.TREASURY_SHARE !== 10n * 10n ** 18n) throw new Error('The deployed fee split does not match the reviewed economics.');
+  if (result.expectedLaunchAllocation !== LAUNCH_ALLOCATION || Number(result.MAX_DAILY_RUNS) !== 3 || result.INITIAL_COIN_REWARD !== 10_000_000n || result.MIN_COIN_REWARD !== 1_000_000n || result.HALVING_INTERVAL !== 10_000n) throw new Error('The deployed reward allocation or test emission settings do not match this console.');
+  const zero = /^0x0{40}$/i.test(result.token);
+  if ((requireBound && !same(result.token, state.deployments.rewardToken?.address)) || (!zero && !same(result.token, state.deployments.rewardToken?.address))) throw new Error('The game is bound to an unexpected reward token.');
+}
+async function validateToken(address) {
+  const names = ['owner', 'rewardMinter', 'launchAllocation', 'rewardAllocation', 'CAP', 'decimals'];
+  const values = await Promise.all(names.map(functionName => client.readContract({ address, abi: artifacts.RareRushToken.abi, functionName })));
+  const result = Object.fromEntries(names.map((name, index) => [name, values[index]]));
+  if (!same(result.owner, config.owner) || !same(result.rewardMinter, state.deployments.game.address)) throw new Error('The reward token owner or authorized minter does not match this game.');
+  if (result.CAP !== REWARD_CAP || Number(result.decimals) !== 6) throw new Error('The reward token cap or decimals do not match the reviewed economics.');
+  if (result.launchAllocation !== LAUNCH_ALLOCATION || result.rewardAllocation !== GAMEPLAY_ALLOCATION) throw new Error('The reward token allocation does not match the approved 10% / 90% test split.');
 }
 async function checkRpc() {
   if (await client.getChainId() !== 46630) throw new Error('The public RPC returned the wrong chain. Deployment stopped.');
@@ -102,45 +128,34 @@ async function refreshWallet() {
 async function verifyReceipt(step, hash, wait = false) {
   await checkRpc();
   const receipt = wait
-    ? await client.waitForTransactionReceipt({ hash, timeout: 60_000, pollingInterval: 2_000,
+    ? await client.waitForTransactionReceipt({ hash, confirmations: 2, timeout: 60_000, pollingInterval: 2_000,
       onReplaced: ({ transaction }) => { state.deployments[step.id].hash = transaction.hash; persist(); render(); } })
     : await client.getTransactionReceipt({ hash });
+  const block = await client.getBlockNumber({ cacheTime: 0 });
+  if (block < receipt.blockNumber + 1n) throw new Error('Waiting for two block confirmations. Resume verification once another block is mined.');
+  const transaction = await client.getTransaction({ hash: receipt.transactionHash });
+  const correctDestination = step.id === 'bind' ? same(transaction.to, destinationFor(step)) : transaction.to === null;
+  if (!same(transaction.hash, receipt.transactionHash) || !same(transaction.from, config.owner) || !correctDestination ||
+      transaction.value !== 0n || transaction.input.toLowerCase() !== deploymentData(step).toLowerCase()) {
+    throw new Error('This transaction does not match the required sender, destination, value and operation data. Progress remains blocked for review.');
+  }
   if (receipt.status !== 'success') {
-    state.deployments[step.id] = { status: 'failed', hash: receipt.transactionHash, error: 'Transaction reverted. No contract was deployed; you can retry.' };
+    state.deployments[step.id] = { status: 'failed', hash: receipt.transactionHash, error: 'The matching transaction reverted. This operation can be retried.' };
     persist(); verified.delete(step.id); return;
   }
-  const transaction = await client.getTransaction({ hash: receipt.transactionHash });
-  if (!same(transaction.from, config.owner) || transaction.to !== null || transaction.input.toLowerCase() !== deploymentData(step).toLowerCase()) {
-    throw new Error('This transaction does not match the required deployer, compiled contract and constructor arguments. Progress remains blocked for review.');
-  }
-  const address = receipt.contractAddress;
-  if (!address || !isAddress(address) || !same(transaction.from, config.owner)) throw new Error('The receipt does not identify the expected contract creation.');
+  const address = step.id === 'bind' ? destinationFor(step) : receipt.contractAddress;
+  if (!address || !isAddress(address) || (step.id === 'bind' && receipt.contractAddress !== null)) throw new Error('The receipt does not identify the expected operation.');
   const code = await client.getCode({ address });
-  if (!code || code === '0x') throw new Error('No contract code was found at the receipt address.');
-  const record = { status: 'confirmed', address, hash: receipt.transactionHash, blockNumber: receipt.blockNumber.toString(),
-    constructorArgs: argumentsFor(step.id), sourceName: artifacts[step.artifact].sourceName,
-    contractName: step.artifact, compiler: artifacts[step.artifact].compiler,
+  if (!code || code === '0x') throw new Error('No contract code was found at the expected address.');
+  if (step.id === 'game') await validateGame(address);
+  if (step.id === 'rewardToken') await validateToken(address);
+  if (step.id === 'bind') { await validateGame(address, true); await validateToken(state.deployments.rewardToken.address); }
+  const record = { status: 'confirmed', address, hash: receipt.transactionHash, blockNumber: receipt.blockNumber.toString(), confirmations: 2,
+    operation: step.id === 'bind' ? 'bindRewardToken' : 'deploy', to: destinationFor(step) ?? null,
+    dataHash: keccak256(deploymentData(step)), constructorArgs: step.id === 'bind' ? undefined : argumentsFor(step.id),
+    arguments: step.id === 'bind' ? argumentsFor(step.id) : undefined,
+    sourceName: artifacts[step.artifact].sourceName, contractName: step.artifact, compiler: artifacts[step.artifact].compiler,
     bytecodeHash: keccak256(artifacts[step.artifact].bytecode) };
-  if (step.id === 'game') {
-    const read = functionName => client.readContract({ address, abi: artifacts.RareRushGame.abi, functionName });
-    const [actualOwner, actualVerifier, actualTreasury, actualEngine, token, rf, genesis, generations, entry, poolShare, treasuryShare] = await Promise.all(
-      ['owner', 'verifier', 'treasury', 'engineVersion', 'token', 'rf', 'genesis', 'generations', 'ENTRY_FEE', 'PRIZE_POOL_SHARE', 'TREASURY_SHARE'].map(read));
-    if (!same(actualOwner, config.owner) || !same(actualVerifier, config.verifier) || !same(actualTreasury, config.treasury) || !same(actualEngine, config.engineVersion) ||
-        !same(rf, state.deployments.rf.address) || !same(genesis, state.deployments.genesis.address) || !same(generations, state.deployments.generations.address)) {
-      throw new Error('The deployed game configuration does not match this console.');
-    }
-    if (entry !== 110n * 10n ** 18n || poolShare !== 100n * 10n ** 18n || treasuryShare !== 10n * 10n ** 18n) {
-      throw new Error('The deployed entry fee or treasury split does not match the reviewed economics.');
-    }
-    if (!isAddress(token) || !(await client.getCode({ address: token })) || await client.getCode({ address: token }) === '0x') {
-      throw new Error('The game reward token has no deployed code.');
-    }
-    const tokenGame = await client.readContract({ address: token, abi: artifacts.RareRushToken.abi, functionName: 'game' });
-    if (!same(tokenGame, address)) throw new Error('The reward token does not belong to this game.');
-    const cap = await client.readContract({ address: token, abi: artifacts.RareRushToken.abi, functionName: 'CAP' });
-    if (cap !== 1_024_000_000n * 1_000_000n) throw new Error('The reward token cap does not match the reviewed economics.');
-    record.token = token;
-  }
   state.deployments[step.id] = record; persist(); verified.add(step.id);
 }
 async function verifyProgress() {
@@ -175,19 +190,19 @@ async function deploy(step) {
     if (!steps.slice(0, index).every(value => verified.has(value.id))) throw new Error('Verify the preceding deployments first.');
     const data = deploymentData(step);
     const [gas, gasPrice, balance] = await Promise.all([
-      client.estimateGas({ account: config.owner, data }), client.getGasPrice(), client.getBalance({ address: config.owner }),
+      client.estimateGas({ account: config.owner, data, to: destinationFor(step) }), client.getGasPrice(), client.getBalance({ address: config.owner }),
     ]);
     const estimate = gas * gasPrice;
     estimates.set(step.id, `Estimated network cost: ${formatEther(estimate)} test ETH. Your wallet shows the final fee.`);
     if (balance < estimate) throw new Error('Not enough test ETH for the estimated deployment fee. Use the official faucet.');
     // Persist before opening the wallet. If the tab closes before a hash returns,
     // the next visit requires a receipt hash; it never silently sends again.
+    await requireWallet(); // Pre-send account/network failures have no ambiguous transaction to recover.
     state.deployments[step.id] = { status: 'awaiting-wallet', startedAt: new Date().toISOString() };
     persist(); render();
     let hash;
     try {
-      await requireWallet();
-      hash = await walletClient.sendTransaction({ account: config.owner, chain, data });
+      hash = await walletClient.sendTransaction({ account: config.owner, chain, data, to: destinationFor(step), value: 0n });
     } catch (error) {
       if (rejected(error)) { delete state.deployments[step.id]; persist(); }
       else {
@@ -232,13 +247,13 @@ function render() {
     } else if (record?.status === 'pending') status.textContent = `PENDING · ${record.hash}\n${record.error ?? 'Waiting for the testnet receipt.'}`;
     else if (record?.status === 'awaiting-wallet') status.textContent = record.error ?? 'Awaiting wallet response. If the tab was closed, check your wallet activity before doing anything else.';
     else if (record?.status === 'failed') { status.textContent = record.error; status.classList.add('error'); }
-    else status.textContent = 'NOT DEPLOYED';
+    else status.textContent = step.id === 'bind' ? 'NOT BOUND' : 'NOT DEPLOYED';
     node.append(status);
     if (record?.hash) { const link = document.createElement('a'); link.href = `${EXPLORER}/tx/${record.hash}`; link.target = '_blank'; link.rel = 'noreferrer'; link.textContent = 'View transaction ↗'; node.append(link); }
     if (estimates.has(step.id)) { const estimate = document.createElement('p'); estimate.className = 'estimate'; estimate.textContent = estimates.get(step.id); node.append(estimate); }
     const controls = document.createElement('div'); controls.className = 'actions';
     if (!record || record.status === 'failed') {
-      const button = document.createElement('button'); button.textContent = `DEPLOY ${step.title.toUpperCase()} ↗`;
+      const button = document.createElement('button'); button.textContent = step.id === 'bind' ? 'BIND REWARD TOKEN ↗' : `DEPLOY ${step.title.toUpperCase()} ↗`;
       button.disabled = !ready || busy || !same(account, OWNER) || walletChain !== 46630 || !steps.slice(0, index).every(value => verified.has(value.id));
       button.addEventListener('click', () => void deploy(step)); controls.append(button);
     } else if (record.status === 'pending') {
@@ -247,7 +262,7 @@ function render() {
     } else if (record.status === 'awaiting-wallet') {
       controls.className = 'recover';
       const label = document.createElement('label'); label.htmlFor = `hash-${step.id}`; label.textContent = 'Already approved? Paste the transaction hash from wallet activity to recover safely.';
-      const input = document.createElement('input'); input.id = label.htmlFor; input.placeholder = '0x… transaction hash'; input.autocomplete = 'off'; input.spellcheck = false;
+      const input = document.createElement('input'); input.disabled = busy; input.id = label.htmlFor; input.placeholder = '0x… transaction hash'; input.autocomplete = 'off'; input.spellcheck = false;
       const button = document.createElement('button'); button.textContent = 'VERIFY HASH'; button.disabled = busy;
       button.addEventListener('click', () => void resume(step, input.value.trim())); controls.append(label, input, button);
     }
@@ -255,32 +270,39 @@ function render() {
   }
   const complete = steps.every(step => verified.has(step.id));
   $('download').disabled = !complete || busy;
-  if (complete) message('summary', `All contracts verified. tRARERUSH: ${state.deployments.game.token}. Download and save your manifest.`);
+  if (complete) message('summary', `All six operations verified. tRARERUSH: ${state.deployments.rewardToken.address}. Download and save your manifest. No Doppler pool is deployed.`);
 }
 function downloadManifest() {
   if (!steps.every(step => verified.has(step.id))) return;
-  const manifest = { formatVersion: 1, network: 'robinhood-testnet', chainId: 46630, rpcUrl: RPC, explorerUrl: EXPLORER,
+  const manifest = { formatVersion: 2, network: 'robinhood-testnet', chainId: 46630, rpcUrl: RPC, explorerUrl: EXPLORER,
     owner: config.owner, verifier: config.verifier, treasury: config.treasury, engineVersion: config.engineVersion,
-    economics: { rewardCap: '1024000000', generationsEntry: '110', prizePoolShare: '100', treasuryShare: '10', rfDecimals: 18, rewardDecimals: 6 },
+    economics, launchRecipient: config.launchRecipient, launchAllocation: config.launchAllocation, artifactFingerprint: fingerprint,
     rf: state.deployments.rf.address, genesis: state.deployments.genesis.address,
-    generations: state.deployments.generations.address, game: state.deployments.game.address, token: state.deployments.game.token,
+    generations: state.deployments.generations.address, game: state.deployments.game.address, token: state.deployments.rewardToken.address, rewardToken: state.deployments.rewardToken.address,
     deployedAt: new Date().toISOString(), deploymentMethod: 'browser-wallet-console', deployments: state.deployments,
     sourceInput: 'rare-rush-standard-input.json', note: 'Test assets only. Not real Rare Friends ownership or a live market.' };
-  const url = URL.createObjectURL(new Blob([JSON.stringify(manifest, null, 2) + '\n'], { type: 'application/json' }));
+  const url = URL.createObjectURL(new Blob([JSON.stringify(manifest, (_, item) => typeof item === 'bigint' ? item.toString() : item, 2) + '\n'], { type: 'application/json' }));
   const link = document.createElement('a'); link.href = url; link.download = 'rare-rush-robinhood-testnet.json'; link.click();
   setTimeout(() => URL.revokeObjectURL(url), 1_000);
 }
 async function initialize() {
-  const names = ['TestRF', 'TestFriends', 'RareRushGame', 'RareRushToken'];
+  const names = ARTIFACT_NAMES;
   const readJson = async path => { const response = await fetch(path); if (!response.ok) throw new Error(`Could not load ${path}. Restart the local console after compiling.`); return response.json(); };
   [config, artifacts] = await Promise.all([readJson('/config.json'), Promise.all(names.map(async name => [name, await readJson(`/artifacts/${name}.json`)])).then(Object.fromEntries)]);
-  if (config.chainId !== 46630 || !same(config.owner, OWNER) || !isAddress(config.verifier) || !isAddress(config.treasury) || /^0x0{40}$/i.test(config.treasury) || !validHash(config.engineVersion)) throw new Error('Invalid public deployment configuration.');
+  config = publicConfig(config);
   for (const name of names) if (!Array.isArray(artifacts[name].abi) || !/^0x[0-9a-f]+$/i.test(artifacts[name].bytecode)) throw new Error(`Invalid ${name} artifact. Recompile before deployment.`);
-  $('owner').textContent = config.owner; $('treasury').textContent = config.treasury; $('verifier').textContent = config.verifier; $('engine').textContent = config.engineVersion;
-  fingerprint = keccak256(stringToHex(JSON.stringify([config.treasury.toLowerCase(), names.map(name => [name, artifacts[name].bytecode])])));
-  key = `rare-rush-testnet-deploy:${config.owner.toLowerCase()}:${config.verifier.toLowerCase()}:${config.engineVersion.toLowerCase()}`;
-  state = loadState(); persist();
-  await verifyProgress(); ready = true; render(); await refreshWallet();
+  $('owner').textContent = config.owner; $('treasury').textContent = config.treasury; $('verifier').textContent = config.verifier; $('engine').textContent = config.engineVersion; $('reserve').textContent = config.launchRecipient;
+  fingerprint = artifactFingerprint(config, artifacts);
+  key = `rare-rush-testnet-deploy:${config.owner.toLowerCase()}`;
+  if (!navigator.locks) throw new Error('This browser does not support safe cross-tab deployment locking. Use a current browser.');
+  busy = true;
+  message('wallet-status', 'Waiting for the shared deployment lock, then checking saved progress…');
+  try {
+    await navigator.locks.request(key, async () => {
+      state = loadState(); persist();
+      await verifyProgress(); ready = true; render(); await refreshWallet();
+    });
+  } finally { busy = false; render(); }
   message('wallet-status', window.ethereum ? 'Connect when ready. No wallet request opens until you click.' : 'Install or enable a browser wallet, then reload this local page.');
   if (window.ethereum?.on) {
     window.ethereum.on('accountsChanged', accounts => { account = accounts[0]; void refreshWallet().catch(error => message('wallet-status', readable(error), true)); });

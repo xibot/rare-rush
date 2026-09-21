@@ -4,8 +4,8 @@ An isolated contract and verifier prototype for **test assets only**. The public
 
 ## What works
 
-- `RareRushToken`: six-decimal `tRARERUSH`, fixed lifetime cap of **1,024,000,000**, minted only through its deploying game; no burn or adjustable cap.
-- `RareRushGame`: NFT-gated starts, three starts per NFT per UTC day, one active run per NFT, signed single-use claims, emergency pause, two-step ownership, verifier rotation, and owner-administered prize awards.
+- `RareRushToken`: six-decimal `tRARERUSH`, fixed lifetime cap of **1,024,000,000**, a one-time 10% launch reserve and 90% reserved for verified gameplay minting; no burn or adjustable cap. It inherits the same token implementation validated by `infra/doppler`.
+- `RareRushGame`: owner-only, one-time binding to the external reward token; starts remain disabled until binding is complete. NFT-gated starts, three starts per NFT per UTC day, one active run per NFT, signed single-use claims, emergency pause, two-step ownership, verifier rotation, and owner-administered prize awards.
 - `TestRF`: a valueless `tRF` faucet, 1,100 per wallet per UTC day (ten paid test entries).
 - `TestFriends`: separate, freely mintable test Genesis and test Generations collections. These do **not** represent real Rare Friends ownership.
 - A verifier that replays the existing 120 Hz game engine, reconstructs pickups, and signs only runs that survive the timer with at least one heart. Client scores, coins, seeds, and state overrides are never accepted.
@@ -52,13 +52,13 @@ npm run prepare:operator -- 0x6fD155b9D52F80E8A73a8A2537268602978486e2
 npm run console
 ```
 
-Open `http://127.0.0.1:4174` in your wallet-enabled desktop browser. The console is pinned to XIBOT's chosen owner wallet above and asks you to approve each of four deployments: test RF, test Genesis, test Generations, and the game. The game creates its reward token internally. Fund that owner with **test ETH** from the official faucet first. Save the downloaded deployment manifest after all receipts succeed. Pending transaction hashes are saved in the browser so a refresh can resume confirmation rather than duplicate deployment.
+Open `http://127.0.0.1:4174` in your wallet-enabled desktop browser. The console is pinned to XIBOT's chosen owner wallet above and asks you to approve six transactions: deploy test RF, test Genesis, test Generations, the game, and the external reward token; then bind that token to the game. The token reserves 102.4 million tokens in the configured owner wallet, with 921.6 million left unminted for gameplay. This reserve is not yet a liquidity pool. Fund that owner with **test ETH** from the official faucet first. Save the downloaded deployment manifest after all receipts succeed. Pending transaction hashes are saved in the browser so a refresh can resume confirmation rather than duplicate deployment.
 
 `prepare:operator` creates a dedicated verifier key in ignored `.env.testnet` with owner-only filesystem permissions and emits an ignored `operator-config.json` containing public addresses only. It reuses an existing local key and never prints it. Back up the secret securely before operating the verifier; never commit it, put it in a browser bundle, or use this test signer for assets with value. The console cannot serve the secret file. This is a local operator setup, not a hosted secrets-management system.
 
-The optional second address argument to `prepare:operator` selects the treasury; it defaults to the owner wallet for this testnet setup. The deployment page displays it before signing. The constructor fixes that address permanently, and every paid start forwards 10 tRF to it atomically. Changing game ownership does not redirect the treasury. A different treasury or revised immutable economics requires a new game deployment. Refresh the console after recompiling; if any earlier package has a pending or confirmed deployment, it preserves and blocks that progress for reconciliation instead of silently deploying again.
+The optional second address argument to `prepare:operator` selects the treasury; it defaults to the owner wallet for this testnet setup. The deployment page displays it before signing. The constructor fixes that address permanently, and every paid start forwards 10 tRF to it atomically. Changing game ownership does not redirect the treasury or the reward token's immutable game minter. The one-time token binding checks the cap, decimals, launch allocation and untouched initial supply before enabling runs. A different treasury or revised immutable economics requires a new game deployment. Refresh the console after recompiling; if any earlier package has a pending or confirmed deployment, it preserves and blocks that progress for reconciliation instead of silently deploying again.
 
-The optional CLI `npm run deploy` performs read-only preflight. CLI broadcasting requires an explicitly configured `RUSH_DEPLOYER_PRIVATE_KEY` and `npm run deploy -- --broadcast`; there is no default public-network key. The browser route avoids exporting your wallet key. CLI deployments checkpoint each transaction into `deployments/`; inspect a partial manifest before attempting another broadcast. Explorer verification uses `artifacts/standard-input.json`, Solidity `v0.8.30+commit.73712a01`, optimization 200, Cancun, and constructor arguments from the manifest.
+The optional CLI `npm run deploy` performs read-only preflight and reports the artifact fingerprint, configured allocation and test ETH balance. CLI broadcasting is disabled; use the six-operation browser console, which checkpoints each pending transaction and verifies it before enabling the next step. No deployer key is exported or loaded. Never clear existing pending progress to retry an ambiguous transaction. Explorer verification uses `artifacts/standard-input.json`, Solidity `v0.8.30+commit.73712a01`, optimization 200, Cancun, and constructor arguments from the manifest.
 
 ## Entry and reward rules
 
@@ -73,14 +73,16 @@ The optional CLI `npm run deploy` performs read-only preflight. CLI broadcasting
 | Genesis reward | 100×, stacked with difficulty and bonus coins |
 | Flying bonus coin | One pickup, 10× reward |
 | Initial ordinary Normal reward | 10 tRARERUSH |
-| Global reduction | Right-shift base reward once per 10,000 successful claimed pickups |
+| Global reduction | Halve the base once per 10,000 successful claimed pickups, with a 1-token base floor |
+| Launch reserve | **102,400,000 tRARERUSH (10%)**, minted once to the configured owner |
+| Gameplay allocation | **921,600,000 tRARERUSH (90%)**, minted only after verified claims |
 | Shared cap | **1,024,000,000 tRARERUSH**; final reward clips to remaining supply |
 | Claim window | Run duration + 15 minutes from start |
 | Verifier receipt validity | Up to five minutes, never beyond the run's claim window |
 
-The cap matches RF's **initial** supply amount from the [official RF docs](https://rarefriends.com/docs/rarefriends). RF itself is issued initially with no later minting; tRARERUSH starts at zero and mints verified rewards, so the issuance models differ. These remain **test parameters**, not finalized launch economics.
+The cap matches RF's **initial** supply amount from the [official RF docs](https://rarefriends.com/docs/rarefriends). RF itself is issued initially with no later minting; tRARERUSH initially mints only its launch reserve, then mints verified rewards from its remaining gameplay allocation, so the issuance models differ. These remain **test parameters**, not finalized launch economics.
 
-The cap is a maximum, not a promise to emit every token. The original 10-token base and 10,000-pickup halving interval remain unchanged. Even the mathematical upper bound in which every pickup earns all three maximum multipliers (2× Degen, 10× bonus, 100× Genesis) is **399,999,840 tokens** across the whole schedule; actual gameplay yields less. Reaching the full 1.024 billion would require a separately agreed emission schedule.
+The agreed first-test allocation is 10% launch / 90% gameplay. The initial 10-token base and 10,000-pickup reduction interval remain, but the provisional test curve now has a **1-token base floor** before multipliers. This avoids the old zero-emission dead end and lets continued successful play exhaust the gameplay allocation. It does not establish a calendar date for full emission. The final claim clips to the unminted gameplay budget; Genesis, difficulty and bonus multipliers share this same budget. Mainnet allocations, reward rates, liquidity funding and emission duration still require separate decisions.
 
 The daily counter belongs to the NFT, so transferring it does not reset its allowance. A lost or abandoned run consumes its start and entry fee. Call `abandonRun` to clear that NFT's active slot immediately; otherwise the slot clears when its claim window expires. Only the original player, still owning the NFT, can claim. Transferring the NFT while a run is pending can therefore prevent a claim.
 

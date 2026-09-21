@@ -5,9 +5,26 @@ export const RPC_URL = 'https://rpc.testnet.chain.robinhood.com';
 export const EXPLORER_URL = 'https://explorer.testnet.chain.robinhood.com';
 export const FAUCET_URL = 'https://faucet.testnet.chain.robinhood.com';
 export const REWARD_CAP = 1_024_000_000n * 1_000_000n;
+export const LAUNCH_ALLOCATION = REWARD_CAP / 10n;
+export const GAMEPLAY_ALLOCATION = REWARD_CAP - LAUNCH_ALLOCATION;
 export type Contracts = Record<'game' | 'rf' | 'genesis' | 'generations' | 'rewardToken', Address>;
 export type PublicConfig = { version: 1; chainId: typeof CHAIN_ID; contracts: Contracts | null; deploymentConsoleUrl: string | null };
 export const CONTRACT_KEYS = ['game', 'rf', 'genesis', 'generations', 'rewardToken'] as const;
+
+export function assertRewardEconomics(value: {
+  cap: bigint; decimals: number; minter: Address; game: Address;
+  launch: bigint; expectedLaunch: bigint; gameplay: bigint; minted: bigint; supply: bigint;
+  initial: bigint; minimum: bigint; interval: bigint;
+}) {
+  if (value.cap !== REWARD_CAP || value.decimals !== 6 ||
+      value.minter.toLowerCase() !== value.game.toLowerCase() ||
+      value.launch !== LAUNCH_ALLOCATION || value.expectedLaunch !== LAUNCH_ALLOCATION ||
+      value.gameplay !== GAMEPLAY_ALLOCATION || value.minted < 0n || value.minted > GAMEPLAY_ALLOCATION ||
+      value.supply !== value.launch + value.minted ||
+      value.initial !== 10_000_000n || value.minimum !== 1_000_000n || value.interval !== 10_000n) {
+    throw new Error('The reward token or test emission settings do not match this test kit. Actions are disabled.');
+  }
+}
 
 function record(value: unknown): Record<string, unknown> {
   if (!value || typeof value !== 'object' || Array.isArray(value)) throw new Error('Invalid public configuration.');

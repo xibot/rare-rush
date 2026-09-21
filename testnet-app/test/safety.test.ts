@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import { CHAIN_ID, actionBlockReason, assertWalletContext, escapeHtml, faucetReady, parseConfig } from '../src/safety.ts';
+import { CHAIN_ID, GAMEPLAY_ALLOCATION, LAUNCH_ALLOCATION, REWARD_CAP, actionBlockReason, assertRewardEconomics, assertWalletContext, escapeHtml, faucetReady, parseConfig } from '../src/safety.ts';
 import type { Address } from 'viem';
 const address = (id: number) => `0x${id.toString(16).padStart(40, '0')}` as Address;
 const configured = () => parseConfig({ version: 1, chainId: CHAIN_ID, contracts: { game: address(1), rf: address(2), genesis: address(3), generations: address(4), rewardToken: address(5) }, deploymentConsoleUrl: null });
@@ -44,4 +44,23 @@ test('daily faucet availability uses chain UTC midnight boundaries', () => {
 });
 test('wallet and provider error strings cannot inject markup', () => {
   assert.equal(escapeHtml('<img src=x onerror="run()">'), '&lt;img src=x onerror=&quot;run()&quot;&gt;');
+});
+
+const economics = () => ({ cap: REWARD_CAP, decimals: 6, minter: address(1), game: address(1),
+  launch: LAUNCH_ALLOCATION, expectedLaunch: LAUNCH_ALLOCATION, gameplay: GAMEPLAY_ALLOCATION,
+  minted: 0n, supply: LAUNCH_ALLOCATION, initial: 10_000_000n, minimum: 1_000_000n, interval: 10_000n });
+
+test('external reward token validates at launch, after claims and at the lifetime cap', () => {
+  assert.doesNotThrow(() => assertRewardEconomics(economics()));
+  assert.doesNotThrow(() => assertRewardEconomics({ ...economics(), minted: 110_000_000n, supply: LAUNCH_ALLOCATION + 110_000_000n }));
+  assert.doesNotThrow(() => assertRewardEconomics({ ...economics(), minted: GAMEPLAY_ALLOCATION, supply: REWARD_CAP }));
+});
+
+test('wrong minter, allocation, token accounting or obsolete emission schedule disables faucets', () => {
+  for (const changed of [
+    { minter: address(2) }, { cap: REWARD_CAP + 1n }, { decimals: 18 },
+    { launch: 0n }, { expectedLaunch: 0n }, { gameplay: REWARD_CAP },
+    { minted: 1n }, { minted: GAMEPLAY_ALLOCATION + 1n, supply: REWARD_CAP + 1n },
+    { initial: 1_000_000n }, { minimum: 0n }, { interval: 100_000n },
+  ]) assert.throws(() => assertRewardEconomics({ ...economics(), ...changed }), /do not match/);
 });

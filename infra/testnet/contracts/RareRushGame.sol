@@ -10,8 +10,17 @@ import {EIP712} from "@openzeppelin/contracts/utils/cryptography/EIP712.sol";
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import {IERC721} from "@openzeppelin/contracts/token/ERC721/IERC721.sol";
-import {RareRushToken} from "./RareRushToken.sol";
 import {TestnetOnly} from "./TestnetOnly.sol";
+
+interface IRewardToken is IERC20 {
+    function CAP() external view returns (uint256);
+    function decimals() external view returns (uint8);
+    function rewardMinter() external view returns (address);
+    function launchAllocation() external view returns (uint256);
+    function rewardAllocation() external view returns (uint256);
+    function rewardsMinted() external view returns (uint256);
+    function mintReward(address recipient, uint256 amount) external;
+}
 
 interface IGenerations is IERC721 {
     function generation(uint256 tokenId) external view returns (uint256);
@@ -32,6 +41,8 @@ contract RareRushGame is Ownable2Step, Pausable, ReentrancyGuard, EIP712, Testne
     uint256 public constant TREASURY_SHARE = 10 ether;
     uint256 public constant ENTRY_FEE = PRIZE_POOL_SHARE + TREASURY_SHARE;
     uint256 public constant INITIAL_COIN_REWARD = 10 * 1e6;
+    uint256 public constant MIN_COIN_REWARD = 1 * 1e6;
+    uint256 public constant REWARD_SUPPLY_CAP = 1_024_000_000 * 1e6;
     uint256 public constant HALVING_INTERVAL = 10_000;
     uint256 public constant MAX_DAILY_RUNS = 3;
     uint256 public constant MAX_PICKUPS = 512;
@@ -53,7 +64,8 @@ contract RareRushGame is Ownable2Step, Pausable, ReentrancyGuard, EIP712, Testne
         bool abandoned;
     }
 
-    RareRushToken public immutable token;
+    IRewardToken public token;
+    uint256 public immutable expectedLaunchAllocation;
     IERC20 public immutable rf;
     address public immutable treasury;
     IERC721 public immutable genesis;
@@ -94,6 +106,10 @@ contract RareRushGame is Ownable2Step, Pausable, ReentrancyGuard, EIP712, Testne
     error InvalidPickupKind();
     error InvalidAward();
     error PrizePoolInsufficient();
+    error InvalidLaunchAllocation();
+    error RewardTokenNotBound();
+    error RewardTokenAlreadyBound();
+    error InvalidRewardToken();
 
     event RunStarted(
         uint256 indexed runId,
@@ -125,6 +141,7 @@ contract RareRushGame is Ownable2Step, Pausable, ReentrancyGuard, EIP712, Testne
     );
     event VerifierChanged(address indexed oldVerifier, address indexed newVerifier, uint256 epoch);
     event PrizeAwarded(bytes32 indexed awardId, address indexed recipient, uint256 amount);
+    event RewardTokenBound(address indexed token, uint256 launchAllocation, uint256 rewardAllocation);
 
     constructor(
         address initialOwner,
@@ -133,13 +150,15 @@ contract RareRushGame is Ownable2Step, Pausable, ReentrancyGuard, EIP712, Testne
         address rfAddress,
         address genesisAddress,
         address generationsAddress,
-        bytes32 version
+        bytes32 version,
+        uint256 launchAllocation
     ) Ownable(initialOwner) EIP712("RareRushTestnet", "1") {
         if (
             initialVerifier == address(0) || treasuryAddress == address(0)
                 || treasuryAddress == address(this)
         ) revert InvalidAddress();
         if (version == bytes32(0)) revert InvalidEngineVersion();
+        if (launchAllocation == 0 || launchAllocation >= REWARD_SUPPLY_CAP) revert InvalidLaunchAllocation();
         _requireContract(rfAddress);
         _requireContract(genesisAddress);
         _requireContract(generationsAddress);
@@ -149,7 +168,26 @@ contract RareRushGame is Ownable2Step, Pausable, ReentrancyGuard, EIP712, Testne
         genesis = IERC721(genesisAddress);
         generations = IGenerations(generationsAddress);
         engineVersion = version;
-        token = new RareRushToken();
+        expectedLaunchAllocation = launchAllocation;
+    }
+
+    /// @notice Bind the separately deployed, fresh reward token exactly once.
+    /// @dev The owner must verify the deployed source; these checks validate its configuration.
+    ///      The launch reserve is already minted, while only this game can mint the remainder.
+    function bindRewardToken(address tokenAddress) external onlyOwner {
+        if (address(token) != address(0)) revert RewardTokenAlreadyBound();
+        _requireContract(tokenAddress);
+        IRewardToken candidate = IRewardToken(tokenAddress);
+        if (
+            candidate.CAP() != REWARD_SUPPLY_CAP || candidate.decimals() != 6
+                || candidate.rewardMinter() != address(this)
+                || candidate.launchAllocation() != expectedLaunchAllocation
+                || candidate.rewardAllocation() != REWARD_SUPPLY_CAP - expectedLaunchAllocation
+                || candidate.rewardsMinted() != 0
+                || candidate.totalSupply() != expectedLaunchAllocation
+        ) revert InvalidRewardToken();
+        token = candidate;
+        emit RewardTokenBound(tokenAddress, expectedLaunchAllocation, candidate.rewardAllocation());
     }
 
     /// @param collection 0 = test Generations; 1 = test Genesis.
@@ -162,6 +200,7 @@ contract RareRushGame is Ownable2Step, Pausable, ReentrancyGuard, EIP712, Testne
         whenNotPaused
         returns (uint256 runId)
     {
+        _requireRewardToken();
         _validateOptions(collection, difficulty);
         _checkOwnership(collection, tokenId, msg.sender);
         bytes32 nft = nftKey(collection, tokenId);
@@ -230,6 +269,7 @@ contract RareRushGame is Ownable2Step, Pausable, ReentrancyGuard, EIP712, Testne
         uint256 deadline,
         bytes calldata signature
     ) external nonReentrant whenNotPaused returns (uint256 reward) {
+        _requireRewardToken();
         Run storage run = runs[runId];
         _checkRunPlayer(run);
         if (run.claimed || run.abandoned) revert RunFinalized();
@@ -251,7 +291,7 @@ contract RareRushGame is Ownable2Step, Pausable, ReentrancyGuard, EIP712, Testne
         run.claimed = true;
         claimedPickups += pickupKinds.length;
         _clearActiveRun(runId, run);
-        if (reward != 0) token.mint(msg.sender, reward);
+        if (reward != 0) token.mintReward(msg.sender, reward);
         emit RunClaimed(runId, msg.sender, pickupKinds.length, reward, replayHash);
     }
 
@@ -272,13 +312,16 @@ contract RareRushGame is Ownable2Step, Pausable, ReentrancyGuard, EIP712, Testne
         view
         returns (uint256 reward)
     {
+        _requireRewardToken();
         _validateOptions(collection, difficulty);
         if (pickupKinds.length > MAX_PICKUPS) revert TooManyPickups();
-        uint256 remaining = token.CAP() - token.totalSupply();
+        uint256 remaining = token.rewardAllocation() - token.rewardsMinted();
         for (uint256 i; i < pickupKinds.length; ++i) {
             uint8 kind = uint8(pickupKinds[i]);
             if (kind > 1) revert InvalidPickupKind();
             uint256 coinReward = INITIAL_COIN_REWARD >> ((claimedPickups + i) / HALVING_INTERVAL);
+            // Provisional test schedule: a base floor avoids a zero-emission dead end.
+            if (coinReward < MIN_COIN_REWARD) coinReward = MIN_COIN_REWARD;
             if (difficulty == 0) coinReward = coinReward * 3 / 4;
             else if (difficulty == 2) coinReward *= 2;
             if (kind == 1) coinReward *= 10;
@@ -336,6 +379,10 @@ contract RareRushGame is Ownable2Step, Pausable, ReentrancyGuard, EIP712, Testne
     function _requireContract(address account) private view {
         if (account == address(0)) revert InvalidAddress();
         if (account.code.length == 0) revert ContractRequired(account);
+    }
+
+    function _requireRewardToken() private view {
+        if (address(token) == address(0)) revert RewardTokenNotBound();
     }
 
     function _validateOptions(uint8 collection, uint8 difficulty) private pure {

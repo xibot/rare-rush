@@ -35,9 +35,11 @@ export async function localFixture() {
   const genesis = await deploy(nftArtifact, [true]);
   const generations = await deploy(nftArtifact, [false]);
   const version = await currentEngineVersion();
-  const game = await deploy(gameArtifact, [player.address, verifier.address, treasury.address, rf, genesis, generations, version]);
+  const launchAllocation = 102_400_000n * 1_000_000n;
+  const game = await deploy(gameArtifact, [player.address, verifier.address, treasury.address, rf, genesis, generations, version, launchAllocation]);
   const read = (functionName: string, args: unknown[] = []) => client.readContract({ address: game, abi: gameArtifact.abi, functionName, args });
   const write = async (address: `0x${string}`, abi: any, functionName: string, args: unknown[] = []) => mined(await wallet.writeContract({ address, abi, functionName, args }));
-  const token = await read('token') as `0x${string}`;
-  return { client, wallet, player, verifier, treasury, verifierKey, game, rf, genesis, generations, token, version, gameArtifact, rfArtifact, nftArtifact, tokenArtifact, read, write, mined };
+  const token = await deploy(tokenArtifact, [treasury.address, player.address, game, launchAllocation]);
+  await write(game, gameArtifact.abi, 'bindRewardToken', [token]);
+  return { client, wallet, player, verifier, treasury, verifierKey, game, rf, genesis, generations, token, launchAllocation, version, gameArtifact, rfArtifact, nftArtifact, tokenArtifact, read, write, mined };
 }

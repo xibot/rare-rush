@@ -1,9 +1,9 @@
 name: Testnet contracts and replay verification
 on:
   push:
-    paths: ['infra/testnet/**', 'games/rare-rush/engine.ts', 'games/rare-rush/difficulty.ts', '.github/workflows/testnet.yml']
+    paths: ['infra/testnet/**', 'infra/doppler/contracts/RareRushDopplerPrototype.sol', 'games/rare-rush/engine.ts', 'games/rare-rush/difficulty.ts', '.github/workflows/testnet.yml']
   pull_request:
-    paths: ['infra/testnet/**', 'games/rare-rush/engine.ts', 'games/rare-rush/difficulty.ts', '.github/workflows/testnet.yml']
+    paths: ['infra/testnet/**', 'infra/doppler/contracts/RareRushDopplerPrototype.sol', 'games/rare-rush/engine.ts', 'games/rare-rush/difficulty.ts', '.github/workflows/testnet.yml']
 permissions:
   contents: read
 jobs:

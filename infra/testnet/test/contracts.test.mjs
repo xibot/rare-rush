@@ -117,6 +117,7 @@ function event(receipt, contract, name) {
 }
 
 const engineVersion = digest('rare-rush-local-engine-v1');
+const launchAllocation = 102_400_000n * 1_000_000n;
 const types = {
   RunResult: [
     { name: 'runId', type: 'uint256' },
@@ -173,8 +174,9 @@ before(async () => {
   const rf = await deployed('TestRF', [], owner);
   const genesis = await deployed('TestFriends', [true], owner);
   const generations = await deployed('TestFriends', [false], owner);
-  const game = await deployed('RareRushGame', [owner, verifier.address, treasury, rf.address, genesis.address, generations.address, engineVersion], owner);
-  const token = { address: await read(game, 'token'), abi: (await artifact('RareRushToken')).abi };
+  const game = await deployed('RareRushGame', [owner, verifier.address, treasury, rf.address, genesis.address, generations.address, engineVersion, launchAllocation], owner);
+  const token = await deployed('RareRushToken', [owner, owner, game.address, launchAllocation], owner);
+  await send(game, 'bindRewardToken', [token.address], owner);
   f = { owner, player, other, treasury, rf, genesis, generations, game, token };
   for (const playerAccount of [player, other]) {
     await send(rf, 'faucet', [], playerAccount);
@@ -192,6 +194,93 @@ before(async () => {
 beforeEach(async () => {
   assert.equal(await publicClient.request({ method: 'evm_revert', params: [snapshot] }), true);
   snapshot = await publicClient.request({ method: 'evm_snapshot', params: [] });
+});
+
+async function unboundGame(allocation = launchAllocation) {
+  return deployed('RareRushGame', [f.owner, verifier.address, f.treasury, f.rf.address, f.genesis.address, f.generations.address, engineVersion, allocation], f.owner);
+}
+
+describe('external capped reward token binding', () => {
+  it('uses the same source implementation validated by the Doppler proof', async () => {
+    const compiled = await artifact('RareRushToken');
+    const sharedSource = await readFile(new URL('../../doppler/contracts/RareRushDopplerPrototype.sol', import.meta.url), 'utf8');
+    assert.equal(compiled.metadata.sources['doppler/contracts/RareRushDopplerPrototype.sol'].keccak256, keccak256(stringToHex(sharedSource)));
+    assert.equal(await read(f.token, 'name'), 'Rare Rush Testnet');
+    assert.equal(await read(f.token, 'launchAllocation'), launchAllocation);
+    assert.equal(await read(f.token, 'rewardAllocation'), 921_600_000n * 1_000_000n);
+    assert.equal(await read(f.token, 'totalSupply'), launchAllocation);
+    assert.equal(await read(f.token, 'rewardsMinted'), 0n);
+  });
+
+  it('blocks starts, reward quotes and claims until its separate token is bound', async () => {
+    const game = await unboundGame();
+    assert.equal(await read(game, 'token'), zeroAddress);
+    for (const collection of [0, 1]) {
+      await reverts(game, 'startRun', [collection, 1n, 1], f.player, 'RewardTokenNotBound');
+    }
+    await reverts(game, 'quoteReward', ['0x00', 0, 1], f.player, 'RewardTokenNotBound');
+    await reverts(game, 'claim', [1n, '0x00', digest('unbound'), 1n, '0x'], f.player, 'RewardTokenNotBound');
+    assert.equal(await read(game, 'runCount'), 0n);
+    assert.equal(await read(game, 'prizePoolBalance'), 0n);
+    assert.equal(await read(f.rf, 'balanceOf', [f.player]), parseEther('1100'));
+  });
+
+  it('allows only the owner to bind once and never to replace the token', async () => {
+    const game = await unboundGame();
+    const token = await deployed('RareRushToken', [f.owner, f.owner, game.address, launchAllocation], f.owner);
+    await reverts(game, 'bindRewardToken', [token.address], f.player, 'OwnableUnauthorizedAccount');
+    await reverts(game, 'bindRewardToken', [zeroAddress], f.owner, 'InvalidAddress');
+    await reverts(game, 'bindRewardToken', [f.player], f.owner, 'ContractRequired');
+    const receipt = await send(game, 'bindRewardToken', [token.address], f.owner);
+    const bound = event(receipt, game, 'RewardTokenBound');
+    assert.equal(bound.token.toLowerCase(), token.address.toLowerCase());
+    assert.equal(bound.launchAllocation, launchAllocation);
+    assert.equal(bound.rewardAllocation, 921_600_000n * 1_000_000n);
+    await reverts(game, 'bindRewardToken', [token.address], f.owner, 'RewardTokenAlreadyBound');
+    await reverts(game, 'bindRewardToken', [f.token.address], f.owner, 'RewardTokenAlreadyBound');
+    await start(1, 1, 1n, f.player, game);
+  });
+
+  it('rejects every incorrect token configuration without consuming the binding slot', async () => {
+    const game = await unboundGame();
+    const cap = 1_024_000_000n * 1_000_000n;
+    const valid = [cap, 6, game.address, launchAllocation, cap - launchAllocation, 0n, launchAllocation];
+    const wrongValues = [cap + 1n, 18, f.game.address, launchAllocation - 1n, cap - launchAllocation - 1n, 1n, launchAllocation + 1n];
+    for (const [index, value] of wrongValues.entries()) {
+      const args = [...valid];
+      args[index] = value;
+      const candidate = await deployed('BindingCandidate', args, f.owner);
+      await reverts(game, 'bindRewardToken', [candidate.address], f.owner, 'InvalidRewardToken');
+      assert.equal(await read(game, 'token'), zeroAddress);
+    }
+    // Real tokens tied to another game or with the wrong launch reserve also fail.
+    await reverts(game, 'bindRewardToken', [f.token.address], f.owner, 'InvalidRewardToken');
+    const wrongAllocation = await deployed('RareRushToken', [f.owner, f.owner, game.address, launchAllocation - 1n], f.owner);
+    await reverts(game, 'bindRewardToken', [wrongAllocation.address], f.owner, 'InvalidRewardToken');
+    const fresh = await deployed('RareRushToken', [f.owner, f.owner, game.address, launchAllocation], f.owner);
+    await send(game, 'bindRewardToken', [fresh.address], f.owner);
+  });
+
+  it('rejects an already-used token even when its immutable game and allocation match', async () => {
+    const game = await unboundGame();
+    const token = await deployed('RareRushToken', [f.owner, f.owner, game.address, launchAllocation], f.owner);
+    await publicClient.request({ method: 'hardhat_impersonateAccount', params: [game.address] });
+    await publicClient.request({ method: 'hardhat_setBalance', params: [game.address, toHex(parseEther('1'))] });
+    try { await send(token, 'mintReward', [f.player, 1n], game.address); }
+    finally { await publicClient.request({ method: 'hardhat_stopImpersonatingAccount', params: [game.address] }); }
+    await reverts(game, 'bindRewardToken', [token.address], f.owner, 'InvalidRewardToken');
+    assert.equal(await read(game, 'token'), zeroAddress);
+  });
+
+  it('requires a nonzero launch reserve smaller than the cap at game construction', async () => {
+    for (const allocation of [0n, 1_024_000_000n * 1_000_000n, 1_024_000_000n * 1_000_000n + 1n]) {
+      await assert.rejects(unboundGame(allocation), error => {
+        const selector = error.details?.match(/return data: (0x[0-9a-f]{8})/i)?.[1];
+        assert.equal(selector, digest('InvalidLaunchAllocation()').slice(0, 10), error.shortMessage);
+        return true;
+      });
+    }
+  });
 });
 
 describe('test economy and custody', () => {
@@ -261,16 +350,34 @@ describe('test economy and custody', () => {
     assert.equal(await read(f.game, 'claimedPickups'), 10_008n);
   });
 
+  it('reaches the provisional one-token floor through real claims and preserves multipliers', async () => {
+    // Exercise all four halvings through normal signed claims; no storage or reward-rate overrides.
+    for (let i = 0; i < 78; i++) {
+      if (i > 0 && i % 3 === 0) await advance(86_400);
+      await finish(await start(1, 1), `0x${'00'.repeat(512)}`);
+    }
+    assert.equal(await read(f.game, 'claimedPickups'), 39_936n);
+    await advance(86_400);
+    const boundary = await finish(await start(1, 1), `0x${'00'.repeat(72)}`);
+    assert.equal(boundary.reward, (64n * 1_250_000n + 8n * 1_000_000n) * 100n);
+    assert.equal(await read(f.game, 'MIN_COIN_REWARD'), 1_000_000n);
+    assert.equal(await read(f.game, 'quoteReward', ['0x00', 0, 1]), 1_000_000n);
+    assert.equal(await read(f.game, 'quoteReward', ['0x00', 0, 0]), 750_000n);
+    assert.equal(await read(f.game, 'quoteReward', ['0x01', 1, 2]), 2_000_000_000n);
+    const floored = await finish(await start(0, 1), '0x0001');
+    assert.equal(floored.reward, 11_000_000n);
+  });
+
   it('clips rewards at the shared cap and never mints above it across claims', async () => {
     const cap = await read(f.token, 'CAP');
     assert.equal(cap, 1_024_000_000n * 1_000_000n);
     // Local-only boundary fixture: impersonate the authorized game minter to
-    // approach the cap. The halving schedule cannot reach this supply naturally.
+    // approach the cap without spending hundreds of millions of gameplay pickups.
     // This uses the real mint guard, without altering contract storage or rates.
     await publicClient.request({ method: 'hardhat_impersonateAccount', params: [f.game.address] });
     await publicClient.request({ method: 'hardhat_setBalance', params: [f.game.address, toHex(parseEther('1'))] });
     try {
-      await send(f.token, 'mint', [f.other, cap - 25_000n * 1_000_000n], f.game.address);
+      await send(f.token, 'mintReward', [f.other, cap - launchAllocation - 25_000n * 1_000_000n], f.game.address);
     } finally {
       await publicClient.request({ method: 'hardhat_stopImpersonatingAccount', params: [f.game.address] });
     }
@@ -281,20 +388,30 @@ describe('test economy and custody', () => {
     const third = await finish(await start(1, 2), '0x01');
     assert.equal(third.reward, 0n);
     assert.equal(await read(f.token, 'totalSupply'), cap);
+    assert.equal(await read(f.token, 'rewardsMinted'), cap - launchAllocation);
+    assert.equal(await read(f.token, 'balanceOf', [f.owner]), launchAllocation);
     assert.equal(await read(f.token, 'balanceOf', [f.player]), 25_000n * 1_000_000n);
     assert.equal(await read(f.game, 'claimedPickups'), 3n);
   });
 
   it('lets only the game mint and independently enforces the token cap', async () => {
-    await reverts(f.token, 'mint', [f.player, 1n], f.owner, 'OnlyGame');
-    await reverts(f.token, 'mint', [f.player, 1n], f.player, 'OnlyGame');
-    // A separately deployed token models the game as its deployer for this unit boundary.
-    const token = await deployed('RareRushToken', [], f.owner);
-    const cap = await read(token, 'CAP');
+    await reverts(f.token, 'mintReward', [f.player, 1n], f.owner, 'OnlyRewardMinter');
+    await reverts(f.token, 'mintReward', [f.player, 1n], f.player, 'OnlyRewardMinter');
+    // Token ownership controls the migration lock, never reward minting.
+    await send(f.token, 'transferOwnership', [f.other], f.owner);
+    await reverts(f.token, 'mintReward', [f.player, 1n], f.other, 'OnlyRewardMinter');
+    assert.equal((await read(f.token, 'rewardMinter')).toLowerCase(), f.game.address.toLowerCase());
+    const cap = await read(f.token, 'CAP');
     assert.equal(cap, 1_024_000_000n * 1_000_000n);
-    await send(token, 'mint', [f.player, cap], f.owner);
-    await reverts(token, 'mint', [f.player, 1n], f.owner, 'SupplyCapExceeded');
-    assert.equal(await read(token, 'totalSupply'), cap);
+    await publicClient.request({ method: 'hardhat_impersonateAccount', params: [f.game.address] });
+    await publicClient.request({ method: 'hardhat_setBalance', params: [f.game.address, toHex(parseEther('1'))] });
+    try {
+      await send(f.token, 'mintReward', [f.player, cap - launchAllocation], f.game.address);
+      await reverts(f.token, 'mintReward', [f.player, 1n], f.game.address, 'RewardAllocationExceeded');
+    } finally {
+      await publicClient.request({ method: 'hardhat_stopImpersonatingAccount', params: [f.game.address] });
+    }
+    assert.equal(await read(f.token, 'totalSupply'), cap);
   });
 
   it('requires all 110 tRF of allowance and reverts without charging or consuming an attempt', async () => {
@@ -334,7 +451,9 @@ describe('NFT eligibility and run lifecycle', () => {
     await reverts(f.game, 'startRun', [1, 1n, 1], f.other, 'NotNftOwner');
     await reverts(f.game, 'startRun', [2, 1n, 1], f.player, 'InvalidCollection');
     await reverts(f.game, 'startRun', [0, 1n, 3], f.player, 'InvalidDifficulty');
-    const mismatch = await deployed('RareRushGame', [f.owner, verifier.address, f.treasury, f.rf.address, f.genesis.address, f.genesis.address, engineVersion], f.owner);
+    const mismatch = await deployed('RareRushGame', [f.owner, verifier.address, f.treasury, f.rf.address, f.genesis.address, f.genesis.address, engineVersion, launchAllocation], f.owner);
+    const mismatchToken = await deployed('RareRushToken', [f.owner, f.owner, mismatch.address, launchAllocation], f.owner);
+    await send(mismatch, 'bindRewardToken', [mismatchToken.address], f.owner);
     await reverts(mismatch, 'startRun', [0, 1n, 1], f.player, 'NotHardwiredGenerations');
     assert.equal(await read(f.game, 'runCount'), 0n);
   });
@@ -415,7 +534,7 @@ describe('signed receipt authorization', () => {
     const run = await start();
     await advance(991);
     await reverts(f.game, 'claim', await signed(run), f.player, 'ClaimExpired');
-    assert.equal(await read(f.token, 'totalSupply'), 0n);
+    assert.equal(await read(f.token, 'totalSupply'), launchAllocation);
   });
 
   it('binds the signature to verifier, chain, contract, player, engine, run, seed, deadline and ordered pickups', async () => {
@@ -442,7 +561,7 @@ describe('signed receipt authorization', () => {
     await reverts(f.game, 'claim', [valid[0], '0x0101', ...valid.slice(2)], f.player, 'InvalidVerifierSignature');
     await reverts(f.game, 'claim', [valid[0], valid[1], digest('tampered-replay'), ...valid.slice(3)], f.player, 'InvalidVerifierSignature');
     await reverts(f.game, 'claim', valid, f.other, 'NotRunPlayer');
-    assert.equal(await read(f.token, 'totalSupply'), 0n);
+    assert.equal(await read(f.token, 'totalSupply'), launchAllocation);
     await send(f.game, 'claim', valid, f.player);
     assert.equal(await read(f.token, 'balanceOf', [f.player]), 110_000_000n);
   });
@@ -454,7 +573,7 @@ describe('signed receipt authorization', () => {
     await reverts(f.game, 'claim', await signed(run, `0x${'00'.repeat(513)}`), f.player, 'TooManyPickups');
     await reverts(f.game, 'claim', await signed(run, '0x00', { replayHash: zeroHash }), f.player, 'InvalidReplayHash');
     assert.equal(await read(f.game, 'claimedPickups'), 0n);
-    assert.equal(await read(f.token, 'totalSupply'), 0n);
+    assert.equal(await read(f.token, 'totalSupply'), launchAllocation);
   });
 });
 
