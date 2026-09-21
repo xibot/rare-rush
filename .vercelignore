@@ -4,4 +4,4 @@ artifacts
 .git
 .env*
 games/*/.friendsdk
-darfts
+drafts
