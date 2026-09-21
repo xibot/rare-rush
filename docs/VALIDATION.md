@@ -67,3 +67,11 @@ The local game server listens at port 4173. The test browser was installed under
 - Thumbnail queues, deadlines and caches are bounded; a slow or unavailable preview leaves the Friend selectable. Genesis caches are scoped to the wallet revision, and Generations only decorates the SDK’s currently listed owned Friends. Unit tests explicitly reject active SVG metadata and establish that a public portrait cannot authorize entry.
 - TypeScript, all 83 unit tests and FriendSDK validation passed. Desktop Generations and small-phone Generations/Genesis picker screenshots were visually inspected.
 - Landing, docs and pitch browser suites passed again after updating their wallet-gate checks to the new visible connection controls.
+
+## Arcade home and Friend navigation
+
+- The arcade logo returns the top-level page to the landing. The start card's **BACK** button returns to the active collection's Friend picker, preserving the connected wallet and artwork; choosing a Friend still performs fresh ownership verification.
+- `npm run test:entry` passed at 1440×1000, 390×844 and 360×640, including both navigation actions and rejection of messages from unrelated windows or with arbitrary destinations. The Generations iframe retains `sandbox="allow-scripts"`; Genesis navigation uses its existing authenticated MessagePort.
+- `npm run test:genesis` passed all three viewport cases plus the existing ownership-transfer, wallet-race, network, disconnect, delayed-read, failure and direct-entry checks. Returning to selection does not request another wallet connection.
+- TypeScript, FriendSDK validation and the production build passed. Desktop and small-phone start cards were visually inspected: the logo and BACK targets remain at least 44px high, with no overlap between the start card and game controls.
+- The five-case `npm run test:browser` suite passed again, covering Normal at all three sizes, phone Easy and small-phone Degen, including gameplay, rewards, pause, results and difficulty changes.

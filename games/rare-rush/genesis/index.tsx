@@ -1,3 +1,4 @@
+import { parseArcadeNavigation } from '../navigation';
 import { useEffect, useRef, useState } from 'react';
 import { createRoot } from 'react-dom/client';
 import { createFriendPublicClient, createFriendWalletSession } from '@rarefriends/friendsdk/wallet';
@@ -167,7 +168,14 @@ function GenesisHost() {
       bridge.current = { port: channel.port1, nonce, key: active.key };
       let lastStart = 0, startPending = false;
       channel.port1.onmessage = async ({ data: request }) => {
-        if (activeRef.current?.key !== active.key || bridge.current?.port !== channel.port1 || request?.type !== 'start' || !Number.isSafeInteger(request.id) || request.id <= lastStart) return;
+        if (activeRef.current?.key !== active.key || bridge.current?.port !== channel.port1) return;
+        const destination = parseArcadeNavigation(request);
+        if (destination) {
+          leave();
+          if (destination === 'home') window.location.assign('/');
+          return;
+        }
+        if (request?.type !== 'start' || !Number.isSafeInteger(request.id) || request.id <= lastStart) return;
         lastStart = request.id;
         if (startPending) { channel.port1.postMessage({ type: 'start-result', id: request.id, allowed: false }); return; }
         startPending = true;

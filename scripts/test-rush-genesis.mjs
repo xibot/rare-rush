@@ -112,6 +112,24 @@ try {
     assert.equal(await game.locator('body').evaluate(() => typeof window.ethereum), 'undefined', 'No wallet reaches the game sandbox');
     assert(await game.locator('body').evaluate(() => { try { localStorage.getItem('test'); return false; } catch { return true; } }));
     assert(await game.locator('h1').evaluate(async () => { await document.fonts.ready; return [...document.fonts].some(f => f.family === 'Silkscreen' && f.status === 'loaded'); }), 'Fonts load under opaque-origin CORS');
+    const gameBack = game.getByRole('button', { name: 'Back to Friend selection', exact: true });
+    const home = game.getByRole('button', { name: 'Rare Rush home', exact: true });
+    for (const control of [gameBack, home]) {
+      const bounds = await control.boundingBox();
+      assert(bounds && bounds.width >= 44 && bounds.height >= 44, 'Genesis arcade navigation has usable touch targets');
+    }
+    const beforeBackMethods = await page.evaluate(() => [...window.testWallet.methods]);
+    await gameBack.click();
+    await page.locator('iframe').waitFor({ state: 'detached' });
+    await friendCard.waitFor();
+    assert.equal(page.url(), `${origin}/genesis/`, 'Arcade BACK restores the Genesis NFT selector');
+    assert.equal(await friendCard.locator('img').getAttribute('src'), portrait, 'Returning preserves the original NFT portrait');
+    assert.deepEqual(await page.evaluate(() => window.testWallet.methods), beforeBackMethods, 'Returning to the Genesis selector never reconnects the wallet');
+    await page.screenshot({ path: `artifacts/genesis-${width}-back-to-friends.png`, fullPage: true });
+    const beforeReselect = state.ownerReads;
+    await friendCard.click();
+    await game.getByRole('button', { name: /LET’S RUSH/ }).waitFor();
+    assert(state.ownerReads > beforeReselect, 'Reselecting Genesis performs fresh ownership checks');
     for (const [mode, reward] of [['Easy', '750'], ['Degen', '2,000'], ['Normal', '1,000']]) {
       await game.getByRole('button', { name: `${mode} difficulty` }).click();
       assert.equal(await game.locator('.economy-bar b').innerText(), reward);
@@ -138,10 +156,16 @@ try {
     await page.screenshot({ path: `artifacts/genesis-${width}-running.png` });
     await page.getByRole('button', { name: 'CHANGE FRIEND', exact: true }).click();
     assert.equal(await page.locator('iframe').count(), 0);
-    assert.deepEqual(state.errors, []); assert.deepEqual(state.unexpected, []);
     assert((await page.evaluate(() => window.testWallet.methods)).every(method => ['eth_accounts', 'eth_chainId'].includes(method)), 'Gameplay never asks for signatures or transactions');
+    await friendCard.click();
+    await game.getByRole('button', { name: /LET’S RUSH/ }).waitFor();
+    await home.click();
+    await page.waitForURL(`${origin}/`);
+    assert.equal(await page.locator('iframe').count(), 0, 'Genesis arcade logo navigates the top-level page home');
+    await page.getByRole('link', { name: /PLAY WITH YOUR FRIEND/i }).waitFor();
+    assert.deepEqual(state.errors, []); assert.deepEqual(state.unexpected, []);
     await page.close();
-    console.log(`${width}px: verified Genesis picker, isolated sandbox, artwork, 100× rewards, free entry and responsive layout passed`);
+    console.log(`${width}px: verified Genesis picker, BACK/home navigation, isolated sandbox, artwork, 100× rewards, free entry and responsive layout passed`);
   }
   {
     const f = await fixture(); await openGame(f);

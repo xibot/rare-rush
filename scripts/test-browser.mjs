@@ -19,6 +19,17 @@ for (const [width, difficulty] of [[1100, 'normal'], [390, 'normal'], [360, 'nor
       assert(pixelFontLoaded, 'The Rare Friends pixel font loads inside the game sandbox');
       assert.equal(await game.locator('.arcade-logo small').innerText(), 'BY XIBOT');
       assert.equal(await game.locator('.arcade-logo [data-canonical-face="08"]').count(), 1, 'Arcade uses the same bear-token logo as the landing');
+      for (const name of ['Rare Rush home', 'Back to Friend selection']) {
+        const control = game.getByRole('button', { name, exact: true });
+        const bounds = await control.boundingBox();
+        assert(bounds && bounds.width >= 44 && bounds.height >= 44, `${name} has a usable touch target`);
+        assert(await control.evaluate(button => {
+          const action = button.getBoundingClientRect();
+          const frame = document.querySelector('.rare-rush').getBoundingClientRect();
+          return action.top >= frame.top && action.bottom <= frame.bottom
+            && action.left >= frame.left && action.right <= frame.right;
+        }), `${name} fits inside the sandbox at this viewport`);
+      }
       assert(await game.locator('.arcade-logo').evaluate(logo => {
         const credit = logo.querySelector('small').getBoundingClientRect();
         const actions = document.querySelector('.top-actions').getBoundingClientRect();

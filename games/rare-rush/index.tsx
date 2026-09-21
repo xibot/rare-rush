@@ -11,22 +11,24 @@ import { WorldArt } from './WorldArt';
 import { TokenCoin } from './CanonicalArt';
 import { BrandMark } from './BrandMark';
 import { FriendSprite as Sprite, EntityArt } from './RunnerArt';
+import { requestArcadeNavigation } from './navigation';
 import './style.css';
 
 type Screen = 'ready' | 'running' | 'result';
 type Panel = 'rules' | 'economy' | null;
+type ArcadeNavigation = (destination: 'home' | 'friends') => void;
 const BIOMES = ['GARDEN COMMONS', 'CIRCUIT COURTYARD', 'CRYSTAL STEPS'];
 
-export default function RareRush(props: GameComponentProps) {
+export default function RareRush(props: GameComponentProps & { onNavigate?: ArcadeNavigation }) {
   return <Runner {...props}/>;
 }
 
 /** Only the separately verified Genesis sandbox host supplies this adapter. */
-export function GenesisRush({ portraitUrl, beforeRun, ...props }: { friendId: bigint; paused: boolean; portraitUrl: string; beforeRun: () => Promise<void> }) {
+export function GenesisRush({ portraitUrl, beforeRun, ...props }: { friendId: bigint; paused: boolean; portraitUrl: string; beforeRun: () => Promise<void>; onNavigate?: ArcadeNavigation }) {
   return <Runner {...props} genesis={{ portraitUrl, beforeRun }}/>;
 }
 
-function Runner({ friendId, client, paused, genesis }: { friendId: bigint; client?: GameClient; paused: boolean; genesis?: { portraitUrl: string; beforeRun: () => Promise<void> } }) {
+function Runner({ friendId, client, paused, genesis, onNavigate = requestArcadeNavigation }: { friendId: bigint; client?: GameClient; paused: boolean; genesis?: { portraitUrl: string; beforeRun: () => Promise<void> }; onNavigate?: ArcadeNavigation }) {
   const collection = genesis ? 'genesis' : 'generations';
   const [sprites, setSprites] = useState<GenerationSprites | null>(null);
   const [starting, setStarting] = useState(false);
@@ -182,7 +184,7 @@ function Runner({ friendId, client, paused, genesis }: { friendId: bigint; clien
     : sprites ? <Sprite sprites={sprites} frame={frame} walking={walking}/> : null;
 
   return <section ref={root} className={`rare-rush ${reduced ? 'reduce-motion' : ''}`} data-collection={collection} data-screen={screen} data-difficulty={run.difficulty} data-run-duration={run.duration} data-bonus-coins={run.bonusCoins} aria-label="Rare Rush arcade game">
-    <div className="arcade-top"><div className="arcade-logo" aria-label="Rare Rush by Xibot"><BrandMark/></div>
+    <div className="arcade-top"><button type="button" className="arcade-logo" aria-label="Rare Rush home" onClick={() => onNavigate('home')}><BrandMark/></button>
       <div className="top-actions"><span className="preview-tag">SIMULATED</span><button onClick={() => { const next = !muted; setMuted(next); sounds.current?.setMuted(next); if (!next) void sounds.current?.unlock(); focusWorld(); }} aria-label={muted ? 'Turn sound on' : 'Mute sound'} title={muted ? 'Sound off' : 'Sound on'}>{muted ? '♪ OFF' : '♪ ON'}</button>
         <button onClick={() => { setReduced(value => !value); focusWorld(); }} aria-pressed={reduced} title="Reduce background motion">FX {reduced ? 'OFF' : 'ON'}</button>
         {running ? <button onClick={() => { setUserPaused(value => !value); focusWorld(); }} aria-label={userPaused ? 'Resume game' : 'Pause game'}>{userPaused ? '▶' : 'Ⅱ'}</button> : <button onClick={() => setPanel('rules')} aria-label="How to play">?</button>}
@@ -215,7 +217,7 @@ function Runner({ friendId, client, paused, genesis }: { friendId: bigint; clien
     {!loaded && <div className="game-overlay loading-screen"><div className="loading-pixel"/><p role={error?'alert':'status'}>{error || 'Loading your Rare Friend…'}</p>{error && <button className="primary" onClick={() => setRetry(value => value + 1)}>Try again</button>}</div>}
     {loaded && screen === 'ready' && <div className="start-screen">
       <div className="start-title"><span className="eyebrow">ENDLESS WORLD. {mode.seconds} SECONDS.</span><h1>RARE<br/><span>RUSH</span><sup>✦</sup></h1>{hasCharacter && <svg className="mobile-friend" viewBox="-1 -1 18 18" aria-label={genesis ? 'Your Genesis Friend' : `Your ${sprites?.familyName} Friend`}>{renderCharacter(0)}</svg>}<div className="selected-friend">{genesis ? 'GENESIS' : 'FRIEND'} #{friendId.toString()}<span>{genesis ? '100× DEMO REWARDS' : sprites?.familyName}</span></div></div>
-      <div className="start-card"><span className="card-kicker">YOUR NEXT HIGH SCORE STARTS HERE</span><h2>Run. Collect.<br/>{' '}Stay rare.</h2>
+      <div className="start-card"><div className="start-card-heading"><span className="card-kicker">YOUR NEXT HIGH SCORE STARTS HERE</span><button type="button" className="start-back" aria-label="Back to Friend selection" onClick={() => onNavigate('friends')}>BACK</button></div><h2>Run. Collect.<br/>{' '}Stay rare.</h2>
         <div className="difficulty-picker" role="group" aria-label="Choose difficulty">{DIFFICULTY_ORDER.map(key => <button key={key} type="button" aria-pressed={difficulty === key} aria-label={`${DIFFICULTIES[key].label} difficulty`} onClick={() => chooseDifficulty(key)}><b>{DIFFICULTIES[key].label}</b><span>{DIFFICULTIES[key].seconds}s · {DIFFICULTIES[key].rewardLabel}</span></button>)}</div>
         <div className="mode-description" aria-live="polite">{mode.description}<span>{mode.rewardLabel} rewards · 3 hearts</span></div>
         <button className="primary start-button" disabled={starting} onClick={start}>{starting ? 'CHECKING YOUR FRIEND…' : 'LET’S RUSH'} <span>↗</span></button><small className="entry-note">{genesis ? 'GENESIS · FREE ENTRY · 100× DEMO REWARDS' : '1 demo RF · All fees → demo prize pool'}</small>

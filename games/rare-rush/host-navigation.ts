@@ -1,3 +1,4 @@
+import { parseArcadeNavigation } from './navigation';
 import { syncFriendPortraits, cleanupFriendPortraits } from './host-portraits';
 
 /** Site chrome for the outer SDK host. Wallet, ownership and gameplay stay in FriendSDK. */
@@ -38,11 +39,19 @@ function enhanceGenerationsEntry(): void {
     if (!pickerOpen) cleanupFriendPortraits();
   };
 
+  const navigate = (event: MessageEvent<unknown>) => {
+    const destination = parseArcadeNavigation(event.data);
+    const frame = root.querySelector<HTMLIFrameElement>('.rf-frame-viewport > iframe');
+    if (!destination || !frame?.contentWindow || event.source !== frame.contentWindow || event.origin !== 'null') return;
+    if (destination === 'home') window.location.assign('/');
+    else root.querySelector<HTMLButtonElement>('.rf-frame-toolbar button[aria-label="Choose Friend"]')?.click();
+  };
+  window.addEventListener('message', navigate);
   const observer = new MutationObserver(update);
   const observe = () => { observer.observe(root, { childList: true, characterData: true, subtree: true }); update(); };
   observe();
-  window.addEventListener('pagehide', () => { observer.disconnect(); cleanupFriendPortraits(); });
-  window.addEventListener('pageshow', event => { if (event.persisted) observe(); });
+  window.addEventListener('pagehide', () => { observer.disconnect(); cleanupFriendPortraits(); window.removeEventListener('message', navigate); });
+  window.addEventListener('pageshow', event => { if (event.persisted) { window.addEventListener('message', navigate); observe(); } });
 }
 
 if (window.self === window.top && /^\/play(?:\/|$)/.test(window.location.pathname)) {

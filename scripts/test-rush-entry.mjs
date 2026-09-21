@@ -55,6 +55,46 @@ try {
     assert.equal(await page.locator('iframe').getAttribute('sandbox'), 'allow-scripts');
     assert.equal(await page.locator('body.rush-generations-selecting').count(), 0);
     assert.equal(await page.locator('.rush-generations-chrome').count(), 0);
+    const gameBack = game.getByRole('button', { name: 'Back to Friend selection', exact: true });
+    const home = game.getByRole('button', { name: 'Rare Rush home', exact: true });
+    for (const control of [gameBack, home]) {
+      const bounds = await control.boundingBox();
+      assert(bounds && bounds.width >= 44 && bounds.height >= 44, 'Arcade navigation has usable touch targets');
+    }
+    if (width === 1440) {
+      // A same-page sender and an unrelated opaque iframe cannot command the game host.
+      await page.evaluate(() => {
+        window.postMessage({ type: 'rarerush:navigate', destination: 'home' }, location.origin);
+        const unrelated = document.createElement('iframe');
+        unrelated.id = 'unrelated-navigation-sender';
+        unrelated.hidden = true;
+        unrelated.sandbox.add('allow-scripts');
+        unrelated.srcdoc = '<!doctype html><body></body>';
+        document.body.append(unrelated);
+      });
+      await page.frameLocator('#unrelated-navigation-sender').locator('body').evaluate(() => {
+        parent.postMessage({ type: 'rarerush:navigate', destination: 'home' }, '*');
+        parent.postMessage({ type: 'rarerush:navigate', destination: 'friends' }, '*');
+      });
+      await page.waitForTimeout(50);
+      await page.locator('#unrelated-navigation-sender').evaluate(node => node.remove());
+      assert.equal(page.url(), `${origin}/play/`, 'Only the active SDK child can request navigation');
+      assert.equal(await page.getByRole('dialog', { name: 'Choose your Friend', exact: true }).count(), 0);
+      await game.locator('body').evaluate(() => parent.postMessage({ type: 'rarerush:navigate', destination: 'https://example.invalid/' }, '*'));
+      await page.waitForTimeout(50);
+      assert.equal(page.url(), `${origin}/play/`, 'Even the active child cannot choose an arbitrary navigation URL');
+    }
+    const beforeBackRequests = await page.evaluate(() => window.__friendWalletTest.state.requests.filter(method => method === 'eth_requestAccounts').length);
+    await gameBack.click();
+    await friend.waitFor();
+    assert.equal(page.url(), `${origin}/play/`, 'Arcade BACK returns to the existing SDK Friend selector');
+    assert.equal(await friend.getAttribute('aria-pressed'), 'true', 'The previously selected Friend stays selected');
+    await friend.locator('img.rush-friend-portrait').waitFor();
+    assert.equal(await page.evaluate(() => window.__friendWalletTest.state.requests.filter(method => method === 'eth_requestAccounts').length), beforeBackRequests,
+      'Going back to Friends does not reconnect the wallet');
+    await page.screenshot({ path: `artifacts/generations-${width}-back-to-friends.png`, fullPage: true });
+    await friend.click();
+    await game.getByRole('button', { name: /LET’S RUSH/ }).waitFor();
     await page.getByRole('button', { name: 'Choose Friend', exact: true }).click();
     await page.locator('.rush-generations-chrome').waitFor();
     assert.equal(await page.locator('.rush-generations-chrome').count(), 1);
@@ -75,9 +115,18 @@ try {
     await page.getByRole('alert').filter({ hasText: /declined|rejected/i }).waitFor();
     assert.equal(await back.count(), 1, 'Connection errors retain the top collection link');
     await back.click(); await page.waitForURL(`${origin}/arcade/`);
+    // A fresh page restores the fixture's normal wallet response after the rejected-request case.
+    await page.locator('a[href="/play/"]').click();
+    await connect.click();
+    await friend.click();
+    await game.getByRole('button', { name: /LET’S RUSH/ }).waitFor();
+    await home.click();
+    await page.waitForURL(`${origin}/`);
+    assert.equal(await page.locator('iframe').count(), 0, 'The arcade logo leaves the top-level host for the public landing');
+    await page.getByRole('link', { name: /PLAY WITH YOUR FRIEND/i }).waitFor();
     assert.deepEqual(errors, []); assert.deepEqual(fixture.errors, []);
     await page.close();
-    console.log(`${width}px: branded entry, keyboard collection navigation, real sprite previews, verified selection, menu reuse and disconnect passed`);
+    console.log(`${width}px: branded entry, real sprite previews, verified selection, arcade BACK/home navigation, menu reuse and disconnect passed`);
   }
   const page = await browser.newPage({ viewport: { width: 360, height: 640 } });
   await page.goto(`${origin}/play/`);
