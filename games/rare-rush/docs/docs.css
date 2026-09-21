@@ -138,6 +138,27 @@ button { color: inherit; }
 .journey-step h3 { font-size: 16px; }
 .journey-step p { font-size: 15px; line-height: 1.6; color: #ccc; margin-bottom: 15px; }
 .status-tag { display: inline-block; max-width: 100%; padding: 5px 8px; border: 1px solid currentColor; color: var(--lime); font: 500 11px/1.5 var(--rush-font-mono); }
+.claim-concept { container-type: inline-size; margin-top: 34px; padding-top: 30px; border-top: 1px solid #fff7; }
+.claim-concept > .status-tag { margin-bottom: 20px; }
+.docs-section .claim-concept > h3 { font-size: clamp(24px, 2.4vw, 32px); }
+.claim-concept > h3 span { color: var(--lime); }
+.claim-concept-intro { color: #ccc; margin-bottom: 24px; }
+.claim-concept-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 16px; margin: 0; padding: 0; list-style: none; }
+.claim-concept-grid > li { min-width: 0; border: 1px solid var(--paper); display: flex; flex-direction: column; }
+.claim-concept-step { display: block; padding: 17px 17px 0; color: var(--lime); font: 500 11px/1.5 var(--rush-font-mono); }
+.claim-concept-art { width: 100%; height: auto; max-height: 300px; overflow: hidden; }
+.claim-concept-caption { border-top: 1px solid #fff7; padding: 20px 17px; flex: 1; }
+.claim-concept-caption h4 { margin: 0 0 11px; font: 400 18px/1.4 var(--rush-font-display); }
+.claim-concept-caption p { margin-bottom: 0; color: #ccc; font-size: 15px; line-height: 1.6; }
+.claim-concept-rule { margin: 21px 0 0; font: 400 13px/1.65 var(--rush-font-mono); color: #ccc; }
+.claim-concept-rule strong { color: var(--lime); }
+.claim-concept-current { margin: 17px 0 0; padding: 17px 19px; border-left: 3px solid var(--lime); background: #151515; font: 400 13px/1.65 var(--rush-font-mono); color: #ccc; max-width: none; }
+.claim-concept-current strong { color: var(--paper); }
+@container (max-width: 760px) {
+  .claim-concept-grid { grid-template-columns: minmax(0, 1fr); }
+  .claim-concept-art { max-height: 240px; }
+  .claim-concept-caption { padding: 20px; }
+}
 .pair-card { display: grid; grid-template-columns: minmax(0, .95fr) minmax(0, 1fr); gap: 29px; align-items: center; padding: 28px; border: 1px solid #fff7; margin-top: 28px; }
 .pair-art { display: flex; justify-content: center; align-items: center; gap: 14px; text-align: center; }
 .pair-art > div { min-width: 0; }
