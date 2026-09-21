@@ -9,18 +9,20 @@ npm ci
 npm run dev
 ```
 
-Open http://localhost:4173 for the landing page and wallet-free autoplay preview. The play button opens http://localhost:4173/arcade/ to choose a collection. Genesis holders use `/genesis/` with fresh ownership checks and their original artwork; eligible hardwired Generations holders (generation ≥1) use the unchanged FriendSDK route at `/play/`. Both need a browser wallet on Robinhood mainnet (4663). Phone controls are built in; open https://rarerush.vercel.app in your wallet’s browser for HTTPS wallet play.
+Open http://localhost:4173 for the landing page and wallet-free autoplay preview. The play button opens http://localhost:4173/arcade/ to choose a collection. Genesis holders use `/genesis/` with fresh ownership checks and their original artwork; eligible hardwired Generations holders (generation ≥1) use the unchanged FriendSDK route at `/play/`. Both need a browser wallet on Robinhood mainnet (4663). Phone controls are built in; open https://rarerush.app in your wallet’s browser for HTTPS wallet play.
 
-The public [Rare Rush 101 guide](https://rarerush.vercel.app/docs/) explains controls, difficulty, growth, surprise coins, and token plans using canonical SVG art and interactive examples. Its reward calculator uses the same reward code as the game to compare standard Generations rewards with the playable 100× Genesis demo boost.
+The visual [Rare Rush pitch](https://rarerush.app/pitch/) introduces the playable character experience, its game loop, the current demo economy and the planned token integrations. It includes a wallet-free autoplay run and links directly to the arcade.
+
+The public [Rare Rush 101 guide](https://rarerush.app/docs/) explains controls, difficulty, growth, surprise coins, and token plans using canonical SVG art and interactive examples. Its reward calculator uses the same reward code as the game to compare standard Generations rewards with the playable 100× Genesis demo boost.
 
 **This is a simulated economy prototype.** Entry fees, the reward token and prize pool have no monetary value and do not make transactions. The game implements a working local preview of the intended diminishing reward model. Verified Genesis testers enter free and earn 100× demo tokens per coin, stacked with difficulty and flying bonuses before the shared issuance cap. Real RARERUSH minting, the RARERUSH / RAREFRIENDS pair, and prize payouts remain future integrations.
 
 See [game instructions and exact rules](games/rare-rush/README.md), [economy design](docs/ECONOMY.md), and [submission draft](docs/SUBMISSION.md).
 
-Run `npm run typecheck:rush`, `npm run test:rush`, `npm run check`, `npm run build`, `npm run test:browser`, `npm run test:landing`, `npm run test:docs`, `npm run test:genesis`, and `npm run test:bonus` to validate Rare Rush. The unmodified FriendSDK v0.1.2 package is included for reproducibility. `dist/` is the static hosting output, with the landing page at its root, the public guide in `docs/`, collection choice in `arcade/`, the Genesis tester host in `genesis/`, and the SDK game inside `play/`.
+Run `npm run typecheck:rush`, `npm run test:rush`, `npm run check`, `npm run build`, `npm run test:browser`, `npm run test:landing`, `npm run test:docs`, `npm run test:pitch`, `npm run test:genesis`, and `npm run test:bonus` to validate Rare Rush. The unmodified FriendSDK v0.1.2 package is included for reproducibility. `dist/` is the static hosting output, with the landing page at its root, the public guide in `docs/`, the judge-facing pitch in `pitch/`, collection choice in `arcade/`, the Genesis tester host in `genesis/`, and the SDK game inside `play/`.
 
 The vibeathon submission remains a draft until the builder is happy with the playtest.
 
 ## Deployment
 
-The `rarerush` Vercel project belongs to XIBOT and serves [rarerush.vercel.app](https://rarerush.vercel.app). The committed configuration installs locked dependencies with `npm ci`, runs `npm run build`, and publishes only `dist/`; the package selects Node.js 22. It preserves `/docs/`, `/arcade/`, `/genesis/`, `/play/`, and the sandbox documents without a catch-all rewrite. No application environment variables or wallet secrets are required. Deployment remains separate from vibeathon submission.
+The `rarerush` Vercel project belongs to XIBOT and serves [rarerush.app](https://rarerush.app) and [rarerush.vercel.app](https://rarerush.vercel.app). The committed configuration installs locked dependencies with `npm ci`, runs `npm run build`, and publishes only `dist/`; the package selects Node.js 22. It preserves `/pitch/`, `/docs/`, `/arcade/`, `/genesis/`, `/play/`, and the sandbox documents without a catch-all rewrite. No application environment variables or wallet secrets are required. Deployment remains separate from vibeathon submission.

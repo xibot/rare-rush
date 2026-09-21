@@ -15,6 +15,7 @@
     "test:browser": "node scripts/test-browser.mjs",
     "test:landing": "node scripts/test-rush-landing.mjs",
     "test:docs": "node scripts/test-rush-docs.mjs",
+    "test:pitch": "node scripts/test-rush-pitch.mjs",
     "test:genesis": "node scripts/test-rush-genesis.mjs",
     "test:bonus": "node scripts/test-rush-bonus.mjs"
   },

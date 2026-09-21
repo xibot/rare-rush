@@ -17,7 +17,7 @@ export async function buildRushSite({ outdir = path.join(project, 'dist'), watch
   let page;
   try {
     page = await context({
-      absWorkingDir: project, entryPoints: { landing: path.join(landing, 'index.tsx'), 'docs/index': path.join(landing, '../docs/index.tsx'), 'genesis/index': path.join(landing, '../genesis/index.tsx'), 'genesis/child': path.join(landing, '../genesis/child.tsx') }, outdir,
+      absWorkingDir: project, entryPoints: { landing: path.join(landing, 'index.tsx'), 'docs/index': path.join(landing, '../docs/index.tsx'), 'pitch/index': path.join(landing, '../pitch/index.tsx'), 'genesis/index': path.join(landing, '../genesis/index.tsx'), 'genesis/child': path.join(landing, '../genesis/child.tsx') }, outdir,
       bundle: true, platform: 'browser', format: 'esm', target: 'es2022', jsx: 'automatic', minify: true,
       loader: { '.woff2': 'file' }, assetNames: 'assets/[name]-[hash]', metafile: true,
       define: { 'process.env.NODE_ENV': '"production"' }, logLevel: 'warning',
@@ -27,6 +27,8 @@ export async function buildRushSite({ outdir = path.join(project, 'dist'), watch
           await writeFile(path.join(outdir, 'index.html'), await readFile(path.join(landing, 'index.html')));
           await mkdir(path.join(outdir, 'docs'), { recursive: true });
           await writeFile(path.join(outdir, 'docs/index.html'), await readFile(path.join(landing, '../docs/index.html')));
+          await mkdir(path.join(outdir, 'pitch'), { recursive: true });
+          await writeFile(path.join(outdir, 'pitch/index.html'), await readFile(path.join(landing, '../pitch/index.html')));
           await mkdir(path.join(outdir, 'genesis'), { recursive: true });
           await mkdir(path.join(outdir, 'arcade'), { recursive: true });
           const genesisHTML = await readFile(path.join(landing, '../genesis/index.html'));
@@ -64,6 +66,10 @@ export function createRushSiteServer(outdir) {
     ['/docs/index.html', ['docs/index.html', 'text/html; charset=utf-8']],
     ['/docs/index.js', ['docs/index.js', 'text/javascript; charset=utf-8']],
     ['/docs/index.css', ['docs/index.css', 'text/css; charset=utf-8']],
+    ['/pitch/', ['pitch/index.html', 'text/html; charset=utf-8']],
+    ['/pitch/index.html', ['pitch/index.html', 'text/html; charset=utf-8']],
+    ['/pitch/index.js', ['pitch/index.js', 'text/javascript; charset=utf-8']],
+    ['/pitch/index.css', ['pitch/index.css', 'text/css; charset=utf-8']],
     ['/arcade/', ['arcade/index.html', 'text/html; charset=utf-8']],
     ['/genesis/', ['genesis/index.html', 'text/html; charset=utf-8']],
     ['/genesis/index.js', ['genesis/index.js', 'text/javascript; charset=utf-8']],
@@ -79,6 +85,7 @@ export function createRushSiteServer(outdir) {
       const url = new URL(request.url, 'http://localhost');
       if (url.pathname === '/play') { response.writeHead(308, { Location: '/play/' }).end(); return; }
       if (url.pathname === '/docs') { response.writeHead(308, { Location: '/docs/' }).end(); return; }
+      if (url.pathname === '/pitch') { response.writeHead(308, { Location: '/pitch/' }).end(); return; }
       if (url.pathname === '/arcade' || url.pathname === '/genesis') { response.writeHead(308, { Location: `${url.pathname}/` }).end(); return; }
       if (url.pathname.startsWith('/play/')) {
         request.url = url.pathname.slice('/play'.length) + url.search;
@@ -105,7 +112,7 @@ async function main() {
   const command = process.argv[2] ?? 'dev';
   if (!['dev', 'build'].includes(command)) throw new Error('Usage: node scripts/rush-site.mjs dev|build');
   const built = await buildRushSite({ watch: command === 'dev' });
-  if (command === 'build') { console.log(`Built landing, docs, collection picker, Genesis tester, and SDK game in ${built.outdir}`); return; }
+  if (command === 'build') { console.log(`Built landing, pitch, docs, collection picker, Genesis tester, and SDK game in ${built.outdir}`); return; }
   const server = createRushSiteServer(built.outdir);
   server.listen(4173, '0.0.0.0', () => console.log('Rare Rush: http://localhost:4173/ · arcade: http://localhost:4173/arcade/'));
   const stop = () => { server.close(); void built.close().finally(() => process.exit(0)); };

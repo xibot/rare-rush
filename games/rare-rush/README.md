@@ -11,7 +11,7 @@ npm ci
 npm run dev
 ```
 
-Open http://localhost:4173 on your computer. The landing page immediately shows a watch-only autoplay run without connecting a wallet. For wallet play on a phone, open https://rarerush.vercel.app in your wallet’s browser over HTTPS.
+Open http://localhost:4173 on your computer. The landing page immediately shows a watch-only autoplay run without connecting a wallet. For wallet play on a phone, open https://rarerush.app in your wallet’s browser over HTTPS.
 
 Select **Play with your Friend** to open `/arcade/` and choose your collection. Both use a browser wallet on **Robinhood mainnet, chain 4663**. **Generations** opens `/play/`, where FriendSDK handles connection, discovery, selection and fresh ownership verification for an owned hardwired NFT (generation 1+). **Genesis** opens `/genesis/`, a separate tester host that verifies Genesis ownership, reads the original token artwork, and checks ownership again before each run. Genesis-only wallets can play; no Generations NFT or activation payment is required. No transaction, RF funding or private key is needed for this simulation. Mobile browsers without an injected wallet cannot connect; use your wallet's built-in browser if supported. WalletConnect is not supplied by this SDK.
 
@@ -58,11 +58,12 @@ npx playwright install chromium
 npm run test:browser
 npm run test:landing
 npm run test:docs
+npm run test:pitch
 npm run test:genesis
 npm run test:bonus
 ```
 
-`dist/` contains the complete static site: landing HTML/JS/CSS at the root, the public guide under `docs/`, collection choice under `arcade/`, the verified Genesis tester host and its sandbox under `genesis/`, and the SDK's unchanged runtime and sandbox documents under `play/`. Host the whole folder over HTTPS, preserving relative paths and the generated sandbox CSP. `scripts/rush-site.mjs` builds and watches the site using the public SDK build API. The local server exposes only generated site files.
+`dist/` contains the complete static site: landing HTML/JS/CSS at the root, the public guide under `docs/`, the visual project pitch under `pitch/`, collection choice under `arcade/`, the verified Genesis tester host and its sandbox under `genesis/`, and the SDK's unchanged runtime and sandbox documents under `play/`. Host the whole folder over HTTPS, preserving relative paths and the generated sandbox CSP. `scripts/rush-site.mjs` builds and watches the site using the public SDK build API. The local server exposes only generated site files.
 
 Game tests use the SDK's automated-only fixture through the actual ownership gate. These fixtures are never included in public builds. Landing tests run without a wallet or RPC and check autoplay, coin growth, manual/automatic Friend rotation, pause, reduced motion, mobile fit and navigation through collection choice to the real wallet gates. Real wallet discovery and owned-art reads still need a human wallet playtest.
 

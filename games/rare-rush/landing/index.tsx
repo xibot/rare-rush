@@ -9,7 +9,7 @@ function Landing() {
   return <div className="rush-landing" id="top">
     <header className="landing-header">
       <a className="landing-logo" href="#top" aria-label="Rare Rush by Xibot home"><BrandMark/></a>
-      <nav aria-label="Main navigation"><a href="#how-to-play">HOW TO PLAY</a><a className="header-docs" href="./docs/">DOCS</a><a className="header-play" href="./arcade/">ENTER ARCADE <span>↗</span></a></nav>
+      <nav aria-label="Main navigation"><a href="#how-to-play">HOW TO PLAY</a><a className="header-docs" href="./docs/">DOCS</a><a href="./pitch/">PITCH</a><a className="header-play" href="./arcade/">ENTER ARCADE <span>↗</span></a></nav>
     </header>
 
     <main>
@@ -37,7 +37,7 @@ function Landing() {
       <div className="landing-play-note"><span>BUILT FOR YOUR PHONE. READY FOR YOUR DESKTOP.</span><a href="./arcade/">YOUR TURN <span>↗</span></a></div>
     </main>
 
-    <footer className="landing-footer"><div><b>RARE RUSH / VIBEATHON BUILD</b><p>Gameplay rewards are simulated. Nothing is minted or charged.<br/>Play with your Genesis or eligible Generations NFT on Robinhood Chain.</p></div><div><a href="./docs/">RARE RUSH 101 / DOCS ↗</a><a href="https://github.com/spokesz/friendsdk">BUILT WITH FRIENDSDK ↗</a><a href="https://rarefriends.com/">ART & WORLD BY RARE FRIENDS ↗</a></div></footer>
+    <footer className="landing-footer"><div><b>RARE RUSH / VIBEATHON BUILD</b><p>Gameplay rewards are simulated. Nothing is minted or charged.<br/>Play with your Genesis or eligible Generations NFT on Robinhood Chain.</p></div><div><a href="./pitch/">THE RARE RUSH PITCH ↗</a><a href="./docs/">RARE RUSH 101 / DOCS ↗</a><a href="https://github.com/spokesz/friendsdk">BUILT WITH FRIENDSDK ↗</a><a href="https://rarefriends.com/">ART & WORLD BY RARE FRIENDS ↗</a></div></footer>
   </div>;
 }
 

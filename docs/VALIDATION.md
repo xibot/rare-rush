@@ -24,7 +24,7 @@
 
 - Results navigation revision: the full-width **← Change difficulty** button returns to the previous selector and focuses the selected mode. TypeScript and static build passed. The five-case game browser suite passed, including desktop replay and phone result→selector→different mode→new run transitions. Ledger snapshots confirm returning/selecting preserves RF, earned tokens, pool and pickup count, while starting charges exactly one additional demo entry. The 44px button stays inside the results panel at every viewport, including 360×640; desktop and small-phone screenshots were visually inspected.
 
-The builder's actual Generations wallet connection, live ownership read and physical phone gameplay still need their manual playtest. Browser mocks do not establish that these work with every wallet. No signing, real transactions, token deployment, liquidity creation or vibeathon submission was performed.
+The builder confirmed a real Generations-wallet connection and completed run on rarerush.app on September 20, 2026, then reported that all three difficulties work with all their Generations Friends. Device details were not supplied; physical-phone and Genesis-wallet checks remain unconfirmed. This builder report is distinct from the automated fixture tests and does not establish compatibility with every wallet. No signing, real transactions, token deployment, liquidity creation or vibeathon submission was performed.
 
 The local game server listens at port 4173. The test browser was installed under `/private/tmp/rare-rush-browsers`; in this environment run `PLAYWRIGHT_BROWSERS_PATH=/private/tmp/rare-rush-browsers npm run test:browser`. On a new machine use `npx playwright install chromium` once, then `npm run test:browser` normally.
 
@@ -41,4 +41,14 @@ The local game server listens at port 4173. The test browser was installed under
 - Separate cases verify fresh ownership before every start, transfer rejection, wallet changes during a pending read, wrong-network gating and switching, disconnect, a slow 11-second handshake, RPC failure, back/forward-cache recovery, standalone child denial, and no-wallet denial. Browser fixtures are confined to test code; no signer or provider is sent into the child.
 - Typecheck, all 81 unit tests, SDK validation, and all five existing Generations browser cases passed after the shared runner refactor. Landing and docs suites also passed all three sizes.
 - A read-only live RPC smoke check found the real holdings and original portrait for public Genesis #1 using the canonical contract on Robinhood. Genesis IDs are 1–1024: ownerOf(0) reverts with ERC721NonexistentToken and has no Transfer history. No holder’s private credentials were used.
-- A human Genesis holder’s wallet connection and physical-phone playtest remain to be performed. No real rewards, signing, or transactions were tested or enabled.
+- A human Genesis holder’s wallet connection and physical-phone playtest remain unconfirmed. No real rewards, signing, or transactions were tested or enabled.
+
+- Builder confirmation (September 20, 2026): connected a real wallet holding Generations and completed a run on rarerush.app; subsequently confirmed Easy, Normal and Degen work with all their Generations Friends. No address was needed or collected. This is a user-reported check, not an independently observed wallet session.
+
+
+## Visual pitch page
+
+- `npm run typecheck` and `npm run build`: passed after adding the public `/pitch/` entry.
+- `npm run test:pitch`: passed at 1440×1000, 768×1024, 390×844 and 360×640. Checks cover visible navigation from home, docs and arcade; bundled Silkscreen; no horizontal overflow; BY XIBOT; real autoplay pickups; manual Friend changes; pause/resume; offscreen suspension; and play links through the collection selector to the real SDK ownership gate. No browser errors, failed assets or external requests occurred in these cases.
+- Reduced motion starts the preview paused and allows explicit opt-in. `/pitch` redirects to `/pitch/`; generated pitch assets are served while source, environment and package files remain unavailable.
+- Desktop and small-phone screenshots were visually inspected. The pitch reuses canonical Rare Friends artwork and the existing game preview. Current local demo accounting is distinguished from planned minting, run validation, liquidity and prize payouts.
