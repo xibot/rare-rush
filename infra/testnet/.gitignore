@@ -1,0 +1,6 @@
+artifacts/
+cache/
+coverage/
+deployments/local.json
+replays/
+operator-config.json

@@ -1,0 +1,23 @@
+name: Testnet contracts and replay verification
+on:
+  push:
+    paths: ['infra/testnet/**', 'games/rare-rush/engine.ts', 'games/rare-rush/difficulty.ts', '.github/workflows/testnet.yml']
+  pull_request:
+    paths: ['infra/testnet/**', 'games/rare-rush/engine.ts', 'games/rare-rush/difficulty.ts', '.github/workflows/testnet.yml']
+permissions:
+  contents: read
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: infra/testnet/package-lock.json
+      - run: npm ci
+      - run: npm --prefix infra/testnet ci
+      - run: npm --prefix infra/testnet run typecheck
+      - run: npm --prefix infra/testnet test
+      - run: npm --prefix infra/testnet run demo

@@ -27,6 +27,10 @@ Run `npm run typecheck:rush`, `npm run test:rush`, `npm run check`, `npm run bui
 
 The Rare Rush entry was submitted to the Rare Friends Vibeathon on September 20, 2026: [submission PR #22](https://github.com/spokesz/rarefriends-vibeathon/pull/22). It is open for organizer review.
 
-## Deployment
+## Testnet contract development
+
+An isolated [Robinhood testnet infrastructure workspace](infra/testnet/README.md) adds capped test-token minting, NFT run limits, entry/prize accounting, and a verifier that replays game inputs before authorizing claims. Its test assets and local wallet deployment console are separate from the submitted simulated game and excluded from the Vercel upload. See that workspace for contract tests, the local end-to-end demo, deployment instructions, and remaining integration work.
+
+## Website deployment
 
 The `rarerush` Vercel project belongs to XIBOT and serves [rarerush.app](https://rarerush.app) and [rarerush.vercel.app](https://rarerush.vercel.app). The committed configuration installs locked dependencies with `npm ci`, runs `npm run build`, and publishes only `dist/`; the package selects Node.js 22. It preserves `/pitch/`, `/docs/`, `/arcade/`, `/genesis/`, `/play/`, and the sandbox documents without a catch-all rewrite. No application environment variables or wallet secrets are required. Deployment remains separate from vibeathon submission.
