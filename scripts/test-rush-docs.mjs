@@ -74,7 +74,7 @@ try {
     await page.locator('#reward-holder').selectOption('genesis');
     assert.equal(await page.locator('[data-reward="ordinary"]').innerText(), '125');
     assert.equal(await page.locator('[data-reward="bonus"]').innerText(), '1,250');
-    assert.match(await page.locator('.holder-preview').innerText(), /not active in the arcade/);
+    assert.match(await page.locator('.holder-preview').innerText(), /free entry and 100× tokens per coin in the Genesis arcade/);
     await mode.selectOption('normal');
     await activity.focus();
     await activity.press('Home');
@@ -93,11 +93,14 @@ try {
     assert.deepEqual(failed, [], 'All bundled guide resources load');
     await page.screenshot({ path: `artifacts/docs-${width}-full.png`, fullPage: true });
     await page.getByRole('link', { name: 'LET’S RUSH ↗' }).click();
+    await page.waitForURL(`${origin}/arcade/`);
+    assert.equal(await page.locator('.collection-cards a[href="/genesis/"]').count(), 1, 'Guide offers the Genesis tester route');
+    await page.locator('.collection-cards a[href="/play/"]').click();
     await page.waitForURL(`${origin}/play/`);
     await page.locator('.rf-runtime-status').waitFor();
     assert.equal(await page.locator('iframe').count(), 0, 'Guide CTA reaches real ownership gate');
     await page.close();
-    console.log(`${width}px: navigation, fonts, layout, growth, reward curve, shared difficulty, FAQ and SDK entry passed`);
+    console.log(`${width}px: navigation, fonts, layout, growth, reward curve, shared difficulty, FAQ, collection choice and SDK entry passed`);
   }
   const page = await browser.newPage();
   const redirect = await page.request.get(`${origin}/docs`, { maxRedirects: 0 });

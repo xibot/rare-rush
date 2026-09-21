@@ -4,7 +4,14 @@
   "installCommand": "npm ci",
   "buildCommand": "npm run build",
   "outputDirectory": "dist",
+  "headers": [
+    { "source": "/genesis/child.js", "headers": [{ "key": "Access-Control-Allow-Origin", "value": "*" }] },
+    { "source": "/assets/(.*)", "headers": [{ "key": "Access-Control-Allow-Origin", "value": "*" }] },
+    { "source": "/genesis/game.html", "headers": [{ "key": "Content-Security-Policy", "value": "frame-ancestors 'self'" }] }
+  ],
   "redirects": [
+    { "source": "/arcade", "destination": "/arcade/", "permanent": true },
+    { "source": "/genesis", "destination": "/genesis/", "permanent": true },
     {
       "source": "/docs",
       "destination": "/docs/",

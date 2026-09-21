@@ -9,7 +9,7 @@ function Landing() {
   return <div className="rush-landing" id="top">
     <header className="landing-header">
       <a className="landing-logo" href="#top" aria-label="Rare Rush by Xibot home"><BrandMark/></a>
-      <nav aria-label="Main navigation"><a href="#how-to-play">HOW TO PLAY</a><a className="header-docs" href="./docs/">DOCS</a><a className="header-play" href="./play/">ENTER ARCADE <span>↗</span></a></nav>
+      <nav aria-label="Main navigation"><a href="#how-to-play">HOW TO PLAY</a><a className="header-docs" href="./docs/">DOCS</a><a className="header-play" href="./arcade/">ENTER ARCADE <span>↗</span></a></nav>
     </header>
 
     <main>
@@ -18,8 +18,8 @@ function Landing() {
           <div className="landing-eyebrow"><span/> A LITTLE FRIEND. A LONG WAY TO GO.</div>
           <h1 id="hero-title"><span className="hero-small">SMALL FRIEND.</span><span>BIG RUSH.</span></h1>
           <p>Floating worlds. Bear coins. One big rush.<br/>Easy, Normal or Degen. How hard will you rush?</p>
-          <a className="landing-cta" href="./play/">PLAY WITH YOUR FRIEND <span>↗</span></a>
-          <small className="entry-caption">Connect your wallet. Choose your Friend. Chase your best.</small>
+          <a className="landing-cta" href="./arcade/">PLAY WITH YOUR FRIEND <span>↗</span></a>
+          <small className="entry-caption">Genesis or Generations. Connect your wallet. Chase your best.</small>
         </div>
         <div className="hero-preview" id="preview">
           <div className="preview-caption"><span><i/> WATCH A NORMAL RUN</span><span>01 / THE ENDLESS WORLD</span></div>
@@ -34,10 +34,10 @@ function Landing() {
         <article><div className="rule-number">02 / GET BIGGER</div><h2>Coins make you grow.</h2><p>Collect bear coins and grow your Friend. Watch for giant flying coins: 2× the size, 10× the demo rewards. An obstacle hit brings you back down.</p><div className="rule-visual"><svg viewBox="0 0 30 30" aria-hidden="true"><TokenCoin size={30}/></svg><span>COLLECT</span><b>↗</b><span>GROW</span></div></article>
         <article><div className="rule-number">03 / GO YOUR WAY</div><h2>Find your pace.</h2><p>Speed up for distance. Slow down to line up<br/>{' '}your next jump. Three hearts. Make it count.</p><div className="rule-keys"><kbd>←</kbd><span>SLOW</span><kbd>→</kbd><span>FAST</span><small>TOUCH CONTROLS TOO</small></div></article>
       </section>
-      <div className="landing-play-note"><span>BUILT FOR YOUR PHONE. READY FOR YOUR DESKTOP.</span><a href="./play/">YOUR TURN <span>↗</span></a></div>
+      <div className="landing-play-note"><span>BUILT FOR YOUR PHONE. READY FOR YOUR DESKTOP.</span><a href="./arcade/">YOUR TURN <span>↗</span></a></div>
     </main>
 
-    <footer className="landing-footer"><div><b>RARE RUSH / VIBEATHON BUILD</b><p>Gameplay rewards are simulated. Nothing is minted or charged.<br/>Playing requires an eligible Rare Friends Generations NFT.</p></div><div><a href="./docs/">RARE RUSH 101 / DOCS ↗</a><a href="https://github.com/spokesz/friendsdk">BUILT WITH FRIENDSDK ↗</a><a href="https://rarefriends.com/">ART & WORLD BY RARE FRIENDS ↗</a></div></footer>
+    <footer className="landing-footer"><div><b>RARE RUSH / VIBEATHON BUILD</b><p>Gameplay rewards are simulated. Nothing is minted or charged.<br/>Play with your Genesis or eligible Generations NFT on Robinhood Chain.</p></div><div><a href="./docs/">RARE RUSH 101 / DOCS ↗</a><a href="https://github.com/spokesz/friendsdk">BUILT WITH FRIENDSDK ↗</a><a href="https://rarefriends.com/">ART & WORLD BY RARE FRIENDS ↗</a></div></footer>
   </div>;
 }
 

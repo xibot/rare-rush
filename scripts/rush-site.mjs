@@ -17,7 +17,7 @@ export async function buildRushSite({ outdir = path.join(project, 'dist'), watch
   let page;
   try {
     page = await context({
-      absWorkingDir: project, entryPoints: { landing: path.join(landing, 'index.tsx'), 'docs/index': path.join(landing, '../docs/index.tsx') }, outdir,
+      absWorkingDir: project, entryPoints: { landing: path.join(landing, 'index.tsx'), 'docs/index': path.join(landing, '../docs/index.tsx'), 'genesis/index': path.join(landing, '../genesis/index.tsx'), 'genesis/child': path.join(landing, '../genesis/child.tsx') }, outdir,
       bundle: true, platform: 'browser', format: 'esm', target: 'es2022', jsx: 'automatic', minify: true,
       loader: { '.woff2': 'file' }, assetNames: 'assets/[name]-[hash]', metafile: true,
       define: { 'process.env.NODE_ENV': '"production"' }, logLevel: 'warning',
@@ -27,6 +27,12 @@ export async function buildRushSite({ outdir = path.join(project, 'dist'), watch
           await writeFile(path.join(outdir, 'index.html'), await readFile(path.join(landing, 'index.html')));
           await mkdir(path.join(outdir, 'docs'), { recursive: true });
           await writeFile(path.join(outdir, 'docs/index.html'), await readFile(path.join(landing, '../docs/index.html')));
+          await mkdir(path.join(outdir, 'genesis'), { recursive: true });
+          await mkdir(path.join(outdir, 'arcade'), { recursive: true });
+          const genesisHTML = await readFile(path.join(landing, '../genesis/index.html'));
+          await writeFile(path.join(outdir, 'genesis/index.html'), genesisHTML);
+          await writeFile(path.join(outdir, 'arcade/index.html'), genesisHTML);
+          await writeFile(path.join(outdir, 'genesis/game.html'), await readFile(path.join(landing, '../genesis/game.html')));
           const fonts = Object.keys(result.metafile.outputs).map(file => path.relative(outdir, path.resolve(project, file)).split(path.sep).join('/')).filter(file => /^assets\/[\w-]+-[A-Z0-9]{8}\.woff2$/.test(file));
           await writeFile(path.join(outdir, '.rush-site-fonts.json'), JSON.stringify(fonts));
           const licenses = await Promise.all(['SILKSCREEN-OFL.txt', 'ARCHIVO-OFL.txt', 'SOMETYPE-MONO-OFL.txt'].map(file => readFile(path.join(landing, '../assets/fonts', file), 'utf8')));
@@ -58,6 +64,13 @@ export function createRushSiteServer(outdir) {
     ['/docs/index.html', ['docs/index.html', 'text/html; charset=utf-8']],
     ['/docs/index.js', ['docs/index.js', 'text/javascript; charset=utf-8']],
     ['/docs/index.css', ['docs/index.css', 'text/css; charset=utf-8']],
+    ['/arcade/', ['arcade/index.html', 'text/html; charset=utf-8']],
+    ['/genesis/', ['genesis/index.html', 'text/html; charset=utf-8']],
+    ['/genesis/index.js', ['genesis/index.js', 'text/javascript; charset=utf-8']],
+    ['/genesis/index.css', ['genesis/index.css', 'text/css; charset=utf-8']],
+    ['/genesis/game.html', ['genesis/game.html', 'text/html; charset=utf-8']],
+    ['/genesis/child.js', ['genesis/child.js', 'text/javascript; charset=utf-8']],
+    ['/genesis/child.css', ['genesis/child.css', 'text/css; charset=utf-8']],
     ['/font-licenses.txt', ['font-licenses.txt', 'text/plain; charset=utf-8']],
   ]);
   return createServer(async (request, response) => {
@@ -66,6 +79,7 @@ export function createRushSiteServer(outdir) {
       const url = new URL(request.url, 'http://localhost');
       if (url.pathname === '/play') { response.writeHead(308, { Location: '/play/' }).end(); return; }
       if (url.pathname === '/docs') { response.writeHead(308, { Location: '/docs/' }).end(); return; }
+      if (url.pathname === '/arcade' || url.pathname === '/genesis') { response.writeHead(308, { Location: `${url.pathname}/` }).end(); return; }
       if (url.pathname.startsWith('/play/')) {
         request.url = url.pathname.slice('/play'.length) + url.search;
         gameServer.emit('request', request, response);
@@ -79,7 +93,9 @@ export function createRushSiteServer(outdir) {
       if (!output) { response.writeHead(404).end('Not found'); return; }
       const base = await realpath(directory), file = await realpath(path.join(directory, output[0]));
       if (file !== path.join(base, output[0]) || !(await stat(file)).isFile()) { response.writeHead(404).end(); return; }
-      response.writeHead(200, { 'Content-Type': output[1], 'Cache-Control': 'no-store', 'X-Content-Type-Options': 'nosniff' });
+      const cors = url.pathname === '/genesis/child.js' || output[1] === 'font/woff2' ? { 'Access-Control-Allow-Origin': '*' } : {};
+      const framing = url.pathname === '/genesis/game.html' ? { 'Content-Security-Policy': "frame-ancestors 'self'" } : {};
+      response.writeHead(200, { 'Content-Type': output[1], 'Cache-Control': 'no-store', 'X-Content-Type-Options': 'nosniff', ...cors, ...framing });
       response.end(request.method === 'HEAD' ? undefined : await readFile(file));
     } catch { response.writeHead(404).end('Not found'); }
   });
@@ -89,9 +105,9 @@ async function main() {
   const command = process.argv[2] ?? 'dev';
   if (!['dev', 'build'].includes(command)) throw new Error('Usage: node scripts/rush-site.mjs dev|build');
   const built = await buildRushSite({ watch: command === 'dev' });
-  if (command === 'build') { console.log(`Built landing page, docs, and SDK game in ${built.outdir}`); return; }
+  if (command === 'build') { console.log(`Built landing, docs, collection picker, Genesis tester, and SDK game in ${built.outdir}`); return; }
   const server = createRushSiteServer(built.outdir);
-  server.listen(4173, '0.0.0.0', () => console.log('Rare Rush: http://localhost:4173/ · game: http://localhost:4173/play/'));
+  server.listen(4173, '0.0.0.0', () => console.log('Rare Rush: http://localhost:4173/ · arcade: http://localhost:4173/arcade/'));
   const stop = () => { server.close(); void built.close().finally(() => process.exit(0)); };
   process.on('SIGINT', stop); process.on('SIGTERM', stop);
   server.on('error', error => { console.error(error); void built.close().finally(() => process.exit(1)); });

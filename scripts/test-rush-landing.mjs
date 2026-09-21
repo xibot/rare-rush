@@ -85,13 +85,17 @@ try {
       assert.equal(await preview.getAttribute('data-preview-distance'), offscreenDistance, 'Offscreen autoplay is suspended');
     }
     await page.getByRole('link', { name: /PLAY WITH YOUR FRIEND/ }).click();
+    await page.waitForURL(`${origin}/arcade/`);
+    assert.equal(await page.locator('.collection-cards a[href="/genesis/"]').count(), 1, 'Collection choice offers Genesis');
+    assert.equal(await page.locator('.collection-cards a[href="/play/"]').count(), 1, 'Collection choice preserves Generations SDK entry');
+    await page.locator('.collection-cards a[href="/play/"]').click();
     await page.waitForURL(`${origin}/play/`);
     await page.locator('.rf-runtime-status').waitFor();
     assert.match(await page.locator('.rf-runtime-status').innerText(), /wallet/i, 'Play CTA reaches the real SDK wallet gate');
     assert.equal(await page.locator('iframe').count(), 0, 'No game is admitted without wallet eligibility');
     assert.deepEqual(errors, [], 'No uncaught browser errors');
     await page.close();
-    console.log(`${label}: autoplay, coins/growth, rotation, pause, layout and SDK entry passed`);
+    console.log(`${label}: autoplay, coins/growth, rotation, pause, layout, collection choice and SDK entry passed`);
   }
   const page = await browser.newPage({ viewport: { width: 390, height: 844 }, reducedMotion: 'reduce' });
   await page.goto(origin);

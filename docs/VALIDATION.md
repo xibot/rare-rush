@@ -1,7 +1,7 @@
 # Validation — September 20, 2026
 
 - `npm run typecheck:rush`: passed. This scoped check keeps Rare Rush separate from other games being developed in this shared workspace.
-- `npm run test:rush`: 61 tests passed (38 engine, 23 economy).
+- `npm run test:rush`: 81 tests passed (38 engine, 30 economy, 13 Genesis identity).
 - `npm run check`: FriendSDK game boundary and definition validation passed. Reported chance-game rewards are unused compatibility values, not runner emissions.
 - `npm run build`: passed; complete static output is in `dist/`.
 - `npm run test:browser`: Normal passed at 1100×820, 390×844 and 360×640; Easy passed at 390×844 and Degen at 360×640. Every case checks all selector options before starting its chosen mode.
@@ -27,3 +27,18 @@
 The builder's actual Generations wallet connection, live ownership read and physical phone gameplay still need their manual playtest. Browser mocks do not establish that these work with every wallet. No signing, real transactions, token deployment, liquidity creation or vibeathon submission was performed.
 
 The local game server listens at port 4173. The test browser was installed under `/private/tmp/rare-rush-browsers`; in this environment run `PLAYWRIGHT_BROWSERS_PATH=/private/tmp/rare-rush-browsers npm run test:browser`. On a new machine use `npx playwright install chromium` once, then `npm run test:browser` normally.
+
+## Genesis tester documentation and economy
+
+- `npm run test:rush`: 68 engine/economy tests passed after adding Genesis accounting (38 engine, 30 economy). Seven new tests cover free entry with zero credit, all difficulty and bonus combinations, one-pickup halving transitions, integer rounding and reward exhaustion, shared-cap clipping, invalid collections without mutation, and unchanged Generations defaults.
+- `npm run test:docs`: passed at 1440×1000, 390×844 and 360×640. The guide describes active Genesis tester access and uses the same collection-aware `nextCoinReward` function as gameplay. Navigation now reaches `/arcade/`, offers Genesis, and preserves the real Generations SDK gate at `/play/`. Genesis ordinary/bonus calculator values, growth controls, font loading, layout, FAQs, local assets and route boundaries passed. Small-phone reward and holder-card screenshots were visually inspected with no clipping.
+- `npm run test:landing`: passed at 1440×1000, 390×844 and 360×640 plus reduced motion. The unchanged autoplay, coin growth, Friend rotation, flight and pause checks passed; primary play links now lead through the Genesis/Generations collection choice and then to the Generations SDK gate.
+- Both collection modes remain simulated. These checks do not replace a holder’s real-wallet Genesis discovery and playtest on Robinhood Chain.
+
+## Genesis host and release checks
+
+- `npm run test:genesis`: passed at 1100×820, 390×844 and 360×640 through the actual opaque-origin iframe. Checks cover collection selection without wallet requests, canonical portrait transfer, CORS/font loading, every difficulty’s 100× reward, actual opening-coin payouts, free entry without RF/pool mutation, and changing Friends. Desktop and phone screenshots were visually inspected.
+- Separate cases verify fresh ownership before every start, transfer rejection, wallet changes during a pending read, wrong-network gating and switching, disconnect, a slow 11-second handshake, RPC failure, back/forward-cache recovery, standalone child denial, and no-wallet denial. Browser fixtures are confined to test code; no signer or provider is sent into the child.
+- Typecheck, all 81 unit tests, SDK validation, and all five existing Generations browser cases passed after the shared runner refactor. Landing and docs suites also passed all three sizes.
+- A read-only live RPC smoke check found the real holdings and original portrait for public Genesis #1 using the canonical contract on Robinhood. Genesis IDs are 1–1024: ownerOf(0) reverts with ERC721NonexistentToken and has no Transfer history. No holder’s private credentials were used.
+- A human Genesis holder’s wallet connection and physical-phone playtest remain to be performed. No real rewards, signing, or transactions were tested or enabled.

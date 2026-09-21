@@ -9,6 +9,20 @@ export const TOKEN_CAP = 200_000n * TOKEN_UNIT;
 export const ENTRY_FEE = RF_UNIT;
 export const INITIAL_RF_BALANCE = 100n * RF_UNIT;
 
+export type PlayerCollection = 'generations' | 'genesis';
+
+export function collectionRewardMultiplier(collection: PlayerCollection): bigint {
+  if (collection === 'generations') return 1n;
+  if (collection === 'genesis') return 100n;
+  throw new RangeError('Player collection must be generations or genesis.');
+}
+
+export function entryFeeFor(collection: PlayerCollection): bigint {
+  // Validate even when no fee or reward would otherwise be due.
+  collectionRewardMultiplier(collection);
+  return collection === 'genesis' ? 0n : ENTRY_FEE;
+}
+
 // The integer reward becomes zero after all 24 significant bits are shifted out.
 const REWARDED_EPOCHS = INITIAL_COIN_REWARD.toString(2).length;
 
@@ -31,10 +45,11 @@ function assertCoinCount(value: number): void {
   }
 }
 
-/** Floor the difficulty reward to microtokens, then apply a coin's bonus multiplier. */
-export function rewardAt(collected: number, difficulty: Difficulty = 'normal', rewardMultiplier: 1 | 10 = 1): bigint {
+/** Floor difficulty rewards to microtokens, then apply coin and collection multipliers. */
+export function rewardAt(collected: number, difficulty: Difficulty = 'normal', rewardMultiplier: 1 | 10 = 1, collection: PlayerCollection = 'generations'): bigint {
   assertCoinCount(collected);
   const settings = difficultySettings(difficulty);
+  const collectionMultiplier = collectionRewardMultiplier(collection);
   if (rewardMultiplier !== 1 && rewardMultiplier !== 10) {
     throw new RangeError('Coin reward multiplier must be 1 or 10.');
   }
@@ -43,7 +58,7 @@ export function rewardAt(collected: number, difficulty: Difficulty = 'normal', r
     ? 0n
     : INITIAL_COIN_REWARD >> BigInt(epoch);
   const difficultyReward = base * BigInt(settings.rewardNumerator) / BigInt(settings.rewardDenominator);
-  return difficultyReward * BigInt(rewardMultiplier);
+  return difficultyReward * BigInt(rewardMultiplier) * collectionMultiplier;
 }
 
 /**
@@ -70,25 +85,26 @@ export function createEconomy(startCoins = 0): Economy {
   };
 }
 
-/** Move one simulated RF into the simulated pool; insufficient credit is a no-op. */
-export function enterRun(economy: Economy): boolean {
-  if (economy.rfBalance < ENTRY_FEE) return false;
-  economy.rfBalance -= ENTRY_FEE;
-  economy.prizePool += ENTRY_FEE;
+/** Genesis enters free; Generations moves one simulated RF into the simulated pool. */
+export function enterRun(economy: Economy, collection: PlayerCollection = 'generations'): boolean {
+  const fee = entryFeeFor(collection);
+  if (economy.rfBalance < fee) return false;
+  economy.rfBalance -= fee;
+  economy.prizePool += fee;
   economy.runs += 1;
   return true;
 }
 
-/** Actual next award, including difficulty, coin bonus and remaining supply. No mutation. */
-export function nextCoinReward(economy: Economy, difficulty: Difficulty = 'normal', rewardMultiplier: 1 | 10 = 1): bigint {
-  const rate = rewardAt(economy.collected, difficulty, rewardMultiplier);
+/** Next award, including difficulty, coin/collection bonuses and shared supply. No mutation. */
+export function nextCoinReward(economy: Economy, difficulty: Difficulty = 'normal', rewardMultiplier: 1 | 10 = 1, collection: PlayerCollection = 'generations'): bigint {
+  const rate = rewardAt(economy.collected, difficulty, rewardMultiplier, collection);
   const remaining = TOKEN_CAP > economy.issued ? TOKEN_CAP - economy.issued : 0n;
   return rate < remaining ? rate : remaining;
 }
 
 /** Award a pickup once, including bonus pickups; issuance stays separate from holdings. */
-export function collectCoin(economy: Economy, difficulty: Difficulty = 'normal', rewardMultiplier: 1 | 10 = 1): bigint {
-  const awarded = nextCoinReward(economy, difficulty, rewardMultiplier);
+export function collectCoin(economy: Economy, difficulty: Difficulty = 'normal', rewardMultiplier: 1 | 10 = 1, collection: PlayerCollection = 'generations'): bigint {
+  const awarded = nextCoinReward(economy, difficulty, rewardMultiplier, collection);
   if (economy.collected === Number.MAX_SAFE_INTEGER) {
     throw new RangeError("The simulated pickup counter is exhausted.");
   }

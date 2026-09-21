@@ -2,8 +2,10 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import {
   collectCoin,
+  collectionRewardMultiplier,
   createEconomy,
   enterRun,
+  entryFeeFor,
   ENTRY_FEE,
   formatRF,
   formatToken,
@@ -274,6 +276,126 @@ test("fractional insufficient RF credit is unchanged on rejection", () => {
   const before = { ...economy };
   assert.equal(enterRun(economy), false);
   assert.deepEqual(economy, before);
+});
+
+test("Genesis entry is free even at zero RF and preserves the shared prize pool", () => {
+  const economy = createEconomy();
+  assert.equal(collectionRewardMultiplier('genesis'), 100n);
+  assert.equal(collectionRewardMultiplier('generations'), 1n);
+  assert.equal(entryFeeFor('genesis'), 0n);
+  assert.equal(entryFeeFor('generations'), ENTRY_FEE);
+  assert.equal(enterRun(economy, 'generations'), true);
+  const paid = { ...economy };
+  assert.equal(enterRun(economy, 'genesis'), true);
+  assert.deepEqual(economy, { ...paid, runs: paid.runs + 1 });
+  economy.rfBalance = 0n;
+  const empty = { ...economy };
+  assert.equal(enterRun(economy, 'genesis'), true);
+  assert.deepEqual(economy, { ...empty, runs: empty.runs + 1 });
+  const beforeRejection = { ...economy };
+  assert.equal(enterRun(economy, 'generations'), false);
+  assert.deepEqual(economy, beforeRejection);
+});
+
+test("Genesis stacks a hundredfold with every difficulty and surprise coin", () => {
+  const rates = { easy: 750n * TOKEN_UNIT, normal: 1_000n * TOKEN_UNIT, degen: 2_000n * TOKEN_UNIT };
+  for (const mode of ['easy', 'normal', 'degen'] as const) {
+    for (const bonus of [1, 10] as const) {
+      const economy = createEconomy();
+      const before = { ...economy };
+      const expected = rates[mode] * BigInt(bonus);
+      assert.equal(rewardAt(0, mode, bonus, 'genesis'), expected);
+      assert.equal(nextCoinReward(economy, mode, bonus, 'genesis'), expected);
+      assert.deepEqual(economy, before);
+      assert.equal(collectCoin(economy, mode, bonus, 'genesis'), expected);
+      assert.equal(economy.collected, 1);
+      assert.equal(economy.balance, expected);
+      assert.equal(economy.issued, expected);
+    }
+  }
+});
+
+test("Genesis bonuses cross halving boundaries by one actual pickup", () => {
+  for (const mode of ['easy', 'normal', 'degen'] as const) {
+    const economy = createEconomy(9_999);
+    const issued = economy.issued;
+    const rate = rewardAt(9_999, mode, 10, 'genesis');
+    assert.equal(collectCoin(economy, mode, 10, 'genesis'), rate);
+    assert.equal(economy.collected, 10_000);
+    assert.equal(nextCoinReward(economy, mode, 10, 'genesis'), rate / 2n);
+    assert.equal(collectCoin(economy, mode, 10, 'genesis'), rate / 2n);
+    assert.equal(economy.collected, 10_001);
+    assert.equal(economy.balance, rate + rate / 2n);
+    assert.equal(economy.issued - issued, economy.balance);
+  }
+});
+
+test("Genesis multiplication follows difficulty flooring and cannot revive zero rewards", () => {
+  assert.equal(rewardAt(200_000, 'easy', 1, 'genesis'), 600n);
+  assert.equal(rewardAt(200_000, 'easy', 10, 'genesis'), 6_000n);
+  assert.equal(rewardAt(230_000, 'easy', 10, 'genesis'), 0n);
+  assert.equal(rewardAt(230_000, 'degen', 10, 'genesis'), 2_000n);
+  for (const mode of ['easy', 'normal', 'degen'] as const) {
+    const economy = createEconomy(240_000);
+    const issued = economy.issued;
+    assert.equal(rewardAt(Number.MAX_SAFE_INTEGER, mode, 10, 'genesis'), 0n);
+    assert.equal(nextCoinReward(economy, mode, 10, 'genesis'), 0n);
+    assert.equal(collectCoin(economy, mode, 10, 'genesis'), 0n);
+    assert.equal(economy.collected, 240_001);
+    assert.equal(economy.issued, issued);
+    assert.equal(economy.balance, 0n);
+  }
+});
+
+test("both collections share the hard cap after all Genesis and coin multipliers", () => {
+  const economy = createEconomy();
+  economy.issued = TOKEN_CAP - 1_500n * TOKEN_UNIT - 7n;
+  assert.equal(collectCoin(economy, 'normal', 1, 'generations'), 10n * TOKEN_UNIT);
+  assert.equal(collectCoin(economy, 'easy', 1, 'genesis'), 750n * TOKEN_UNIT);
+  assert.equal(nextCoinReward(economy, 'degen', 10, 'genesis'), 740n * TOKEN_UNIT + 7n);
+  assert.equal(collectCoin(economy, 'degen', 10, 'genesis'), 740n * TOKEN_UNIT + 7n);
+  assert.equal(economy.issued, TOKEN_CAP);
+  assert.equal(economy.balance, 1_500n * TOKEN_UNIT + 7n);
+  economy.balance = 0n;
+  for (const collection of ['genesis', 'generations'] as const) {
+    assert.equal(nextCoinReward(economy, 'degen', 10, collection), 0n);
+    assert.equal(collectCoin(economy, 'degen', 10, collection), 0n);
+  }
+  assert.equal(economy.collected, 5);
+  assert.equal(economy.issued, TOKEN_CAP);
+  assert.equal(economy.balance, 0n);
+});
+
+test("unknown collections fail before accounting changes, even when credit or rewards are zero", () => {
+  for (const count of [0, 240_000]) {
+    const economy = createEconomy(count);
+    economy.rfBalance = 0n;
+    const before = { ...economy };
+    for (const invalid of ['', 'Genesis', 'toString', '__proto__', null, 0, {}, []]) {
+      assert.throws(() => collectionRewardMultiplier(invalid as never), RangeError);
+      assert.throws(() => entryFeeFor(invalid as never), RangeError);
+      assert.throws(() => enterRun(economy, invalid as never), RangeError);
+      assert.throws(() => rewardAt(count, 'normal', 10, invalid as never), RangeError);
+      assert.throws(() => nextCoinReward(economy, 'normal', 10, invalid as never), RangeError);
+      assert.throws(() => collectCoin(economy, 'normal', 10, invalid as never), RangeError);
+      assert.deepEqual(economy, before);
+    }
+  }
+});
+
+test("omitting collection preserves all Generations fees and rewards", () => {
+  for (const mode of ['easy', 'normal', 'degen'] as const) {
+    for (const bonus of [1, 10] as const) {
+      for (const count of [0, 9_999, 10_000, 230_000, 240_000]) {
+        const implicit = createEconomy(count), explicit = createEconomy(count);
+        assert.equal(enterRun(implicit), enterRun(explicit, 'generations'));
+        assert.equal(rewardAt(count, mode, bonus), rewardAt(count, mode, bonus, 'generations'));
+        assert.equal(nextCoinReward(implicit, mode, bonus), nextCoinReward(explicit, mode, bonus, 'generations'));
+        assert.equal(collectCoin(implicit, mode, bonus), collectCoin(explicit, mode, bonus, 'generations'));
+        assert.deepEqual(implicit, explicit);
+      }
+    }
+  }
 });
 
 test("finite integer halvings bound total issuance and eventually award zero", () => {
