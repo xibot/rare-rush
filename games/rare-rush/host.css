@@ -16,9 +16,6 @@ body:has(.rf-game-frame)>#root{width:100%;margin:auto!important;max-width:960px}
 .rf-runtime-status{font-family:var(--rush-font-body)}.rf-runtime-status:before{font-family:var(--rush-font-display);font-size:40px;font-weight:400;letter-spacing:0}
 .rf-frame-scrim,.rf-frame-toolbar,.rf-game-frame button{font-family:var(--rush-font-mono)}.rf-frame-menu-heading h2{font-family:var(--rush-font-display);font-weight:400}
 @media(max-width:600px){.rf-runtime-status:before{font-size:24px}}
-.rf-frame-menu .rush-collection-back{display:inline-flex;align-items:center;justify-content:center;flex:0 0 auto;min-height:44px;padding:8px 12px;border:1px solid #000;background:#fff;color:#000;font:inherit;text-decoration:none;white-space:nowrap;box-sizing:border-box}
-.rf-frame-menu .rush-collection-back:hover{background:#ccff00}
-.rf-frame-menu .rush-collection-back:focus-visible{outline:3px solid #000;outline-offset:-3px}
 
 /* Collection entry uses the same full-page brand layout as the Genesis host. */
 body.rush-generations-selecting{display:block;padding:0 40px;background:#000;color:#fff}
@@ -55,8 +52,6 @@ body.rush-generations-selecting>#root{max-width:1080px;margin:0 auto!important}
 .rush-generations-menu .rf-runtime-connection>p{flex-basis:100%;margin:0 0 6px}
 .rush-generations-menu .rf-runtime-connection>button{min-height:50px;padding:14px 20px;background:#ccff00;color:#000;border:1px solid #ccff00;font:14px/1.5 var(--rush-font-display)}
 .rush-generations-menu .rf-runtime-connection>button:hover:not(:disabled){background:#fff;border-color:#fff}
-.rush-generations-menu .rush-collection-back{min-height:50px;display:inline-flex;align-items:center;justify-content:center;margin:0;padding:12px 16px;border:1px solid #fff;color:#fff;background:#000;font:13px/1.5 var(--rush-font-mono)}
-.rush-generations-menu .rush-collection-back:hover{background:#fff;color:#000}
 .rush-generations-menu .rf-frame-friends{grid-template-columns:repeat(3,minmax(0,1fr));gap:12px;margin:24px 0 0;max-height:480px;overflow:auto;padding:6px}
 .rush-generations-menu .rf-frame-friends:empty{display:none}
 .rush-generations-menu .rf-frame-friends button{padding:18px;align-items:center;gap:10px;text-align:center;min-width:0;background:#000;color:#fff;border:1px solid #fff;font:14px/1.5 var(--rush-font-mono)}
@@ -64,6 +59,6 @@ body.rush-generations-selecting>#root{max-width:1080px;margin:0 auto!important}
 .rush-generations-menu .rf-frame-friends small{color:inherit;font-size:10px}
 .rush-friend-portrait{width:80px;height:80px;object-fit:contain;image-rendering:pixelated;display:block}
 .rush-generations-menu>.rush-generations-caption{max-width:920px;width:100%;align-self:center;padding:0;margin:30px 0 40px;color:#ccc;font:12px/1.8 var(--rush-font-mono)}
-@media(max-width:700px){body.rush-generations-selecting{padding:0 20px}.rush-entry-header{min-height:80px}.rush-entry-logo>span{font-size:20px}.rush-entry-logo>img{width:36px;height:36px}.rush-entry-header nav{font-size:11px;gap:15px}.rush-entry-intro{padding-top:30px}.rush-entry-kicker{font-size:11px}.rush-generations-menu>.rf-frame-menu-body{padding:20px}.rush-generations-menu .rf-runtime-connection{gap:10px}.rush-generations-menu .rf-runtime-connection>button{font-size:12px;padding:12px 14px}.rush-generations-menu .rush-collection-back{font-size:12px;padding:12px}.rush-generations-menu .rf-frame-friends{grid-template-columns:repeat(2,minmax(0,1fr))}.rush-generations-menu .rf-frame-friends button{padding:14px 8px;font-size:12px}.rush-generations-menu .rf-frame-friends small{font-size:8px}}
+@media(max-width:700px){body.rush-generations-selecting{padding:0 20px}.rush-entry-header{min-height:80px}.rush-entry-logo>span{font-size:20px}.rush-entry-logo>img{width:36px;height:36px}.rush-entry-header nav{font-size:11px;gap:15px}.rush-entry-intro{padding-top:30px}.rush-entry-kicker{font-size:11px}.rush-generations-menu>.rf-frame-menu-body{padding:20px}.rush-generations-menu .rf-runtime-connection{gap:10px}.rush-generations-menu .rf-runtime-connection>button{font-size:12px;padding:12px 14px}.rush-generations-menu .rf-frame-friends{grid-template-columns:repeat(2,minmax(0,1fr))}.rush-generations-menu .rf-frame-friends button{padding:14px 8px;font-size:12px}.rush-generations-menu .rf-frame-friends small{font-size:8px}}
 
 .rush-friend-portrait[hidden]{display:none}

@@ -9,7 +9,7 @@ npm ci
 npm run dev
 ```
 
-Open http://localhost:4173 for the landing page and wallet-free autoplay preview. The play button opens http://localhost:4173/arcade/ to choose a collection. Genesis holders use `/genesis/` with fresh ownership checks and their original artwork; eligible hardwired Generations holders (generation ≥1) use the unchanged FriendSDK route at `/play/`. Both need a browser wallet on Robinhood mainnet (4663). Their matching entry pages show original artwork on Friend selection cards, and Generations includes a Back control beside the wallet actions. Phone controls are built in; open https://rarerush.app in your wallet’s browser for HTTPS wallet play.
+Open http://localhost:4173 for the landing page and wallet-free autoplay preview. The play button opens http://localhost:4173/arcade/ to choose a collection. Genesis holders use `/genesis/` with fresh ownership checks and their original artwork; eligible hardwired Generations holders (generation ≥1) use the unchanged FriendSDK route at `/play/`. Both need a browser wallet on Robinhood mainnet (4663). Their matching entry pages show original artwork on Friend selection cards, with a top Choose Collection link to return to the collection selector. Phone controls are built in; open https://rarerush.app in your wallet’s browser for HTTPS wallet play.
 
 The visual [Rare Rush pitch](https://rarerush.app/pitch/) introduces the playable character experience, its game loop, the current demo economy and the planned token integrations. It includes a wallet-free autoplay run and links directly to the arcade.
 

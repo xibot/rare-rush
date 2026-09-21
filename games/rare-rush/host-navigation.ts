@@ -13,7 +13,7 @@ function enhanceGenerationsEntry(): void {
         const isPicker = menu.querySelector('.rf-frame-menu-heading h2')?.textContent?.trim() === 'Choose your Friend';
         menu.classList.toggle('rush-generations-menu', isPicker);
         if (!isPicker) {
-          menu.querySelectorAll('.rush-generations-chrome, .rush-generations-caption, .rush-collection-back').forEach(node => node.remove());
+          menu.querySelectorAll('.rush-generations-chrome, .rush-generations-caption').forEach(node => node.remove());
           continue;
         }
         pickerOpen = framePickerOpen = true;
@@ -29,21 +29,6 @@ function enhanceGenerationsEntry(): void {
           caption.className = 'rush-generations-caption';
           caption.textContent = 'FriendSDK verifies your Generations NFT on Robinhood Chain. Generation 1 or later is required. Runs cost 1 demo RF; all fees and rewards are simulated. No transaction or signature is required.';
           menu.append(caption);
-        }
-        const connection = menu.querySelector<HTMLElement>('.rf-runtime-connection');
-        if (connection) {
-          let back = connection.querySelector<HTMLAnchorElement>('.rush-collection-back');
-          if (!back) {
-            back = document.createElement('a');
-            back.className = 'rush-collection-back';
-            back.href = '/arcade/';
-            back.textContent = '← Back';
-            back.setAttribute('aria-label', 'Back to Genesis or Generations');
-          }
-          const firstAction = connection.querySelector<HTMLButtonElement>('button');
-          if (firstAction) {
-            if (back.nextElementSibling !== firstAction) connection.insertBefore(back, firstAction);
-          } else if (back.parentElement !== connection) connection.append(back);
         }
         syncFriendPortraits(menu);
       }

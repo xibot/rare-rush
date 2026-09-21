@@ -22,7 +22,7 @@ try {
     const errors = [];
     page.on('pageerror', error => errors.push(error.message));
     const fixture = await installFixture(page, origin, { artworkCall });
-    const back = page.getByRole('link', { name: 'Back to Genesis or Generations', exact: true });
+    const back = page.getByRole('link', { name: '← CHOOSE COLLECTION', exact: true });
     const connect = page.getByRole('button', { name: /^Connect (wallet|Browser wallet)$/ });
     await page.goto(`${origin}/play/`);
     await back.waitFor(); await connect.waitFor();
@@ -30,9 +30,8 @@ try {
     assert.equal((await page.locator('h1').innerText()).toUpperCase(), 'GENERATIONS\nUNLOCKED.');
     assert.equal(await page.locator('.rush-entry-logo small').innerText(), 'BY XIBOT');
     assert.equal(await page.locator('body').evaluate(el => el.scrollWidth > innerWidth), false);
-    const [left, right] = await Promise.all([back.boundingBox(), connect.boundingBox()]);
-    assert(left.height >= 44 && right.height >= 44);
-    assert(left.x + left.width <= right.x && Math.abs(left.y - right.y) < 2, 'Back sits to the left of Connect wallet');
+    const [backBox, connectBox] = await Promise.all([back.boundingBox(), connect.boundingBox()]);
+    assert(backBox.height >= 44 && connectBox.height >= 44);
     await page.screenshot({ path: `artifacts/generations-${width}-entry.png`, fullPage: true });
     await back.focus(); await page.keyboard.press('Enter');
     await page.waitForURL(`${origin}/arcade/`);
@@ -70,20 +69,20 @@ try {
     await page.getByRole('button', { name: 'Disconnect', exact: true }).click();
     await connect.waitFor();
     assert.equal(await page.locator('.rf-frame-friends img').count(), 0, 'Disconnect removes prior wallet portraits');
-    assert.equal(await page.locator('.rush-collection-back').count(), 1);
+    assert.equal(await back.count(), 1);
     await page.evaluate(() => { const original = window.ethereum.request; window.ethereum.request = args => args.method === 'eth_requestAccounts' ? Promise.reject({ code: 4001, message: 'Connection declined for test' }) : original(args); });
     await connect.click();
     await page.getByRole('alert').filter({ hasText: /declined|rejected/i }).waitFor();
-    assert.equal(await back.count(), 1, 'Connection errors retain one back control');
+    assert.equal(await back.count(), 1, 'Connection errors retain the top collection link');
     await back.click(); await page.waitForURL(`${origin}/arcade/`);
     assert.deepEqual(errors, []); assert.deepEqual(fixture.errors, []);
     await page.close();
-    console.log(`${width}px: branded entry, keyboard Back, real sprite previews, verified selection, menu reuse and disconnect passed`);
+    console.log(`${width}px: branded entry, keyboard collection navigation, real sprite previews, verified selection, menu reuse and disconnect passed`);
   }
   const page = await browser.newPage({ viewport: { width: 360, height: 640 } });
   await page.goto(`${origin}/play/`);
   await page.getByRole('button', { name: 'Check for wallet', exact: true }).waitFor();
-  await page.getByRole('link', { name: 'Back to Genesis or Generations', exact: true }).click();
+  await page.getByRole('link', { name: '← CHOOSE COLLECTION', exact: true }).click();
   await page.waitForURL(`${origin}/arcade/`);
   for (const route of ['/', '/docs/', '/pitch/', '/arcade/', '/genesis/', '/play/']) {
     const response = await page.request.get(origin + route);
@@ -96,7 +95,7 @@ try {
   assert.equal((await page.request.get(`${origin}/host-navigation.js`)).status(), 200);
   assert.equal((await page.request.get(`${origin}/host-navigation.ts`)).status(), 404);
   await page.close();
-  console.log('No-wallet Back and shared favicon on every public entry passed');
+  console.log('No-wallet collection navigation and shared favicon on every public entry passed');
 } finally {
   await browser?.close();
   if (server) { server.closeAllConnections(); await new Promise(resolve => server.close(resolve)); }
