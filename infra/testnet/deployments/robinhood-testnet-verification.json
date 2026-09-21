@@ -1,0 +1,625 @@
+{
+  "formatVersion": 1,
+  "verifiedAt": "2026-09-21T23:18:43.230Z",
+  "network": "robinhood-testnet",
+  "chainId": 46630,
+  "rpcUrl": "https://rpc.testnet.chain.robinhood.com",
+  "blockNumber": "122552684",
+  "blockHash": "0x818d8b3fc79d75dc9bd818084ddcfaa945843e161e6c05cfafed7c72a20d741f",
+  "blockTimestamp": "1790032716",
+  "manifestHash": "0xa2419125dda7a50731f4f6a65f26e9b2d7415a75b42964f67c1801de4ffc4bd2",
+  "standardInputHash": "0x7c17ca9b3d9fd43dce12682ad174b32bc75e03a1767e27edfc5eeefdda647b54",
+  "submittedCompilerInputMatched": true,
+  "compiler": "0.8.30+commit.73712a01.Emscripten.clang",
+  "artifactFingerprint": "0x53d51748b6e02ee12414c9c89d8748095a1c9d0f76732d733449d7ffeaa7fbbd",
+  "owner": "0x6fD155b9D52F80E8A73a8A2537268602978486e2",
+  "treasury": "0x6fD155b9D52F80E8A73a8A2537268602978486e2",
+  "verifier": "0xd3166A769cF352F103A60a385892b599ecCc2B36",
+  "engineVersion": "0xd907fa6f48be2aff2712c2e254943dc8afa749e7bfb5d9b28dc865c3a096ba99",
+  "contracts": {
+    "rf": "0xED668133bab94DD83e537F12B68365c4bC0eC2a3",
+    "genesis": "0x7404d2b0461228C6478fdB8850d27d8e65EFD2c3",
+    "generations": "0x606dCbFA17b76E4194865a09D6cfb92BE7EE26c3",
+    "game": "0x24BcA5Bf559e0353801F719EbC3885441CB49Fd3",
+    "rewardToken": "0x9fCe27c074281709d0Ccd9bd0439f223E8F83844"
+  },
+  "economics": {
+    "rewardCap": "1024000000",
+    "launchReserve": "102400000",
+    "gameplayAllocation": "921600000",
+    "allocationStatus": "provisional-test-settings",
+    "launchPercent": 10,
+    "gameplayPercent": 90,
+    "generationsEntry": "110",
+    "prizePoolShare": "100",
+    "treasuryShare": "10",
+    "genesisEntry": "0",
+    "genesisMultiplier": 100,
+    "dailyRunsPerNft": 3,
+    "initialCoinReward": "10",
+    "minimumCoinReward": "1",
+    "halvingInterval": 10000,
+    "rfDecimals": 18,
+    "rewardDecimals": 6,
+    "liquidityPoolDeployed": false
+  },
+  "transactions": {
+    "rf": {
+      "hash": "0xbee7ad4ad60965a3aa709ea45b28c97ef9aa579b9008648fe42cd60dd00556b7",
+      "blockNumber": "122550772",
+      "blockHash": "0x4469cf32c2c0772d779fdfbb66fe09d4997e7da6b2c40dd598f852610df3dd68",
+      "confirmations": "1913",
+      "nonce": 126,
+      "dataHash": "0x7fea32db4b696838583e85303d42e0e8491fa28f4d368b3f87db3b02b7960c1f",
+      "status": "success"
+    },
+    "genesis": {
+      "hash": "0x35459e84385621530c6439341818ea404e2071be85ae156d1fddbfd6fb5f11aa",
+      "blockNumber": "122550801",
+      "blockHash": "0x9820691141b272d8672d543f71f749c5ffb7ef42441dce55f4d02970b6282df3",
+      "confirmations": "1884",
+      "nonce": 127,
+      "dataHash": "0x6cb82113bfb45150959d775f19ca9917ff588281bad2d95299fec6573991cbf7",
+      "status": "success"
+    },
+    "generations": {
+      "hash": "0xe4f20b746f2e6b97aa94c89c4d7dc932b4488acc3deac079c86dbcabff7d53a0",
+      "blockNumber": "122550834",
+      "blockHash": "0x4cf47d58db134f0ed9490d1d47be5ed56c1ffa52a5babe0e4c0dbf1c4ece4c6d",
+      "confirmations": "1851",
+      "nonce": 128,
+      "dataHash": "0x803016a4985e32691e16524cf62a0b6209d0c55a1bbc136db3a7782b5af5aca9",
+      "status": "success"
+    },
+    "game": {
+      "hash": "0x207262243404c71606e76b49e3656eedcbe931e9104becb8892761f3a6e28477",
+      "blockNumber": "122550868",
+      "blockHash": "0xb5d33409f071f154887c2988eda502b3c8d41ccf4a2144d6dd92eac59cd06af4",
+      "confirmations": "1817",
+      "nonce": 129,
+      "dataHash": "0x513aa611667056edd06138376930728cc6278880dad7bf7fc5175242b51e9776",
+      "status": "success"
+    },
+    "rewardToken": {
+      "hash": "0x889266c2fccb61ebf214d374b68dfee5d994a626c47642222fad311c6930473a",
+      "blockNumber": "122550905",
+      "blockHash": "0x2fa90e83da12959ef9c18c897ff963eff5eeb68fa1f8ede3959148e3fee12e27",
+      "confirmations": "1780",
+      "nonce": 130,
+      "dataHash": "0x5dafb218ce78a1ed1b6fbc2f5119a83fd57a9d45cd2ddb139092c2db49e59c6f",
+      "status": "success"
+    },
+    "bind": {
+      "hash": "0x27091b1060eb0be15425e58dc79906b3178075f3e55edf922b6ada041c8267d3",
+      "blockNumber": "122550945",
+      "blockHash": "0xe82f5bc79b5704f51f91f1badfbd1d57a2d7f5c537f711ee48ebd96a6aea9052",
+      "confirmations": "1740",
+      "nonce": 131,
+      "dataHash": "0xaabd35d426dbcfec0638ea3b7dd3219e579af19c7b368356504be0d303fb6463",
+      "status": "success"
+    }
+  },
+  "runtimes": {
+    "rf": {
+      "address": "0xED668133bab94DD83e537F12B68365c4bC0eC2a3",
+      "runtimeCodeHash": "0x2255d3a4fbaafdc39c6f7be4215449eb8ccb014b5c27c325be66c8080998a736",
+      "bytes": 2155,
+      "exactOutsideCompilerImmutableSlots": true,
+      "immutableSlots": 0
+    },
+    "genesis": {
+      "address": "0x7404d2b0461228C6478fdB8850d27d8e65EFD2c3",
+      "runtimeCodeHash": "0x8461ccd4fa48cccce7fe5789dfcdce17eea1cff0ad1d1ddc67d11d20a0b28ad8",
+      "bytes": 4160,
+      "exactOutsideCompilerImmutableSlots": true,
+      "immutableSlots": 2
+    },
+    "generations": {
+      "address": "0x606dCbFA17b76E4194865a09D6cfb92BE7EE26c3",
+      "runtimeCodeHash": "0x98cd06ca67c51f51fcfa892e0dcbe8b88b453dcf37281ed035e0007cfae046aa",
+      "bytes": 4160,
+      "exactOutsideCompilerImmutableSlots": true,
+      "immutableSlots": 2
+    },
+    "game": {
+      "address": "0x24BcA5Bf559e0353801F719EbC3885441CB49Fd3",
+      "runtimeCodeHash": "0x45b5d1e61c371b44010b2c690fd9a7808a680b544cd184a1b3ac207d1cb5df4e",
+      "bytes": 12260,
+      "exactOutsideCompilerImmutableSlots": true,
+      "immutableSlots": 33
+    },
+    "rewardToken": {
+      "address": "0x9fCe27c074281709d0Ccd9bd0439f223E8F83844",
+      "runtimeCodeHash": "0x970a032a864e1a2038b32b92775e98c6ca82116afd1e00233e50bbb6154fdb19",
+      "bytes": 2780,
+      "exactOutsideCompilerImmutableSlots": true,
+      "immutableSlots": 5
+    }
+  },
+  "state": [
+    {
+      "contract": "rf",
+      "function": "name",
+      "args": [],
+      "value": "Rare Friends Testnet Faucet"
+    },
+    {
+      "contract": "rf",
+      "function": "symbol",
+      "args": [],
+      "value": "tRF"
+    },
+    {
+      "contract": "rf",
+      "function": "decimals",
+      "args": [],
+      "value": 18
+    },
+    {
+      "contract": "rf",
+      "function": "FAUCET_AMOUNT",
+      "args": [],
+      "value": "1100000000000000000000"
+    },
+    {
+      "contract": "genesis",
+      "function": "name",
+      "args": [],
+      "value": "Rare Rush Test Genesis"
+    },
+    {
+      "contract": "genesis",
+      "function": "symbol",
+      "args": [],
+      "value": "tGENESIS"
+    },
+    {
+      "contract": "genesis",
+      "function": "isGenesis",
+      "args": [],
+      "value": true
+    },
+    {
+      "contract": "generations",
+      "function": "name",
+      "args": [],
+      "value": "Rare Rush Test Generations"
+    },
+    {
+      "contract": "generations",
+      "function": "symbol",
+      "args": [],
+      "value": "tGENERATIONS"
+    },
+    {
+      "contract": "generations",
+      "function": "isGenesis",
+      "args": [],
+      "value": false
+    },
+    {
+      "contract": "genesis",
+      "function": "supportsInterface",
+      "args": [
+        "0x80ac58cd"
+      ],
+      "value": true
+    },
+    {
+      "contract": "generations",
+      "function": "supportsInterface",
+      "args": [
+        "0x80ac58cd"
+      ],
+      "value": true
+    },
+    {
+      "contract": "game",
+      "function": "owner",
+      "args": [],
+      "value": "0x6fD155b9D52F80E8A73a8A2537268602978486e2"
+    },
+    {
+      "contract": "game",
+      "function": "pendingOwner",
+      "args": [],
+      "value": "0x0000000000000000000000000000000000000000"
+    },
+    {
+      "contract": "game",
+      "function": "verifier",
+      "args": [],
+      "value": "0xd3166A769cF352F103A60a385892b599ecCc2B36"
+    },
+    {
+      "contract": "game",
+      "function": "verifierEpoch",
+      "args": [],
+      "value": "1"
+    },
+    {
+      "contract": "game",
+      "function": "treasury",
+      "args": [],
+      "value": "0x6fD155b9D52F80E8A73a8A2537268602978486e2"
+    },
+    {
+      "contract": "game",
+      "function": "engineVersion",
+      "args": [],
+      "value": "0xd907fa6f48be2aff2712c2e254943dc8afa749e7bfb5d9b28dc865c3a096ba99"
+    },
+    {
+      "contract": "game",
+      "function": "rf",
+      "args": [],
+      "value": "0xED668133bab94DD83e537F12B68365c4bC0eC2a3"
+    },
+    {
+      "contract": "game",
+      "function": "genesis",
+      "args": [],
+      "value": "0x7404d2b0461228C6478fdB8850d27d8e65EFD2c3"
+    },
+    {
+      "contract": "game",
+      "function": "generations",
+      "args": [],
+      "value": "0x606dCbFA17b76E4194865a09D6cfb92BE7EE26c3"
+    },
+    {
+      "contract": "game",
+      "function": "token",
+      "args": [],
+      "value": "0x9fCe27c074281709d0Ccd9bd0439f223E8F83844"
+    },
+    {
+      "contract": "game",
+      "function": "expectedLaunchAllocation",
+      "args": [],
+      "value": "102400000000000"
+    },
+    {
+      "contract": "game",
+      "function": "REWARD_SUPPLY_CAP",
+      "args": [],
+      "value": "1024000000000000"
+    },
+    {
+      "contract": "game",
+      "function": "ENTRY_FEE",
+      "args": [],
+      "value": "110000000000000000000"
+    },
+    {
+      "contract": "game",
+      "function": "PRIZE_POOL_SHARE",
+      "args": [],
+      "value": "100000000000000000000"
+    },
+    {
+      "contract": "game",
+      "function": "TREASURY_SHARE",
+      "args": [],
+      "value": "10000000000000000000"
+    },
+    {
+      "contract": "game",
+      "function": "INITIAL_COIN_REWARD",
+      "args": [],
+      "value": "10000000"
+    },
+    {
+      "contract": "game",
+      "function": "MIN_COIN_REWARD",
+      "args": [],
+      "value": "1000000"
+    },
+    {
+      "contract": "game",
+      "function": "HALVING_INTERVAL",
+      "args": [],
+      "value": "10000"
+    },
+    {
+      "contract": "game",
+      "function": "MAX_DAILY_RUNS",
+      "args": [],
+      "value": "3"
+    },
+    {
+      "contract": "game",
+      "function": "MAX_PICKUPS",
+      "args": [],
+      "value": "512"
+    },
+    {
+      "contract": "game",
+      "function": "CLAIM_GRACE",
+      "args": [],
+      "value": "900"
+    },
+    {
+      "contract": "game",
+      "function": "paused",
+      "args": [],
+      "value": false
+    },
+    {
+      "contract": "game",
+      "function": "runCount",
+      "args": [],
+      "value": "0"
+    },
+    {
+      "contract": "game",
+      "function": "claimedPickups",
+      "args": [],
+      "value": "0"
+    },
+    {
+      "contract": "game",
+      "function": "prizePoolBalance",
+      "args": [],
+      "value": "0"
+    },
+    {
+      "contract": "rewardToken",
+      "function": "name",
+      "args": [],
+      "value": "Rare Rush Testnet"
+    },
+    {
+      "contract": "rewardToken",
+      "function": "symbol",
+      "args": [],
+      "value": "tRARERUSH"
+    },
+    {
+      "contract": "rewardToken",
+      "function": "decimals",
+      "args": [],
+      "value": 6
+    },
+    {
+      "contract": "rewardToken",
+      "function": "owner",
+      "args": [],
+      "value": "0x6fD155b9D52F80E8A73a8A2537268602978486e2"
+    },
+    {
+      "contract": "rewardToken",
+      "function": "rewardMinter",
+      "args": [],
+      "value": "0x24BcA5Bf559e0353801F719EbC3885441CB49Fd3"
+    },
+    {
+      "contract": "rewardToken",
+      "function": "CAP",
+      "args": [],
+      "value": "1024000000000000"
+    },
+    {
+      "contract": "rewardToken",
+      "function": "launchAllocation",
+      "args": [],
+      "value": "102400000000000"
+    },
+    {
+      "contract": "rewardToken",
+      "function": "rewardAllocation",
+      "args": [],
+      "value": "921600000000000"
+    },
+    {
+      "contract": "rewardToken",
+      "function": "rewardsMinted",
+      "args": [],
+      "value": "0"
+    },
+    {
+      "contract": "rewardToken",
+      "function": "totalSupply",
+      "args": [],
+      "value": "102400000000000"
+    },
+    {
+      "contract": "rewardToken",
+      "function": "isPoolLocked",
+      "args": [],
+      "value": false
+    },
+    {
+      "contract": "rewardToken",
+      "function": "pool",
+      "args": [],
+      "value": "0x0000000000000000000000000000000000000000"
+    },
+    {
+      "contract": "rewardToken",
+      "function": "balanceOf",
+      "args": [
+        "0x6fD155b9D52F80E8A73a8A2537268602978486e2"
+      ],
+      "value": "102400000000000"
+    },
+    {
+      "contract": "game",
+      "function": "durationFor",
+      "args": [
+        0
+      ],
+      "value": "120"
+    },
+    {
+      "contract": "game",
+      "function": "quoteReward",
+      "args": [
+        "0x00",
+        0,
+        0
+      ],
+      "value": "7500000"
+    },
+    {
+      "contract": "game",
+      "function": "quoteReward",
+      "args": [
+        "0x01",
+        0,
+        0
+      ],
+      "value": "75000000"
+    },
+    {
+      "contract": "game",
+      "function": "quoteReward",
+      "args": [
+        "0x00",
+        1,
+        0
+      ],
+      "value": "750000000"
+    },
+    {
+      "contract": "game",
+      "function": "quoteReward",
+      "args": [
+        "0x01",
+        1,
+        0
+      ],
+      "value": "7500000000"
+    },
+    {
+      "contract": "game",
+      "function": "durationFor",
+      "args": [
+        1
+      ],
+      "value": "90"
+    },
+    {
+      "contract": "game",
+      "function": "quoteReward",
+      "args": [
+        "0x00",
+        0,
+        1
+      ],
+      "value": "10000000"
+    },
+    {
+      "contract": "game",
+      "function": "quoteReward",
+      "args": [
+        "0x01",
+        0,
+        1
+      ],
+      "value": "100000000"
+    },
+    {
+      "contract": "game",
+      "function": "quoteReward",
+      "args": [
+        "0x00",
+        1,
+        1
+      ],
+      "value": "1000000000"
+    },
+    {
+      "contract": "game",
+      "function": "quoteReward",
+      "args": [
+        "0x01",
+        1,
+        1
+      ],
+      "value": "10000000000"
+    },
+    {
+      "contract": "game",
+      "function": "durationFor",
+      "args": [
+        2
+      ],
+      "value": "60"
+    },
+    {
+      "contract": "game",
+      "function": "quoteReward",
+      "args": [
+        "0x00",
+        0,
+        2
+      ],
+      "value": "20000000"
+    },
+    {
+      "contract": "game",
+      "function": "quoteReward",
+      "args": [
+        "0x01",
+        0,
+        2
+      ],
+      "value": "200000000"
+    },
+    {
+      "contract": "game",
+      "function": "quoteReward",
+      "args": [
+        "0x00",
+        1,
+        2
+      ],
+      "value": "2000000000"
+    },
+    {
+      "contract": "game",
+      "function": "quoteReward",
+      "args": [
+        "0x01",
+        1,
+        2
+      ],
+      "value": "20000000000"
+    },
+    {
+      "contract": "game",
+      "function": "eip712Domain",
+      "args": [],
+      "value": [
+        "0x0f",
+        "RareRushTestnet",
+        "1",
+        "46630",
+        "0x24BcA5Bf559e0353801F719EbC3885441CB49Fd3",
+        "0x0000000000000000000000000000000000000000000000000000000000000000",
+        []
+      ]
+    }
+  ],
+  "guards": [
+    {
+      "contract": "rewardToken",
+      "function": "mintReward",
+      "from": "0x6fD155b9D52F80E8A73a8A2537268602978486e2",
+      "expectedError": "OnlyRewardMinter",
+      "method": "eth_call",
+      "passed": true
+    },
+    {
+      "contract": "game",
+      "function": "bindRewardToken",
+      "from": "0x6fD155b9D52F80E8A73a8A2537268602978486e2",
+      "expectedError": "RewardTokenAlreadyBound",
+      "method": "eth_call",
+      "passed": true
+    }
+  ],
+  "checksPassed": 66,
+  "scope": "Read-only initial deployment verification. No transaction was signed or broadcast. No hosted verifier, playable testnet game, or liquidity pool is asserted by this evidence."
+}

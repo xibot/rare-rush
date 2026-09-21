@@ -13,9 +13,9 @@ With the dev server running, `npm run test:browser` checks desktop/mobile layout
 
 ## Public configuration
 
-`public/testnet-config.json` is an allowlisted public manifest, **never a secret store**. The committed default has `contracts: null`, which keeps all contract writes disabled. The official test ETH faucet and wallet connection remain available. No blockchain addresses have been fabricated.
+`public/testnet-config.json` is an allowlisted public manifest, **never a secret store**. It contains the five deployed Robinhood testnet addresses, independently checked against the reviewed compiler input and all six deployment/binding transactions. The [deployment manifest](../infra/testnet/deployments/robinhood-testnet.json) and [verification snapshot](../infra/testnet/deployments/robinhood-testnet-verification.json) preserve the public evidence. Setting `contracts: null` disables contract writes while retaining wallet connection and the official test ETH faucet.
 
-After the intended contracts have actually been deployed and confirmed, populate all five distinct addresses:
+The configuration shape requires all five distinct addresses:
 
 ```json
 {
@@ -40,7 +40,7 @@ Wallet balances are read from the testnet RPC. Newly minted test NFT IDs are ext
 
 ## Scope and honest status
 
-Public deployment is pending unless actual addresses are configured and pass checks. Browser gameplay, hosted run verification, and reward claims are **not connected in this app yet**. A separate local Robinhood fork has validated the custom Doppler launch, RF swaps and signed reward minting; public custom factory approval and public liquidity deployment remain pending. The full game contract now binds an external token using the same validated token implementation; hosted browser gameplay remains a separate step. This lab has no live Doppler pool or exchange. Test contracts use a 1.024B cap, a 102.4M launch reserve, and 921.6M for gameplay. The provisional test curve begins at 10 tokens, halves every 10,000 claimed pickups, and has a 1-token base floor before multipliers. These are test settings, not finalized mainnet economics. Test tokens and test NFTs have no redemption value and do not become mainnet assets.
+The five public contracts are deployed and the game is bound to its reward token. The site enables test RF and NFT faucets after checking the deployed contracts. Browser gameplay, hosted run verification, and reward claims are **not connected in this app yet**. A separate local Robinhood fork has validated the custom Doppler launch, RF swaps and signed reward minting; public custom factory approval and public liquidity deployment remain pending. This lab has no live Doppler pool or exchange. Test contracts use a 1.024B cap, a 102.4M launch reserve, and 921.6M for gameplay. The provisional test curve begins at 10 tokens, halves every 10,000 claimed pickups, and has a 1-token base floor before multipliers. These are test settings, not finalized mainnet economics. Test tokens and test NFTs have no redemption value and do not become mainnet assets.
 
 ## Assets
 

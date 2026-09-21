@@ -13,6 +13,12 @@ An isolated contract and verifier prototype for **test assets only**. The public
 
 No public verifier endpoint, production wallet-game integration, real-holder bridge, DEX pair, liquidity, or automated leaderboard payout is included in this first infrastructure milestone.
 
+## Public testnet deployment
+
+The owner completed the six browser-wallet operations on September 21, 2026. The [public manifest](deployments/robinhood-testnet.json) records all five addresses, transaction hashes, constructor arguments and the reward-token binding. The [independent verification snapshot](deployments/robinhood-testnet-verification.json) checks them against the reviewed compiler input and deployed state. This is our read-only verification evidence, not a claim of explorer source verification or a security audit.
+
+The separate [testnet lab](https://testnet.rarerush.app) exposes the 1,100 tRF daily faucet and free test Genesis/Generations minting. Browser gameplay and the hosted run verifier are next; the public arcade at `rarerush.app` retains its simulated economy. The 102.4M launch reserve is in the configured owner wallet; it is not a deployed liquidity pool.
+
 ## Run locally
 
 Use Node **22.18 or later**. From the repository root:
@@ -59,6 +65,14 @@ Open `http://127.0.0.1:4174` in your wallet-enabled desktop browser. The console
 The optional second address argument to `prepare:operator` selects the treasury; it defaults to the owner wallet for this testnet setup. The deployment page displays it before signing. The constructor fixes that address permanently, and every paid start forwards 10 tRF to it atomically. Changing game ownership does not redirect the treasury or the reward token's immutable game minter. The one-time token binding checks the cap, decimals, launch allocation and untouched initial supply before enabling runs. A different treasury or revised immutable economics requires a new game deployment. Refresh the console after recompiling; if any earlier package has a pending or confirmed deployment, it preserves and blocks that progress for reconciliation instead of silently deploying again.
 
 The optional CLI `npm run deploy` performs read-only preflight and reports the artifact fingerprint, configured allocation and test ETH balance. CLI broadcasting is disabled; use the six-operation browser console, which checkpoints each pending transaction and verifies it before enabling the next step. No deployer key is exported or loaded. Never clear existing pending progress to retry an ambiguous transaction. Explorer verification uses `artifacts/standard-input.json`, Solidity `v0.8.30+commit.73712a01`, optimization 200, Cancun, and constructor arguments from the manifest.
+
+After deployment, independently check the downloaded files against the local public `operator-config.json`, current source, pinned compiler and RPC:
+
+```sh
+npm run verify:deployment -- deployments/robinhood-testnet.json /path/to/rare-rush-standard-input.json
+```
+
+The second path is optional. The check signs and sends no transactions, writes public evidence to ignored `artifacts/public-deployment-verification.json`, and verifies exact transaction inputs, canonical receipts, compiled runtime outside compiler-declared immutable slots, contract bindings, economics and access guards at one pinned block. It is an **initial deployment** check: it deliberately expects zero gameplay starts/mints and an untouched launch reserve, so it will fail once gameplay starts or the owner’s reserve balance differs. The committed snapshot records the initial deployment rather than making an ongoing health claim.
 
 ## Entry and reward rules
 
