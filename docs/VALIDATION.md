@@ -24,7 +24,7 @@
 
 - Results navigation revision: the full-width **← Change difficulty** button returns to the previous selector and focuses the selected mode. TypeScript and static build passed. The five-case game browser suite passed, including desktop replay and phone result→selector→different mode→new run transitions. Ledger snapshots confirm returning/selecting preserves RF, earned tokens, pool and pickup count, while starting charges exactly one additional demo entry. The 44px button stays inside the results panel at every viewport, including 360×640; desktop and small-phone screenshots were visually inspected.
 
-The builder confirmed a real Generations-wallet connection and completed run on rarerush.app on September 20, 2026, then reported that all three difficulties work with all their Generations Friends. Device details were not supplied; physical-phone and Genesis-wallet checks remain unconfirmed. This builder report is distinct from the automated fixture tests and does not establish compatibility with every wallet. No signing, real transactions, token deployment, liquidity creation or vibeathon submission was performed.
+The builder confirmed a real Generations-wallet connection and completed run on rarerush.app on September 20, 2026, then reported that all three difficulties work with all their Generations Friends. Device details were not supplied; physical-phone and Genesis-wallet checks remain unconfirmed. This builder report is distinct from the automated fixture tests and does not establish compatibility with every wallet. No signing, real transactions, token deployment or liquidity creation was performed.
 
 The local game server listens at port 4173. The test browser was installed under `/private/tmp/rare-rush-browsers`; in this environment run `PLAYWRIGHT_BROWSERS_PATH=/private/tmp/rare-rush-browsers npm run test:browser`. On a new machine use `npx playwright install chromium` once, then `npm run test:browser` normally.
 
@@ -75,3 +75,8 @@ The local game server listens at port 4173. The test browser was installed under
 - `npm run test:genesis` passed all three viewport cases plus the existing ownership-transfer, wallet-race, network, disconnect, delayed-read, failure and direct-entry checks. Returning to selection does not request another wallet connection.
 - TypeScript, FriendSDK validation and the production build passed. Desktop and small-phone start cards were visually inspected: the logo and BACK targets remain at least 44px high, with no overlap between the start card and game controls.
 - The five-case `npm run test:browser` suite passed again, covering Normal at all three sizes, phone Easy and small-phone Degen, including gameplay, rewards, pause, results and difficulty changes.
+
+## Vibeathon submission
+
+- Submitted on September 20, 2026 through [PR #22](https://github.com/spokesz/rarefriends-vibeathon/pull/22), adding only `submissions/rare-rush/README.md` to the event repository. The PR is open and is not a draft; organizer review and acceptance remain pending.
+- The README and PR description include the user-supplied public contacts, Economy Potential category, public source and game/pitch/guide links, reproducible setup, wallet requirements, simulated mechanics, asset credits and recorded validation. The source repository is public.

@@ -17,11 +17,11 @@ The public [Rare Rush 101 guide](https://rarerush.app/docs/) explains controls, 
 
 **This is a simulated economy prototype.** Entry fees, the reward token and prize pool have no monetary value and do not make transactions. The game implements a working local preview of the intended diminishing reward model. Verified Genesis testers enter free and earn 100× demo tokens per coin, stacked with difficulty and flying bonuses before the shared issuance cap. Real RARERUSH minting, the RARERUSH / RAREFRIENDS pair, and prize payouts remain future integrations.
 
-See [game instructions and exact rules](games/rare-rush/README.md), [economy design](docs/ECONOMY.md), and [submission draft](docs/SUBMISSION.md).
+See [game instructions and exact rules](games/rare-rush/README.md), [economy design](docs/ECONOMY.md), and [submission details](docs/SUBMISSION.md).
 
 Run `npm run typecheck:rush`, `npm run test:rush`, `npm run check`, `npm run build`, `npm run test:browser`, `npm run test:landing`, `npm run test:docs`, `npm run test:pitch`, `npm run test:entry`, `npm run test:genesis`, and `npm run test:bonus` to validate Rare Rush. The unmodified FriendSDK v0.1.2 package is included for reproducibility. `dist/` is the static hosting output, with the landing page at its root, the public guide in `docs/`, the judge-facing pitch in `pitch/`, collection choice in `arcade/`, the Genesis tester host in `genesis/`, and the SDK game inside `play/`.
 
-The vibeathon submission remains a draft. Publishing the site and source does not submit the entry.
+The Rare Rush entry was submitted to the Rare Friends Vibeathon on September 20, 2026: [submission PR #22](https://github.com/spokesz/rarefriends-vibeathon/pull/22). It is open for organizer review.
 
 ## Deployment
 
