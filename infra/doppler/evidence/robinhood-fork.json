@@ -1,7 +1,7 @@
 {
   "sourceChainId": 4663,
   "localChainId": 31337,
-  "forkBlock": 69150471,
+  "forkBlock": 69192915,
   "dopplerCommit": "bda077cf05c834f3bb5eb311f5b86376910d7912",
   "airlock": "0xeb7c034704ef8dcd2d32324c1545f62fb4ad0862",
   "initializer": "0xde8886a0019ea060b8378ee37b8a23b8117f29a3",
@@ -9,20 +9,25 @@
   "migrator": "0xba2f330edb16cd8056f5988d8ce19bbc63475a0e",
   "rf": "0x0779369854d3EcdEA927206718FFD7730C67B71f",
   "scope": "LOCAL FORK ONLY; no public transaction, no actual Doppler approval",
-  "allocationStatus": "10% launch / 90% gameplay is only a configurable test fixture, not an approved final allocation",
+  "allocationStatus": "10% launch / 90% gameplay is approved provisionally for testing, not final mainnet allocation",
   "checks": [
     "Pinned canonical Robinhood contracts have deployed code on the fork",
     "Canonical RF uses 18 decimals; custom RARERUSH uses 6",
+    "Canonical V3 factory enables the selected 1% fee tier with 200-tick spacing",
     "Existing pool, governance and migrator modules are approved at the pinned block",
     "Unapproved custom factory cannot launch through real Airlock",
     "Third parties cannot consume or bypass the single-launch factory",
     "Factory approval simulated ONLY on local fork",
     "Airlock launches capped custom token and a real RF V3 market; second launch denied",
+    "Launched pool has a 1% trading fee and locked 5% protocol / 95% game-recipient beneficiaries",
     "Buy custom six-decimal RARERUSH with canonical 18-decimal RF",
     "Sell custom RARERUSH back into the same RF pool",
     "Launcher, attacker, Airlock contract and its owner have no reward mint privilege",
     "Player-bound signed receipt mints once; theft, tampering and replay rejected",
     "Newly reward-minted tokens trade in the existing RF market",
+    "Real initializer collection pays nonzero 5/95 fees in both currencies to protocol and separate game recipient",
+    "Collected fee events match balance deltas exactly; only last sorted beneficiary gets rounding dust",
+    "Fee collection is permissionless, preserves LP liquidity and pays nothing to the launcher",
     "Combined launch and reward issuance reaches exact 1.024B cap and cannot exceed it",
     "Doppler lock/unlock/ownership interface works; ownership changes cannot change the minter"
   ],
@@ -33,7 +38,7 @@
     "migrator": "0x7bf5115543e8e0769ceabe4da9b8e23547c9e95c1cce15d24d96f164406129e3",
     "rf": "0x957b8e4fd8881a93d6f00862c079a76955dc464b0823c4513c1345474bfe33c2"
   },
-  "forkBlockHash": "0xdaaa6a99fcbeeeb4e23cd6ff4b54e048b2cddd1c75aed97b023ea88f399f8de0",
+  "forkBlockHash": "0x352fdea804fb9581c1ca7cfa6c14c8502f071a51810dc954c4a446a165a557da",
   "rfSymbol": "RAREFRIENDS",
   "airlockOwner": "0x21E2ce70511e4FE542a97708e89520471DAa7A66",
   "approval": "Airlock owner impersonated on LOCAL fork only to set module state 1; public approval NOT obtained",
@@ -41,27 +46,95 @@
     "token": "0x067BFBeeDDceDdCd8Ad0e47e156c5E34384C8b72",
     "factory": "0x886a2a3abf5b79aa5dff1c73016bd07cfc817e04",
     "claimFixture": "0xa4f9885550548c6a45b9d18c57b114c06f3c39b8",
-    "pool": "0x10d8C0fe14bD24f5f10CCCf1234792200FD509Db",
-    "transaction": "0xb7d1748be94cc96263608b07b2857266a39707d25dc1d3b32f6f3adf156d6e0b",
+    "pool": "0x6948744710b428bC4d99370Bc91A9771aB41d64a",
+    "transaction": "0x29a1aadef56f624c17952fbacb29c6fff946a53bb2729bc3aad16705d29570a3",
     "initialSupply": "102400000",
     "cap": "1024000000",
     "ticks": [
-      207240,
-      230280
+      207200,
+      230400
     ],
-    "poolLiquidity": "378688789435133875"
+    "poolFee": 10000,
+    "tickSpacing": 200,
+    "poolLiquidity": "376546005442978962"
   },
   "rfFunding": "Local-only impersonation of the RF contract transferred 1,000 existing fork RF to a disposable player; RF code/storage otherwise unmodified",
   "trades": {
     "spentRF": "100",
-    "boughtRARERUSH": "98906.535522",
-    "soldRARERUSH": "49453.267761",
-    "receivedRF": "49.907135757281765603"
+    "boughtRARERUSH": "98605.209939",
+    "soldRARERUSH": "49302.604969",
+    "receivedRF": "49.210350390470090548"
   },
   "rewardClaim": {
     "mintedRARERUSH": "2070",
-    "saleReceivedRF": "2.080002568616974671",
+    "saleReceivedRF": "2.057285404261737308",
     "scope": "Trusted signed-receipt fixture only, not full game replay"
+  },
+  "tradingFees": {
+    "poolFee": 10000,
+    "tradingFeePercent": 1,
+    "tickSpacing": 200,
+    "v3FeeProtocol": 0,
+    "splitBasis": "Fees collected from initializer-owned LP positions; this fresh local pool has no additional V3 protocol-fee cut",
+    "protocolFeePercent": 5,
+    "gameFeePercent": 95,
+    "protocolBeneficiary": "0x21E2ce70511e4FE542a97708e89520471DAa7A66",
+    "gameFeeRecipient": "0x15d34AAf54267DB7D7c367839AAf71A00a2C6A65",
+    "gameFeeRecipientScope": "Disposable local wallet index 4, distinct from launcher; not the public project recipient",
+    "collector": "0x3C44CdDdB6a900fa2b585dd299e03d12FA4293BC",
+    "collectionTransaction": "0xb37600aa4214bfa020d494ad76436ee50637f0a6f7454b1c4105fa781b7455ad",
+    "permissionlessCollection": true,
+    "currencies": [
+      {
+        "token": "0x067BFBeeDDceDdCd8Ad0e47e156c5E34384C8b72",
+        "symbol": "pRARERUSH",
+        "decimals": 6,
+        "totalCollectedRaw": "513726049",
+        "totalCollected": "513.726049",
+        "payouts": [
+          {
+            "beneficiary": "0x15d34AAf54267DB7D7c367839AAf71A00a2C6A65",
+            "sharePercent": 95,
+            "amountRaw": "488039746",
+            "roundingRemainderRaw": "0"
+          },
+          {
+            "beneficiary": "0x21E2ce70511e4FE542a97708e89520471DAa7A66",
+            "sharePercent": 5,
+            "amountRaw": "25686303",
+            "roundingRemainderRaw": "1"
+          }
+        ],
+        "roundingDustRaw": "1"
+      },
+      {
+        "token": "0x0779369854d3EcdEA927206718FFD7730C67B71f",
+        "symbol": "RAREFRIENDS",
+        "decimals": 18,
+        "totalCollectedRaw": "999999999999999999",
+        "totalCollected": "0.999999999999999999",
+        "payouts": [
+          {
+            "beneficiary": "0x15d34AAf54267DB7D7c367839AAf71A00a2C6A65",
+            "sharePercent": 95,
+            "amountRaw": "949999999999999999",
+            "roundingRemainderRaw": "0"
+          },
+          {
+            "beneficiary": "0x21E2ce70511e4FE542a97708e89520471DAa7A66",
+            "sharePercent": 5,
+            "amountRaw": "50000000000000000",
+            "roundingRemainderRaw": "1"
+          }
+        ],
+        "roundingDustRaw": "1"
+      }
+    ],
+    "launcherReceivedFees": false,
+    "initializerRetainedDust": false,
+    "poolLiquidityPreserved": true,
+    "roundingRule": "Each share is floored; the last beneficiary by address receives the remainder, at most one base unit per currency for two beneficiaries.",
+    "source": "https://github.com/whetstoneresearch/doppler/blob/bda077cf05c834f3bb5eb311f5b86376910d7912/src/initializers/LockableUniswapV3Initializer.sol"
   },
   "indexing": {
     "airlockRecordedInitialSupply": "102400000",
@@ -70,12 +143,13 @@
   },
   "claimScope": "Signed receipt fixture only. No physics replay, NFT ownership, quotas or existing RareRushGame adapter exercised here.",
   "limitations": [
-    "No public deployment or Airlock approval",
+    "No public Doppler pool deployment or Airlock factory approval",
     "No public Robinhood-testnet Doppler modules in official deployments list",
     "No production migration exercised: locked V3 market with NoOpMigrator fixture",
-    "No final launch allocation, price, fee beneficiaries or emission schedule decided",
-    "No end-to-end integration with existing RareRushGame; it currently creates its own token",
+    "10/90 allocation is provisional for testing; launch price, positions and mainnet emission schedule remain undecided",
+    "The selected 1% trading fee and 5/95 fee split are proven locally; the game recipient here is a disposable fixture wallet, not the public project recipient",
+    "The deployed standalone testnet RareRushGame binds its external token, but this Doppler proof exercises only the signed-claim fixture, not the complete game replay",
     "Prototype is unaudited and intentionally rejects mainnet chain ID"
   ],
-  "generatedAt": "2026-09-21T22:19:46.077Z"
+  "generatedAt": "2026-09-21T23:31:00.987Z"
 }

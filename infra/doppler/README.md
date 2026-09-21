@@ -5,8 +5,8 @@ This isolated experiment asks whether a custom six-decimal, capped, play-to-mint
 
 ## What passed
 
-- Fourteen local unit checks for allocation bounds, contract-only immutable reward minter, signed receipt authorization, player/amount binding, chain/contract replay separation, expiry, one-time claims, pool locks, ownership transfer and the exact cap boundary.
-- Fourteen compatibility checks against unchanged **deployed Robinhood mainnet contract code** on a disposable local fork. These exercised factory rejection before approval; locally simulated approval; real Airlock/V3 initialization with RF; buying and selling; a signed reward mint; selling newly minted rewards; cap enforcement; and token migration interface calls.
+- Three fee-configuration checks for sorted shares, invalid recipients and unset mainnet destinations, plus fourteen local unit checks for allocation bounds, contract-only immutable reward minter, signed receipt authorization, player/amount binding, chain/contract replay separation, expiry, one-time claims, pool locks, ownership transfer and the exact cap boundary.
+- Nineteen compatibility checks against unchanged **deployed Robinhood mainnet contract code** on a disposable local fork. These exercised factory rejection before approval; locally simulated approval; real Airlock/V3 initialization with RF; buying and selling; a signed reward mint; selling newly minted rewards; cap enforcement; token migration interface calls; and actual 1% fee collection to the 5% Doppler / 95% designated game recipients in both currencies.
 - The detailed block/hash, module code hashes, local contract addresses and measured trade amounts are in [`evidence/robinhood-fork.json`](./evidence/robinhood-fork.json). Those transaction hashes and newly created addresses exist **only on the local fork**.
 
 The fork uses source chain 4663, but all transactions run on a loopback Hardhat chain with ID 31337. No public wallet is connected. No public transaction is broadcast. The contracts deliberately reject deployment on mainnet; these are unaudited prototypes.
@@ -48,9 +48,15 @@ Replace `BLOCK_FROM_EVIDENCE` with the `forkBlock` number in the saved report. A
 
 `V3SwapFixture` is a local-only swap callback. The RF and V3 pool code used for swaps are the actual forked/deployed contracts.
 
-## Fixture economics are not final tokenomics
+## Selected trading fees and provisional launch settings
 
-This test chooses **10% launch / 90% gameplay**, a roughly 0.001 RF starting price per RARERUSH, a 0.3% V3 trading fee, ten liquidity positions, an 80% bonding-curve share and fee beneficiaries. These were local fixture inputs. The user subsequently selected 10% launch / 90% gameplay for the first standalone testnet deployment; the price, V3 fee, positions and pool settings remain unselected for public deployment. None of these are final mainnet economics or forecasts.
+The selected pool policy is a **1% trading fee**, split **5% of collected fees to Doppler / 95% to the designated game revenue recipient**. The split applies to fees collected from the launch initializer’s liquidity positions. When those positions own all fee-earning liquidity and V3’s separate protocol fee is off, this is approximately 0.05% and 0.95% of swap volume respectively, subject to integer rounding. For example, 100 RF collected from those positions distributes 5 RF to Doppler and 95 RF to the game recipient. Other LPs earn fees on their own positions; a separate V3 protocol cut would reduce the LP fees available to split. This policy is recorded in [`config/trading-fees.mjs`](config/trading-fees.mjs); no public trading pool is deployed yet.
+
+For testnet, the chosen game fee recipient is the existing treasury wallet, `0x6fD155b9D52F80E8A73a8A2537268602978486e2`. For mainnet, trading fees will go to a **game admin address**, while game-entry treasury fees will go to a **separate treasury address/contract**; both mainnet destinations are still unset. The existing Generations entry accounting remains 110 RF: 100 reserved for prizes and 10 for the entry treasury. Pool trading fees do not automatically fund that prize accounting. The current gameplay contract has no general trading-fee withdrawal mechanism, so it is not used as the trading-fee beneficiary.
+
+The local fork uses disposable wallets, including a designated fee recipient different from the launcher; it never pays the real testnet treasury wallet. The 1% V3 tier uses fee value `10000` and tick spacing `200`. Doppler's protocol beneficiary is read from the pinned Airlock owner. Fees accrue in the pool's two currencies and are distributed by `collectFees(pool)`; they are not automatically converted into RF. Recipient shares are set when the locked pool is initialized.
+
+Other fixture choices remain provisional: **10% launch / 90% gameplay**, a roughly 0.001 RF starting price per RARERUSH, ten liquidity positions and an 80% bonding-curve share. The user selected 10% launch / 90% gameplay for the first standalone testnet deployment. The price, positions, liquidity funding and final mainnet emissions remain undecided; the fork is not a forecast.
 
 The pool is funded initially with the launch RARERUSH allocation. Buyers supply RF when they buy. **“Instant market” does not mean free RF liquidity.** Reward tokens can only sell against RF that has actually entered the pool. The test buys first, then sells and then sells a newly minted reward.
 
@@ -70,10 +76,10 @@ Robinhood mainnet is in the official deployment list; Robinhood testnet is not c
 
 ## Still required before integration
 
-1. Decide final mainnet launch/gameplay allocation, fee recipients, RF funding assumptions and emissions. The standalone game testnet uses the agreed 10% reserve / 90% gameplay split and a provisional 1-token base floor; this fork prototype does not decide final launch economics.
+1. Supply the separate mainnet game-admin and entry-treasury destinations, and decide final mainnet launch/gameplay allocation, RF funding assumptions and emissions. The selected pool fee is 1% with a 5/95 Doppler/game split. The standalone game testnet uses the agreed 10% reserve / 90% gameplay split and a provisional 1-token base floor.
 2. The standalone `RareRushGame` now binds an external token using this same token implementation, preserving verified replay, ownership checks, multipliers, daily starts, fees and cap accounting. Its integrated local game tests and replay demo are in `infra/testnet`. A complete game → canonical factory launch → claim → swap fork rehearsal remains separate from this prototype's receipt-fixture proof.
 3. Obtain public factory approval, verify the final factory/token bytecode and choose the actual launch route. This prototype deliberately cannot deploy to mainnet.
-4. Provide testnet contract deployments, a durable verifier service and a wallet-connected play/claim interface. No public deployment is performed by these scripts.
+4. Connect the deployed testnet game and reward token to a hosted verifier service and wallet-connected play/claim interface. The five verified standalone testnet contracts do not include a Doppler pool. No public deployment is performed by these fork scripts.
 5. Review economic effects of ongoing issuance and Genesis ×100. Contract compatibility does not establish sustainable liquidity, an emission timeline or resistance to gameplay bots.
 
 ## Pinned references
