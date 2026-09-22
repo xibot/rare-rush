@@ -62,3 +62,6 @@ body.rush-generations-selecting>#root{max-width:1080px;margin:0 auto!important}
 @media(max-width:700px){body.rush-generations-selecting{padding:0 20px}.rush-entry-header{min-height:80px}.rush-entry-logo>span{font-size:20px}.rush-entry-logo>img{width:36px;height:36px}.rush-entry-header nav{font-size:11px;gap:15px}.rush-entry-intro{padding-top:30px}.rush-entry-kicker{font-size:11px}.rush-generations-menu>.rf-frame-menu-body{padding:20px}.rush-generations-menu .rf-runtime-connection{gap:10px}.rush-generations-menu .rf-runtime-connection>button{font-size:12px;padding:12px 14px}.rush-generations-menu .rf-frame-friends{grid-template-columns:repeat(2,minmax(0,1fr))}.rush-generations-menu .rf-frame-friends button{padding:14px 8px;font-size:12px}.rush-generations-menu .rf-frame-friends small{font-size:8px}}
 
 .rush-friend-portrait[hidden]{display:none}
+
+/* Keep MVP and testnet navigation visible on phones. */
+@media(max-width:600px){.rush-entry-header{flex-wrap:wrap;padding:17px 0 12px;row-gap:12px}.rush-entry-header nav{width:100%;justify-content:space-between;gap:12px}}

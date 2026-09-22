@@ -12,3 +12,6 @@
 .genesis-friends small{grid-row:3;grid-column:1}
 .genesis-friends b{grid-row:2/4}
 @media(max-width:700px){.genesis-portrait{min-height:95px;padding:10px}.genesis-portrait-placeholder{font-size:8px}}
+
+/* Keep MVP and testnet navigation visible on phones. */
+@media(max-width:600px){.genesis-header{flex-wrap:wrap;padding:17px 0 12px;row-gap:12px}.genesis-header nav{width:100%;justify-content:space-between;gap:12px}}

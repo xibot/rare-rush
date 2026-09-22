@@ -32,7 +32,7 @@ try {
         pixelLoaded: [...document.fonts].some(font => font.family === 'Silkscreen' && font.weight === '400' && font.status === 'loaded') };
     });
     assert.match(typography.heading, /Silkscreen/);
-    assert.match(typography.body, /Archivo/);
+    assert.match(typography.body, /Sometype Mono/);
     assert(typography.pixelLoaded, 'The real pixel font must load locally');
     assert.equal(await page.locator('.landing-logo small').innerText(), 'BY XIBOT');
     assert.equal(await page.locator('.landing-logo [data-canonical-face="08"]').count(), 1);
