@@ -45,6 +45,8 @@
 .entry-shell .site-header nav { gap: 22px; font-size: 12px; letter-spacing: 0; }
 .entry-shell .site-header nav a { min-height: 44px; display: flex; align-items: center; }
 .entry-shell .site-header nav .outline-link { border: 0; padding: 0; }
+.entry-shell .site-header nav .arcade-link { border-color: #fff; background: transparent; color: #fff; }
+.entry-shell .site-header nav .arcade-link:is(:hover, :focus-visible) { border-color: var(--lime); background: var(--lime); color: #000; text-decoration: none; }
 
 @media (max-width: 1100px) {
   .lab-shell:not(.entry-shell):not(.arcade-page) { padding-inline: 28px; }
