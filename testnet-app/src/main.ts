@@ -3,6 +3,7 @@ import { tokenAbi, nftAbi, gameAbi } from './abi.ts';
 import { mintedIds, type PendingMint } from './receipts.ts';
 import { CHAIN_ID, CONTRACT_KEYS, EXPLORER_URL, FAUCET_URL, RPC_URL, actionBlockReason, assertRewardEconomics, assertWalletContext, escapeHtml as e, faucetReady, parseConfig, type PublicConfig } from './safety.ts';
 import './style.css';
+import './navbar.css';
 import { loadPlayState, savePlayState } from './play/storage.ts';
 import { createWalletSession } from './wallet-session.ts';
 
@@ -57,7 +58,7 @@ function render() {
     <div class="lab-shell">
       <header class="site-header">
         <a class="brand" href="/" aria-label="Rare Rush testnet home"><img src="/assets/rare-friend.svg" width="60" height="60" alt=""/><span><strong>RARE<span>RUSH</span></strong><small>BY XIBOT</small></span></a>
-        <nav aria-label="Main navigation"><a href="/dashboard/">DASHBOARD</a><a href="/play/" class="outline-link">PLAY TESTNET ↗</a></nav>
+        <nav aria-label="Main navigation"><a href="/dashboard/">DASHBOARD</a><a href="/play/" class="outline-link">PLAY TESTNET <span aria-hidden="true">↗</span></a></nav>
       </header>
       <main>
         <section class="hero" aria-labelledby="hero-title">

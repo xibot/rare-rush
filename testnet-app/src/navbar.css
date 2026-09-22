@@ -1,0 +1,66 @@
+/* Match the public landing header; collection pages use its entry header sizes. */
+.lab-shell:not(.entry-shell):not(.arcade-page) { max-width: 1480px; padding-inline: 48px; }
+.site-header {
+  --lime: #ccff00;
+  height: 102px;
+  border-bottom: 1px solid #ffffff50;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 24px;
+}
+.brand { display: flex; align-items: center; gap: 12px; }
+.brand img { width: 42px; height: 42px; }
+.brand > span { display: block; line-height: 1; }
+.brand strong { display: block; font: 400 20px/1 var(--pixel); letter-spacing: 0; }
+.brand strong span { color: var(--lime); }
+.brand small { display: block; margin-top: 7px; font: 400 8px/1 Sometype, monospace; letter-spacing: 2.2px; }
+.site-header nav { display: flex; align-items: center; gap: 32px; font-size: 11px; letter-spacing: .5px; }
+.site-header nav .outline-link { padding: 13px 17px; font-size: inherit; }
+.site-header nav .outline-link > span { color: var(--lime); margin-left: 18px; font-size: 17px; }
+.site-header a:hover { transform: none; text-decoration: underline; }
+.site-header a:focus-visible { outline-offset: 5px; }
+
+.entry-shell .site-header { height: auto; min-height: 100px; gap: 20px; border-color: #fff6; }
+.entry-shell .brand { gap: 13px; }
+.entry-shell .brand img { width: 44px; height: 44px; }
+.entry-shell .brand strong { font-size: 24px; }
+.entry-shell .brand small { font-size: 10px; line-height: 1.5; letter-spacing: 2px; margin-top: 8px; }
+.entry-shell .site-header nav { gap: 22px; font-size: 12px; letter-spacing: 0; }
+.entry-shell .site-header nav a { min-height: 44px; display: flex; align-items: center; }
+.entry-shell .site-header nav .outline-link { border: 0; padding: 0; }
+
+@media (max-width: 1100px) {
+  .lab-shell:not(.entry-shell):not(.arcade-page) { padding-inline: 28px; }
+}
+@media (max-width: 800px) {
+  .site-header { height: 80px; }
+  .site-header nav { gap: 16px; font-size: 9px; }
+}
+@media (max-width: 700px) {
+  .entry-shell .site-header { min-height: 80px; }
+  .entry-shell .brand img { width: 36px; height: 36px; }
+  .entry-shell .brand strong { font-size: 20px; }
+  .entry-shell .site-header nav { gap: 15px; font-size: 11px; }
+}
+@media (max-width: 600px) {
+  .lab-shell:not(.entry-shell):not(.arcade-page) { padding-inline: 20px; }
+  .site-header { height: auto; min-height: 104px; padding: 17px 0 12px; flex-wrap: wrap; gap: 12px 10px; }
+  .brand { gap: 8px; }
+  .brand img { width: 32px; height: 32px; }
+  .brand strong { font-size: 16px; }
+  .brand small { font-size: 7px; letter-spacing: 1.6px; }
+  .site-header nav { width: 100%; justify-content: space-between; gap: 16px; font-size: 11px; }
+  .site-header nav a { min-height: 44px; display: flex; align-items: center; }
+  .site-header nav .outline-link { font-size: 10px; padding: 10px 12px; }
+  .site-header nav .outline-link > span { margin-left: 8px; font-size: 14px; }
+  .entry-shell .site-header { padding: 0; flex-wrap: nowrap; }
+  .entry-shell .site-header nav { width: auto; }
+  .entry-shell .site-header nav .outline-link { padding: 0; font-size: 11px; }
+}
+
+/* Keep the longer testnet navigation readable on the narrowest phones. */
+@media (max-width: 359px) {
+  .entry-shell .site-header { padding: 17px 0 12px; flex-wrap: wrap; row-gap: 12px; }
+  .entry-shell .site-header nav { width: 100%; }
+}
