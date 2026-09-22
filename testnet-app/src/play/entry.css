@@ -3,7 +3,7 @@
   --entry-lime: #ccff00;
   color: #fff;
   background: #000;
-  font-family: Archivo, sans-serif;
+  font-family: Sometype, monospace;
 }
 .testnet-entry .testnet-entry-content {
   max-width: 920px;
@@ -23,7 +23,7 @@
 }
 .testnet-entry h1 span { color: var(--entry-lime); }
 .testnet-entry p {
-  font: 16px/1.65 Archivo, sans-serif;
+  font: 16px/1.65 Sometype, monospace;
   max-width: 64ch;
   color: #ddd;
 }
@@ -66,7 +66,7 @@
   margin: 0 0 16px;
 }
 .testnet-entry .testnet-collection-description {
-  font: 16px/1.65 Archivo, sans-serif;
+  font: 16px/1.65 Sometype, monospace;
   color: #ddd;
   margin: 0 0 25px;
   flex: 1;
