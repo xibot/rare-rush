@@ -10,6 +10,8 @@ The independent app at `https://testnet.rarerush.app`, deployed only to XIBOT’
 4. Wait for the confirmed start, then play. The contract seed initializes the unchanged 120 Hz game engine. Each NFT gets three starts per UTC day; losing or abandoning consumes the attempt and entry fee.
 5. Survive the timer with at least one heart. Authorize verification with a gas-free wallet signature, then submit the reward claim transaction. Confirmed claims mint valueless test RARERUSH.
 
+After a loss, choose **Close finished run** and confirm the wallet transaction to release the run's onchain slot. Closing uses test ETH gas but no additional daily attempt or tRF entry fee; it does not refund the used attempt or entry. The next run is a separate explicit start. Closing also works while the verifier is unavailable. If the claim window has already expired, a new run can be started without closing the old one.
+
 All test assets are separate from mainnet Rare Friends. Test characters use cosmetic canonical artwork and do not assert ownership of the corresponding mainnet NFT. They do not become mainnet assets. No public liquidity pool is live.
 
 ## Local setup

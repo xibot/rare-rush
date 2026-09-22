@@ -5,6 +5,7 @@ import { chromium } from 'playwright';
 import { decodeFunctionData, encodeAbiParameters, encodeEventTopics, encodeFunctionData, encodeFunctionResult, keccak256, parseAbi, toHex } from 'viem';
 import { PLAY_CONTRACTS, ENGINE_VERSION, DEPLOYMENT_BLOCK } from '../src/play/types.ts';
 import { PLAY_GAME_ABI } from '../src/play/chain.ts';
+import { advanceRecorder, createRecorder, exportReplay } from '../src/play/recorder.ts';
 import { emptyPlayState, stateKey } from '../src/play/storage.ts';
 import { tokenAbi, nftAbi } from '../src/abi.ts';
 import { REWARD_CAP, LAUNCH_ALLOCATION, GAMEPLAY_ALLOCATION, RPC_URL } from '../src/safety.ts';
@@ -20,6 +21,15 @@ const fullTokenAbi = [...tokenAbi, ...parseAbi(['function allowance(address,addr
 const fullNftAbi = [...nftAbi, ...parseAbi(['function generation(uint256) view returns(uint256)'])];
 const runFixture = (collection = 0) => ({ runId: '5', player: account, tokenId: '1', seed, startedAt: String(now), claimUntil: String(now + 990n), collection, difficulty: 1, claimed: false, verifierEpoch: '1', abandoned: false });
 function readyState(collection = 0) { return { ...emptyPlayState(account), friends: [{ collection: 0, tokenId: '1' }, { collection: 1, tokenId: '2' }], savedRun: { run: runFixture(collection), replay: { version: 'rare-rush-input-v1', frames: [] }, completedTicks: 0, status: 'ready' } }; }
+function lostState(collection) {
+    const recording = createRecorder(seed, 'normal');
+    while (recording.run.status === 'running') advanceRecorder(recording);
+    assert.equal(recording.run.finishReason, 'hearts');
+    const state = readyState(collection);
+    state.friends = [{ collection, tokenId: '1' }];
+    Object.assign(state.savedRun, { status: 'lost', replay: exportReplay(recording), completedTicks: recording.run._tick });
+    return state;
+}
 function pendingState(hashKnown = true) { return { ...emptyPlayState(account), friends: [{ collection: 0, tokenId: '1' }], pending: { kind: 'start', to: PLAY_CONTRACTS.game, data: encodeFunctionData({ abi: PLAY_GAME_ABI, functionName: 'startRun', args: [0, 1n, 1] }), value: '0', nonce: 9, hash: hashKnown ? hash : null, createdAt: Number(now) * 1000, selection: { collection: 0, tokenId: '1', difficulty: 1 } } }; }
 for (const key of Object.keys(PLAY_CONTRACTS)) {
     assert.equal(runtimes.contracts[key], PLAY_CONTRACTS[key]);
@@ -33,7 +43,8 @@ async function setup({ state = null, mobile = false, chain = '0xb626', authorize
     const page = await context.newPage();
     await context.route('**/*', r => new URL(r.request().url()).origin === new URL(origin).origin ? r.continue() : r.abort());
     const requests = [], unexpected = [];
-    const currentRun = state?.savedRun?.run ?? runFixture(), pending = state?.pending ?? pendingState().pending;
+    const currentRun = structuredClone(state?.savedRun?.run ?? runFixture()), pending = state?.pending ?? pendingState().pending;
+    let verifierReady = serverReady;
     await context.addInitScript(({ state, key, account, chain, authorized }) => {
         // New tabs initially run this script on about:blank, which has no origin storage.
         if (!/^https?:$/.test(location.protocol)) return;
@@ -48,7 +59,7 @@ async function setup({ state = null, mobile = false, chain = '0xb626', authorize
             get account() { return read().account; }, set account(value) { update({ account: value }); },
             get chain() { return read().chain; }, set chain(value) { update({ chain: value }); },
             get authorized() { return read().authorized; }, set authorized(value) { update({ authorized: value }); },
-            get prompts() { return read().prompts; }, writes: [], requests: [], listeners: {},
+            get prompts() { return read().prompts; }, writes: [], requests: [], listeners: {}, confirmTransactions: false,
         };
         window.ethereum = { on(name, fn) { (window.mockWallet.listeners[name] ??= []).push(fn); }, removeListener(name, fn) { window.mockWallet.listeners[name] = (window.mockWallet.listeners[name] ?? []).filter(v => v !== fn); }, async request({ method, params }) {
                 window.mockWallet.requests.push({ method, params });
@@ -65,21 +76,33 @@ async function setup({ state = null, mobile = false, chain = '0xb626', authorize
                     return null;
                 }
                 window.mockWallet.writes.push({ method, params });
+                if (method === 'eth_sendTransaction' && window.mockWallet.confirmTransactions)
+                    return window.mockBroadcastTransaction(params[0]);
                 throw Object.assign(new Error('User rejected fixture wallet operation'), { code: 4001 });
             } };
     }, { state, key: stateKey(account), account, chain, authorized });
-    await context.route('**/api/status', r => r.fulfill({ json: { ready: serverReady, chainId: 46630, game: PLAY_CONTRACTS.game } }));
+    await context.route('**/api/status', r => r.fulfill({ json: { ready: verifierReady, chainId: 46630, game: PLAY_CONTRACTS.game } }));
     await context.route('**/api/verify-run', r => { unexpected.push('Unexpected verification request'); return r.fulfill({ status: 503, json: { error: 'Verification fixture unavailable' } }); });
     const nft = keccak256(encodeAbiParameters([{ type: 'uint8' }, { type: 'uint256' }], [currentRun.collection, BigInt(currentRun.tokenId)]));
     const startedLog = { address: PLAY_CONTRACTS.game, topics: encodeEventTopics({ abi: PLAY_GAME_ABI, eventName: 'RunStarted', args: { runId: 5n, player: account, nft } }), data: encodeAbiParameters([{ type: 'uint8' }, { type: 'uint256' }, { type: 'uint8' }, { type: 'bytes32' }, { type: 'uint64' }, { type: 'uint64' }, { type: 'uint256' }], [currentRun.collection, BigInt(currentRun.tokenId), 1, seed, BigInt(currentRun.startedAt), BigInt(currentRun.claimUntil), 1n]), blockNumber: toHex(head - 1n), blockHash, transactionHash: hash, transactionIndex: '0x0', logIndex: '0x0', removed: false };
     const tx = { hash, from: account, to: PLAY_CONTRACTS.game, nonce: '0x9', chainId: '0xb626', value: '0x0', input: pending.data, blockHash, blockNumber: toHex(head - 1n), transactionIndex: '0x0', type: '0x2', gas: '0x50000', gasPrice: '0x1', maxFeePerGas: '0x1', maxPriorityFeePerGas: '0x1', v: '0x1', r: `0x${'5'.repeat(64)}`, s: `0x${'6'.repeat(64)}`, accessList: [] };
     const receipt = { transactionHash: hash, transactionIndex: '0x0', blockHash, blockNumber: toHex(head - 1n), from: account, to: PLAY_CONTRACTS.game, cumulativeGasUsed: '0x21000', gasUsed: '0x21000', effectiveGasPrice: '0x1', contractAddress: null, logs: [startedLog], status: '0x1', type: '0x2', logsBloom: `0x${'00'.repeat(256)}` };
+    await context.exposeBinding('mockBroadcastTransaction', (_source, transaction) => {
+        assert.equal(transaction.to.toLowerCase(), PLAY_CONTRACTS.game);
+        assert.equal(transaction.from.toLowerCase(), account);
+        assert.equal(BigInt(transaction.value), 0n);
+        assert.deepEqual(decodeFunctionData({ abi: PLAY_GAME_ABI, data: transaction.data }), { functionName: 'abandonRun', args: [5n] });
+        Object.assign(tx, { input: transaction.data, nonce: transaction.nonce });
+        receipt.logs = [{ ...startedLog, topics: encodeEventTopics({ abi: PLAY_GAME_ABI, eventName: 'RunAbandoned', args: { runId: 5n, player: account } }), data: '0x' }];
+        currentRun.abandoned = true;
+        return hash;
+    });
     function contractCall(item) {
         const key = Object.keys(PLAY_CONTRACTS).find(k => PLAY_CONTRACTS[k] === item.params[0].to.toLowerCase());
         assert.ok(key, `Unknown contract ${item.params[0].to}`);
         const abi = key === 'game' ? PLAY_GAME_ABI : ['genesis', 'generations'].includes(key) ? fullNftAbi : fullTokenAbi;
         const { functionName } = decodeFunctionData({ abi, data: item.params[0].data });
-        const values = { game: { rf: PLAY_CONTRACTS.rf, genesis: PLAY_CONTRACTS.genesis, generations: PLAY_CONTRACTS.generations, token: PLAY_CONTRACTS.rewardToken, ENTRY_FEE: 110n * 10n ** 18n, PRIZE_POOL_SHARE: 100n * 10n ** 18n, TREASURY_SHARE: 10n * 10n ** 18n, MAX_DAILY_RUNS: 3n, engineVersion: ENGINE_VERSION, paused: false, expectedLaunchAllocation: LAUNCH_ALLOCATION, INITIAL_COIN_REWARD: 10000000n, MIN_COIN_REWARD: 1000000n, HALVING_INTERVAL: 10000n, runs: [currentRun.player, BigInt(currentRun.tokenId), currentRun.seed, BigInt(currentRun.startedAt), BigInt(currentRun.claimUntil), currentRun.collection, currentRun.difficulty, currentRun.claimed, 1n, currentRun.abandoned], nftKey: nft, dailyStarts: 1n, activeRunByNft: state?.savedRun ? 5n : 0n }, rewardToken: { CAP: REWARD_CAP, rewardMinter: PLAY_CONTRACTS.game, decimals: 6, launchAllocation: LAUNCH_ALLOCATION, rewardAllocation: GAMEPLAY_ALLOCATION, rewardsMinted: 0n, totalSupply: LAUNCH_ALLOCATION, balanceOf: 0n }, rf: { FAUCET_AMOUNT: 1100n * 10n ** 18n, lastFaucetDayPlusOne: 0n, balanceOf: 1100n * 10n ** 18n, allowance: 110n * 10n ** 18n }, genesis: { isGenesis: true, ownerOf: account, balanceOf: 1n }, generations: { isGenesis: false, ownerOf: account, generation: 1n, balanceOf: 1n } };
+        const values = { game: { rf: PLAY_CONTRACTS.rf, genesis: PLAY_CONTRACTS.genesis, generations: PLAY_CONTRACTS.generations, token: PLAY_CONTRACTS.rewardToken, ENTRY_FEE: 110n * 10n ** 18n, PRIZE_POOL_SHARE: 100n * 10n ** 18n, TREASURY_SHARE: 10n * 10n ** 18n, MAX_DAILY_RUNS: 3n, engineVersion: ENGINE_VERSION, paused: false, expectedLaunchAllocation: LAUNCH_ALLOCATION, INITIAL_COIN_REWARD: 10000000n, MIN_COIN_REWARD: 1000000n, HALVING_INTERVAL: 10000n, runs: [currentRun.player, BigInt(currentRun.tokenId), currentRun.seed, BigInt(currentRun.startedAt), BigInt(currentRun.claimUntil), currentRun.collection, currentRun.difficulty, currentRun.claimed, 1n, currentRun.abandoned], nftKey: nft, dailyStarts: 1n, activeRunByNft: state?.savedRun && !currentRun.abandoned ? 5n : 0n, abandonRun: undefined }, rewardToken: { CAP: REWARD_CAP, rewardMinter: PLAY_CONTRACTS.game, decimals: 6, launchAllocation: LAUNCH_ALLOCATION, rewardAllocation: GAMEPLAY_ALLOCATION, rewardsMinted: 0n, totalSupply: LAUNCH_ALLOCATION, balanceOf: 0n }, rf: { FAUCET_AMOUNT: 1100n * 10n ** 18n, lastFaucetDayPlusOne: 0n, balanceOf: 1100n * 10n ** 18n, allowance: 110n * 10n ** 18n }, genesis: { isGenesis: true, ownerOf: account, balanceOf: 1n }, generations: { isGenesis: false, ownerOf: account, generation: 1n, balanceOf: 1n } };
         assert.ok(functionName in values[key], `Unexpected ${key}.${functionName}`);
         return encodeFunctionResult({ abi, functionName, result: values[key][functionName] });
     }
@@ -93,6 +116,8 @@ async function setup({ state = null, mobile = false, chain = '0xb626', authorize
                 result = toHex(head);
             else if (item.method === 'eth_getBalance')
                 result = toHex(10n ** 18n);
+            else if (item.method === 'eth_getTransactionCount')
+                result = '0x9';
             else if (item.method === 'eth_getCode') {
                 const key = Object.keys(PLAY_CONTRACTS).find(k => PLAY_CONTRACTS[k] === item.params[0].toLowerCase());
                 assert.ok(key);
@@ -121,7 +146,7 @@ async function setup({ state = null, mobile = false, chain = '0xb626', authorize
     await context.route('**/testnet-config.json', r => r.fulfill({ json: { version: 1, chainId: 46630, contracts: PLAY_CONTRACTS, deploymentConsoleUrl: null } }));
     await page.goto(`${origin}/play/`);
     await page.getByRole('heading', { name: /MAKE YOUR RUN COUNT/ }).waitFor();
-    return { page, context, requests, unexpected };
+    return { page, context, requests, unexpected, setServerReady(value) { verifierReady = value; } };
 }
 async function connect(page) {
     await page.getByRole('button', { name: /CONNECT WALLET|DISCONNECT/ }).waitFor();
@@ -319,6 +344,61 @@ try {
     await noWrites(c.page);
     assert.deepEqual(c.unexpected, []);
     await c.context.close();
+    for (const collection of [0, 1]) {
+        const loss = await setup({ state: lostState(collection), mobile: collection === 1, serverReady: false });
+        await connect(loss.page);
+        const close = loss.page.getByRole('button', { name: 'CLOSE FINISHED RUN' });
+        await close.waitFor();
+        await loss.page.locator('button:enabled').filter({ hasText: 'CLOSE FINISHED RUN' }).waitFor();
+        assert.equal(await close.isEnabled(), true, 'a lost run can be closed while the verifier is unavailable');
+        await loss.page.getByText(/2 \/ 3 starts left today/).waitFor();
+        assert.equal(await loss.page.getByRole('button', { name: /START (FREE RUN|RUN · 110 tRF)|APPROVE 110 tRF/ }).count(), 0, 'show the required close action instead of a disabled start');
+        assert.equal(await loss.page.getByText('Abandon this run', { exact: true }).count(), 0);
+        assert.equal(await loss.page.getByText(/Claim window:/).count(), 0);
+        await screenshot(loss.page, `play-app-lost-close-${collection === 1 ? 'mobile' : 'desktop'}.png`);
+        await noWrites(loss.page);
+
+        // Declining the explicit close keeps the replay and remaining attempts intact.
+        const before = await saved(loss.page);
+        await close.click();
+        await loss.page.getByText('Request declined. Your saved run is still here.', { exact: true }).waitFor();
+        await loss.page.locator('button:enabled').filter({ hasText: 'CLOSE FINISHED RUN' }).waitFor();
+        assert.equal(await close.isEnabled(), true);
+        assert.deepEqual((await saved(loss.page)).savedRun, before.savedRun);
+        assert.equal((await saved(loss.page)).pending, null);
+        await loss.page.getByText(/2 \/ 3 starts left today/).waitFor();
+
+        // Confirm only abandonment; no approval or new entry may be triggered afterward.
+        await loss.page.evaluate(() => { window.mockWallet.confirmTransactions = true; });
+        await close.click();
+        await loss.page.waitForFunction(key => JSON.parse(localStorage.getItem(key))?.savedRun?.status === 'abandoned', stateKey(account));
+        const start = loss.page.getByRole('button', { name: collection === 1 ? 'START FREE RUN' : 'START RUN · 110 tRF' });
+        await start.waitFor();
+        assert.equal(await start.isDisabled(), true, 'the unavailable verifier still gates a new entry, never closing');
+        assert.equal((await saved(loss.page)).pending, null);
+        assert.equal((await saved(loss.page)).history.length, 1);
+        assert.equal((await saved(loss.page)).history[0].kind, 'abandon');
+        assert.equal((await saved(loss.page)).history[0].status, 'confirmed');
+        await loss.page.getByText(/2 \/ 3 starts left today/).waitFor();
+        loss.setServerReady(true);
+        await loss.page.getByRole('button', { name: 'REFRESH' }).click();
+        await loss.page.waitForFunction(() => [...document.querySelectorAll('button')].some(button => /^START (FREE RUN|RUN · 110 tRF)/.test(button.textContent.trim()) && !button.disabled));
+        assert.equal(await start.isEnabled(), true, 'a confirmed close unlocks the next entry without consuming an attempt');
+        const writes = await loss.page.evaluate(() => window.mockWallet.writes);
+        assert.equal(writes.length, 2, 'only the rejected close and explicitly retried close open the wallet');
+        for (const write of writes) {
+            assert.equal(write.method, 'eth_sendTransaction');
+            assert.equal(write.params[0].to.toLowerCase(), PLAY_CONTRACTS.game);
+            assert.equal(BigInt(write.params[0].value), 0n);
+            assert.deepEqual(decodeFunctionData({ abi: PLAY_GAME_ABI, data: write.params[0].data }), { functionName: 'abandonRun', args: [5n] });
+        }
+        await loss.page.reload();
+        await loss.page.getByRole('button', { name: collection === 1 ? 'START FREE RUN' : 'START RUN · 110 tRF' }).waitFor();
+        assert.equal((await saved(loss.page)).savedRun.status, 'abandoned');
+        await noWrites(loss.page);
+        assert.deepEqual(loss.unexpected, []);
+        await loss.context.close();
+    }
     const bad = await setup({ state: readyState(), runtimeMismatch: true });
     await connect(bad.page);
     await bad.page.getByText(/Unexpected .* runtime/).waitFor();
@@ -333,7 +413,7 @@ try {
     assert.deepEqual(off.unexpected, []);
     await off.context.close();
     assert.deepEqual(errors, []);
-    console.log('Play browser checks passed: desktop/mobile UI, silent wallet restoration across test kit/arcade/reload, persistent cross-tab disconnect, provider revocation and account/network changes, pinned runtime verification, saved play/reload, keyboard/touch, pause/resume, external-tab checkpoint isolation, account isolation, known/hashless recovery, NFT/mode choice, runtime and unavailable-verifier gating. All RPC/wallet/API traffic mocked; no transactions submitted.');
+    console.log('Play browser checks passed: desktop/mobile UI, silent wallet restoration across test kit/arcade/reload, persistent cross-tab disconnect, provider revocation and account/network changes, pinned runtime verification, saved play/reload, keyboard/touch, pause/resume, external-tab checkpoint isolation, account isolation, known/hashless recovery, NFT/mode choice, both collections’ lost-run close/rejection/confirmation without extra entries or automatic transactions, runtime and unavailable-verifier gating. All RPC/wallet/API traffic mocked; no transactions submitted.');
 }
 finally {
     await browser.close();
