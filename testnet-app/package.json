@@ -8,18 +8,26 @@
   },
   "scripts": {
     "dev": "vite --host 127.0.0.1",
-    "build": "tsc --noEmit && vite build",
+    "build": "npm run prepare:shared && tsc --noEmit && vite build",
     "preview": "vite preview --host 127.0.0.1",
     "test": "node --test test/*.test.ts",
-    "test:browser": "node test/browser.mjs"
+    "test:browser": "node test/browser.mjs",
+    "prepare:shared": "node scripts/prepare-shared.mjs",
+    "test:play-browser": "node test/play-browser.mjs",
+    "test:integration": "RUSH_RUN_PLAY_INTEGRATION=1 node --test test/play-integration.test.ts"
   },
   "dependencies": {
-    "viem": "2.56.3"
+    "viem": "2.56.3",
+    "react": "19.2.8",
+    "react-dom": "19.2.8",
+    "@rarefriends/friendsdk": "file:generated/vendor/rarefriends-friendsdk-0.1.2.tgz"
   },
   "devDependencies": {
     "@types/node": "22.20.4",
     "playwright": "1.63.0",
     "typescript": "6.0.3",
-    "vite": "7.3.6"
+    "vite": "7.3.6",
+    "@types/react": "19.1.12",
+    "@types/react-dom": "19.1.9"
   }
 }
