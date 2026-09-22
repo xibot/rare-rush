@@ -1,0 +1,172 @@
+/* Match the main app's Genesis/Generations entrance without touching its shell. */
+.testnet-entry {
+  --entry-lime: #ccff00;
+  color: #fff;
+  background: #000;
+  font-family: Archivo, sans-serif;
+}
+.testnet-entry .testnet-entry-content {
+  max-width: 920px;
+  padding: 55px 0 40px;
+  margin: auto;
+}
+.testnet-entry .testnet-entry-kicker {
+  display: block;
+  font: 12px/1.7 Sometype, monospace;
+  color: var(--entry-lime);
+  margin-bottom: 17px;
+}
+.testnet-entry h1 {
+  font: 400 clamp(28px, 5vw, 62px)/1.14 Silkscreen, monospace;
+  letter-spacing: 0;
+  margin: 0 0 24px;
+}
+.testnet-entry h1 span { color: var(--entry-lime); }
+.testnet-entry p {
+  font: 16px/1.65 Archivo, sans-serif;
+  max-width: 64ch;
+  color: #ddd;
+}
+.testnet-entry button { border-radius: 0; touch-action: manipulation; }
+.testnet-entry button:not(:disabled):hover { transform: none; }
+.testnet-entry button:focus-visible,
+.testnet-entry a:focus-visible,
+.testnet-entry input:focus-visible,
+.testnet-entry select:focus-visible {
+  outline: 3px solid var(--entry-lime);
+  outline-offset: 4px;
+}
+.testnet-entry .testnet-collection-cards {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 24px;
+  margin: 35px 0;
+}
+.testnet-entry .testnet-collection-card {
+  border: 1px solid #fff;
+  padding: 30px;
+  display: flex;
+  align-items: flex-start;
+  flex-direction: column;
+  min-width: 0;
+  background: #000;
+  color: #fff;
+  text-align: left;
+}
+.testnet-entry .testnet-collection-card:hover { border-color: var(--entry-lime); }
+.testnet-entry .testnet-collection-card > img {
+  width: 76px;
+  height: 76px;
+  margin-bottom: 25px;
+  display: block;
+  image-rendering: pixelated;
+}
+.testnet-entry .testnet-collection-title {
+  font: 400 24px/1.4 Silkscreen, monospace;
+  margin: 0 0 16px;
+}
+.testnet-entry .testnet-collection-description {
+  font: 16px/1.65 Archivo, sans-serif;
+  color: #ddd;
+  margin: 0 0 25px;
+  flex: 1;
+}
+.testnet-entry .testnet-collection-action {
+  display: block;
+  width: 100%;
+  background: var(--entry-lime);
+  color: #000;
+  padding: 15px;
+  font: 13px/1.5 Sometype, monospace;
+}
+.testnet-entry .testnet-entry-caption {
+  font: 12px/1.8 Sometype, monospace;
+  margin-top: 30px;
+  color: #ccc;
+}
+.testnet-entry .testnet-entry-back {
+  font: 12px/1.6 Sometype, monospace;
+  display: flex;
+  align-items: center;
+  min-height: 44px;
+  margin-bottom: 26px;
+  padding: 0;
+  color: #fff;
+  background: none;
+  border: 0;
+}
+.testnet-entry .testnet-entry-back:hover { color: var(--entry-lime); }
+.testnet-entry .testnet-entry-wallet {
+  border: 1px solid #fff;
+  padding: 24px;
+  margin: 30px 0;
+}
+.testnet-entry .testnet-entry-account {
+  max-width: none;
+  overflow-wrap: anywhere;
+  margin: 0 0 18px;
+}
+.testnet-entry .testnet-entry-wallet-controls {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+.testnet-entry .testnet-entry-wallet-controls button {
+  min-height: 50px;
+  padding: 14px 20px;
+  background: var(--entry-lime);
+  color: #000;
+  border: 1px solid var(--entry-lime);
+  font: 14px/1.5 Silkscreen, monospace;
+}
+.testnet-entry .testnet-entry-wallet-controls button:hover:not(:disabled) {
+  background: #fff;
+  border-color: #fff;
+}
+.testnet-entry .testnet-entry-feedback { overflow-wrap: anywhere; }
+.testnet-entry .testnet-entry-feedback:empty { display: none; }
+.testnet-entry .testnet-entry-feedback .feedback { min-height: 0; padding: 16px 0 0; }
+.testnet-entry .testnet-entry-friends {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 12px;
+  margin: 24px 0 0;
+  max-height: 480px;
+  overflow: auto;
+  padding: 6px;
+}
+.testnet-entry .testnet-entry-friend {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  padding: 18px;
+  text-align: center;
+  min-width: 0;
+  background: #000;
+  color: #fff;
+  border: 1px solid #fff;
+  font: 14px/1.5 Sometype, monospace;
+}
+.testnet-entry .testnet-entry-friend:hover:not(:disabled) { background: var(--entry-lime); color: #000; }
+.testnet-entry .testnet-entry-friend > svg { display: block; width: 80px; height: 80px; image-rendering: pixelated; }
+.testnet-entry .testnet-entry-friend > strong { max-width: 100%; overflow-wrap: anywhere; }
+.testnet-entry .testnet-entry-friend > small { font-size: 10px; }
+.testnet-entry .testnet-entry-wallet > p a { color: var(--entry-lime); }
+.testnet-entry .recovery { font-family: Sometype, monospace; }
+
+@media (max-width: 700px) {
+  .testnet-entry .testnet-entry-content { padding-top: 30px; }
+  .testnet-entry .testnet-entry-kicker { font-size: 11px; }
+  .testnet-entry .testnet-collection-cards { grid-template-columns: 1fr; gap: 18px; margin-top: 27px; }
+  .testnet-entry .testnet-collection-card { padding: 24px; }
+  .testnet-entry .testnet-collection-card > img { width: 55px; height: 55px; margin-bottom: 18px; }
+  .testnet-entry .testnet-entry-wallet { padding: 20px; }
+  .testnet-entry .testnet-entry-wallet-controls { gap: 10px; }
+  .testnet-entry .testnet-entry-wallet-controls button { font-size: 12px; padding: 12px 14px; }
+  .testnet-entry .testnet-entry-friends { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .testnet-entry .testnet-entry-friend { padding: 14px 8px; font-size: 12px; }
+  .testnet-entry .testnet-entry-friend > small { font-size: 8px; }
+}

@@ -7,6 +7,7 @@ import { PLAY_CONTRACTS, ENGINE_VERSION, DEPLOYMENT_BLOCK } from '../src/play/ty
 import { PLAY_GAME_ABI } from '../src/play/chain.ts';
 import { advanceRecorder, createRecorder, exportReplay } from '../src/play/recorder.ts';
 import { emptyPlayState, stateKey } from '../src/play/storage.ts';
+import { recordPilot } from '../../infra/testnet/test/pilot.ts';
 import { tokenAbi, nftAbi } from '../src/abi.ts';
 import { REWARD_CAP, LAUNCH_ALLOCATION, GAMEPLAY_ALLOCATION, RPC_URL } from '../src/safety.ts';
 import runtimes from './fixtures/play-runtimes.json' with { type: 'json' };
@@ -30,6 +31,17 @@ function lostState(collection) {
     Object.assign(state.savedRun, { status: 'lost', replay: exportReplay(recording), completedTicks: recording.run._tick });
     return state;
 }
+function claimedState(collection = 1) {
+    const replay = recordPilot(seed);
+    const recording = createRecorder(seed, 'normal', replay, replay.frames.length);
+    assert.equal(recording.run.finishReason, 'time');
+    const state = readyState(collection);
+    state.friends = [{ collection: 0, tokenId: '1' }, { collection: 1, tokenId: '1' }];
+    Object.assign(state.savedRun, { status: 'claimed', replay, completedTicks: recording.run._tick, reward: String((recording.run.coins + recording.run.bonusCoins * 9) * 10 * (collection === 1 ? 100 : 1) * 10 ** 6) });
+    state.savedRun.run.claimed = true;
+    state.history = [{ kind: 'claim', hash, status: 'confirmed', at: Number(now) * 1000 }];
+    return state;
+}
 function pendingState(hashKnown = true) { return { ...emptyPlayState(account), friends: [{ collection: 0, tokenId: '1' }], pending: { kind: 'start', to: PLAY_CONTRACTS.game, data: encodeFunctionData({ abi: PLAY_GAME_ABI, functionName: 'startRun', args: [0, 1n, 1] }), value: '0', nonce: 9, hash: hashKnown ? hash : null, createdAt: Number(now) * 1000, selection: { collection: 0, tokenId: '1', difficulty: 1 } } }; }
 for (const key of Object.keys(PLAY_CONTRACTS)) {
     assert.equal(runtimes.contracts[key], PLAY_CONTRACTS[key]);
@@ -37,14 +49,14 @@ for (const key of Object.keys(PLAY_CONTRACTS)) {
 }
 const browser = await chromium.launch({ headless: true });
 const errors = [];
-async function setup({ state = null, mobile = false, chain = '0xb626', authorized = false, runtimeMismatch = false, serverReady = true } = {}) {
+async function setup({ state = null, mobile = false, chain = '0xb626', authorized = false, runtimeMismatch = false, serverReady = true, path = '/dashboard/' } = {}) {
     const context = await browser.newContext({ viewport: mobile ? { width: 390, height: 844 } : { width: 1440, height: 1100 }, isMobile: mobile, hasTouch: mobile, deviceScaleFactor: 1 });
     context.on('page', page => page.on('pageerror', e => errors.push(e.message)));
     const page = await context.newPage();
     await context.route('**/*', r => new URL(r.request().url()).origin === new URL(origin).origin ? r.continue() : r.abort());
     const requests = [], unexpected = [];
     const currentRun = structuredClone(state?.savedRun?.run ?? runFixture()), pending = state?.pending ?? pendingState().pending;
-    let verifierReady = serverReady;
+    let verifierReady = serverReady, startBroadcast = false;
     await context.addInitScript(({ state, key, account, chain, authorized }) => {
         // New tabs initially run this script on about:blank, which has no origin storage.
         if (!/^https?:$/.test(location.protocol)) return;
@@ -91,10 +103,17 @@ async function setup({ state = null, mobile = false, chain = '0xb626', authorize
         assert.equal(transaction.to.toLowerCase(), PLAY_CONTRACTS.game);
         assert.equal(transaction.from.toLowerCase(), account);
         assert.equal(BigInt(transaction.value), 0n);
-        assert.deepEqual(decodeFunctionData({ abi: PLAY_GAME_ABI, data: transaction.data }), { functionName: 'abandonRun', args: [5n] });
+        const operation = decodeFunctionData({ abi: PLAY_GAME_ABI, data: transaction.data });
         Object.assign(tx, { input: transaction.data, nonce: transaction.nonce });
-        receipt.logs = [{ ...startedLog, topics: encodeEventTopics({ abi: PLAY_GAME_ABI, eventName: 'RunAbandoned', args: { runId: 5n, player: account } }), data: '0x' }];
-        currentRun.abandoned = true;
+        if (operation.functionName === 'startRun') {
+            assert.deepEqual(operation, { functionName: 'startRun', args: [0, 1n, 1] });
+            startBroadcast = true;
+            receipt.logs = [startedLog];
+        } else {
+            assert.deepEqual(operation, { functionName: 'abandonRun', args: [5n] });
+            receipt.logs = [{ ...startedLog, topics: encodeEventTopics({ abi: PLAY_GAME_ABI, eventName: 'RunAbandoned', args: { runId: 5n, player: account } }), data: '0x' }];
+            currentRun.abandoned = true;
+        }
         return hash;
     });
     function contractCall(item) {
@@ -102,7 +121,7 @@ async function setup({ state = null, mobile = false, chain = '0xb626', authorize
         assert.ok(key, `Unknown contract ${item.params[0].to}`);
         const abi = key === 'game' ? PLAY_GAME_ABI : ['genesis', 'generations'].includes(key) ? fullNftAbi : fullTokenAbi;
         const { functionName } = decodeFunctionData({ abi, data: item.params[0].data });
-        const values = { game: { rf: PLAY_CONTRACTS.rf, genesis: PLAY_CONTRACTS.genesis, generations: PLAY_CONTRACTS.generations, token: PLAY_CONTRACTS.rewardToken, ENTRY_FEE: 110n * 10n ** 18n, PRIZE_POOL_SHARE: 100n * 10n ** 18n, TREASURY_SHARE: 10n * 10n ** 18n, MAX_DAILY_RUNS: 3n, engineVersion: ENGINE_VERSION, paused: false, expectedLaunchAllocation: LAUNCH_ALLOCATION, INITIAL_COIN_REWARD: 10000000n, MIN_COIN_REWARD: 1000000n, HALVING_INTERVAL: 10000n, runs: [currentRun.player, BigInt(currentRun.tokenId), currentRun.seed, BigInt(currentRun.startedAt), BigInt(currentRun.claimUntil), currentRun.collection, currentRun.difficulty, currentRun.claimed, 1n, currentRun.abandoned], nftKey: nft, dailyStarts: 1n, activeRunByNft: state?.savedRun && !currentRun.abandoned ? 5n : 0n, abandonRun: undefined }, rewardToken: { CAP: REWARD_CAP, rewardMinter: PLAY_CONTRACTS.game, decimals: 6, launchAllocation: LAUNCH_ALLOCATION, rewardAllocation: GAMEPLAY_ALLOCATION, rewardsMinted: 0n, totalSupply: LAUNCH_ALLOCATION, balanceOf: 0n }, rf: { FAUCET_AMOUNT: 1100n * 10n ** 18n, lastFaucetDayPlusOne: 0n, balanceOf: 1100n * 10n ** 18n, allowance: 110n * 10n ** 18n }, genesis: { isGenesis: true, ownerOf: account, balanceOf: 1n }, generations: { isGenesis: false, ownerOf: account, generation: 1n, balanceOf: 1n } };
+        const values = { game: { rf: PLAY_CONTRACTS.rf, genesis: PLAY_CONTRACTS.genesis, generations: PLAY_CONTRACTS.generations, token: PLAY_CONTRACTS.rewardToken, ENTRY_FEE: 110n * 10n ** 18n, PRIZE_POOL_SHARE: 100n * 10n ** 18n, TREASURY_SHARE: 10n * 10n ** 18n, MAX_DAILY_RUNS: 3n, engineVersion: ENGINE_VERSION, paused: false, expectedLaunchAllocation: LAUNCH_ALLOCATION, INITIAL_COIN_REWARD: 10000000n, MIN_COIN_REWARD: 1000000n, HALVING_INTERVAL: 10000n, runs: [currentRun.player, BigInt(currentRun.tokenId), currentRun.seed, BigInt(currentRun.startedAt), BigInt(currentRun.claimUntil), currentRun.collection, currentRun.difficulty, currentRun.claimed, 1n, currentRun.abandoned], nftKey: nft, dailyStarts: startBroadcast ? 2n : 1n, activeRunByNft: (state?.savedRun || startBroadcast) && !currentRun.abandoned && !currentRun.claimed ? 5n : 0n, abandonRun: undefined, startRun: 5n }, rewardToken: { CAP: REWARD_CAP, rewardMinter: PLAY_CONTRACTS.game, decimals: 6, launchAllocation: LAUNCH_ALLOCATION, rewardAllocation: GAMEPLAY_ALLOCATION, rewardsMinted: 0n, totalSupply: LAUNCH_ALLOCATION, balanceOf: BigInt(state?.savedRun?.reward ?? '0') }, rf: { FAUCET_AMOUNT: 1100n * 10n ** 18n, lastFaucetDayPlusOne: 0n, balanceOf: 1100n * 10n ** 18n, allowance: 110n * 10n ** 18n }, genesis: { isGenesis: true, ownerOf: account, balanceOf: 1n }, generations: { isGenesis: false, ownerOf: account, generation: 1n, balanceOf: 1n } };
         assert.ok(functionName in values[key], `Unexpected ${key}.${functionName}`);
         return encodeFunctionResult({ abi, functionName, result: values[key][functionName] });
     }
@@ -144,16 +163,21 @@ async function setup({ state = null, mobile = false, chain = '0xb626', authorize
     }
     await context.route(`${RPC_URL}/**`, r => { const data = r.request().postDataJSON(); return r.fulfill({ json: Array.isArray(data) ? data.map(respond) : respond(data) }); });
     await context.route('**/testnet-config.json', r => r.fulfill({ json: { version: 1, chainId: 46630, contracts: PLAY_CONTRACTS, deploymentConsoleUrl: null } }));
-    await page.goto(`${origin}/play/`);
-    await page.getByRole('heading', { name: /MAKE YOUR RUN COUNT/ }).waitFor();
+    await page.goto(`${origin}${path}`);
+    await page.locator('.play-shell').waitFor();
     return { page, context, requests, unexpected, setServerReady(value) { verifierReady = value; } };
 }
 async function connect(page) {
+    const target = page.url();
+    // The cabinet intentionally keeps wallet administration on the dashboard.
+    const useDashboard = new URL(target).pathname === '/play/';
+    if (useDashboard) await page.goto(`${origin}/dashboard/`);
     await page.getByRole('button', { name: /CONNECT WALLET|DISCONNECT/ }).waitFor();
     if (await page.getByRole('button', { name: 'CONNECT WALLET' }).isVisible()) await page.getByRole('button', { name: 'CONNECT WALLET' }).click();
     await page.getByRole('button', { name: 'REFRESH' }).waitFor();
+    if (useDashboard) { await page.goto(target); await page.locator('.play-shell').waitFor(); }
 }
-async function screenshot(page, name) { await page.screenshot({ path: fileURLToPath(new URL(name, output)), fullPage: true, animations: 'disabled' }); }
+async function screenshot(page, name) { await page.evaluate(() => document.fonts.ready); await page.screenshot({ path: fileURLToPath(new URL(name, output)), fullPage: true, animations: 'disabled' }); }
 async function saved(page, who = account) { return page.evaluate(key => JSON.parse(localStorage.getItem(key)), stateKey(who)); }
 async function noWrites(page) { assert.deepEqual(await page.evaluate(() => window.mockWallet.writes), []); }
 try {
@@ -176,11 +200,11 @@ try {
     await session.page.reload();
     await session.page.locator('#disconnect').waitFor();
     assert.equal(await session.page.evaluate(() => window.mockWallet.prompts), 1, 'test kit navigation and reload must retain authorization silently');
-    await session.page.getByRole('link', { name: 'ARCADE' }).click();
+    await session.page.getByRole('link', { name: 'DASHBOARD', exact: true }).click();
     await session.page.getByRole('button', { name: 'DISCONNECT', exact: true }).waitFor();
     await session.page.reload();
     await session.page.getByRole('button', { name: 'DISCONNECT', exact: true }).waitFor();
-    assert.equal(await session.page.evaluate(() => window.mockWallet.prompts), 1, 'arcade navigation and reload must retain authorization silently');
+    assert.equal(await session.page.evaluate(() => window.mockWallet.prompts), 1, 'dashboard navigation and reload must retain authorization silently');
 
     const secondTab = await session.context.newPage();
     await secondTab.goto(origin);
@@ -206,7 +230,7 @@ try {
     assert.match(await session.page.locator('.wallet-panel').innerText(), /0x2222…2222/);
     assert.equal(await session.page.evaluate(() => window.mockWallet.prompts), 2, 'only an explicit reconnect may request permissions after disconnect');
     await secondTab.close();
-    await session.page.getByRole('link', { name: 'ARCADE' }).click();
+    await session.page.getByRole('link', { name: 'DASHBOARD', exact: true }).click();
     await session.page.locator('.play-wallet').filter({ hasText: '0x2222…2222' }).waitFor();
 
     // Revoking account access clears the connected UI, including after reload.
@@ -250,7 +274,7 @@ try {
     assert.deepEqual(session.unexpected, []);
     await session.context.close();
 
-    const d = await setup({ state: readyState() });
+    const d = await setup({ state: readyState(), path: '/play/?run=5' });
     await connect(d.page);
     await d.page.getByRole('button', { name: 'PLAY RUN' }).waitFor();
     await screenshot(d.page, 'play-app-saved-desktop.png');
@@ -289,9 +313,8 @@ try {
     await d.page.waitForFunction(({ key, tick }) => JSON.parse(localStorage.getItem(key)).savedRun.completedTicks > tick, { key: stateKey(account), tick: external.savedRun.completedTicks });
     await d.page.evaluate(other => { window.mockWallet.account = other; for (const listener of [...window.mockWallet.listeners.accountsChanged])
         listener([other]); }, other);
-    await d.page.locator('.play-wallet').filter({ hasText: '0x2222…2222' }).waitFor();
+    await d.page.locator('.rush-run').waitFor({ state: 'hidden' });
     assert.equal(await d.page.locator('.rush-run').count(), 0);
-    await d.page.getByRole('button', { name: 'REFRESH' }).waitFor();
     await d.page.waitForFunction(key => localStorage.getItem(key) !== null, stateKey(other));
     assert.equal((await saved(d.page, other)).savedRun, null);
     assert.ok((await saved(d.page)).savedRun.completedTicks >= checkpoint.completedTicks);
@@ -301,7 +324,7 @@ try {
     assert.ok(codeReads.length >= 5);
     assert.ok(codeReads.every(i => i.params[1] === toHex(head)));
     await d.context.close();
-    const m = await setup({ state: readyState(1), mobile: true });
+    const m = await setup({ state: readyState(1), mobile: true, path: '/play/?run=5' });
     await connect(m.page);
     await m.page.getByRole('button', { name: 'PLAY RUN' }).click();
     await screenshot(m.page, 'play-app-ready-mobile.png');
@@ -315,7 +338,7 @@ try {
     assert.deepEqual(m.unexpected, []);
     await m.context.close();
     for (const hashKnown of [true, false]) {
-        const p = await setup({ state: pendingState(hashKnown), mobile: !hashKnown });
+        const p = await setup({ state: pendingState(hashKnown), mobile: !hashKnown, path: '/play/?collection=generations&friend=1' });
         await connect(p.page);
         await p.page.getByRole('heading', { name: 'START PENDING' }).waitFor();
         assert.equal(await p.page.getByRole('button', { name: 'START RUN · 110 tRF' }).isDisabled(), true);
@@ -333,25 +356,86 @@ try {
         assert.deepEqual(p.unexpected, []);
         await p.context.close();
     }
-    const c = await setup({ state: { ...emptyPlayState(account), friends: readyState().friends } });
-    await connect(c.page);
-    await c.page.locator('.friend-card').first().waitFor();
-    await c.page.getByRole('button', { name: /GENESIS #2/ }).click();
+    const c = await setup({ state: { ...emptyPlayState(account), friends: readyState().friends }, authorized: true, path: '/play/' });
+    await c.page.getByRole('heading', { name: /Bring your Rare Friend/i }).waitFor();
+    await screenshot(c.page, 'play-collection-desktop.png');
+    await c.page.setViewportSize({ width: 390, height: 844 });
+    assert.equal(await c.page.evaluate(() => document.documentElement.scrollWidth > innerWidth), false);
+    await screenshot(c.page, 'play-collection-mobile.png');
+    await c.page.setViewportSize({ width: 1440, height: 1100 });
+    await c.page.getByRole('button', { name: /PLAY GENESIS/ }).click();
+    await c.page.getByRole('button', { name: 'Play with test Genesis #2', exact: true }).waitFor();
+    assert.equal(new URL(c.page.url()).searchParams.get('collection'), 'genesis');
+    assert.equal(await c.page.getByRole('button', { name: /Play with test Generations/ }).count(), 0, 'Genesis page only lists Genesis NFTs');
+    assert.ok(await c.page.locator('.testnet-entry-friend svg').count() > 0, 'NFT selection must show artwork');
+    await screenshot(c.page, 'play-friends-desktop.png');
+    await c.page.setViewportSize({ width: 390, height: 844 });
+    assert.equal(await c.page.evaluate(() => document.documentElement.scrollWidth > innerWidth), false);
+    await screenshot(c.page, 'play-friends-mobile.png');
+    await c.page.setViewportSize({ width: 1440, height: 1100 });
+    await c.page.getByRole('button', { name: 'Play with test Genesis #2', exact: true }).click();
     await c.page.getByRole('button', { name: 'DEGEN' }).click();
     await c.page.getByRole('button', { name: /START FREE RUN/ }).waitFor();
+    assert.equal(new URL(c.page.url()).searchParams.get('friend'), '2');
     assert.equal(await c.page.getByRole('button', { name: 'DEGEN' }).getAttribute('aria-pressed'), 'true');
     await screenshot(c.page, 'play-app-chooser-desktop.png');
+    await c.page.setViewportSize({ width: 390, height: 844 });
+    assert.equal(await c.page.evaluate(() => document.documentElement.scrollWidth > innerWidth), false);
+    await screenshot(c.page, 'play-app-chooser-mobile.png');
+    await c.page.goto(`${origin}/play/?collection=generations`);
+    await c.page.getByRole('button', { name: 'Play with test Generations #1', exact: true }).waitFor();
+    assert.equal(await c.page.getByRole('button', { name: /Play with test Genesis/ }).count(), 0, 'Generations page only lists Generations NFTs');
+    await c.page.getByRole('button', { name: 'Play with test Generations #1', exact: true }).click();
+    await c.page.getByRole('button', { name: 'START RUN · 110 tRF' }).waitFor();
+    assert.equal(await c.page.evaluate(() => window.mockWallet.prompts), 0, 'moving between collection and arcade pages keeps the wallet authorized');
     await noWrites(c.page);
     assert.deepEqual(c.unexpected, []);
     await c.context.close();
+
+    const entry = await setup({ state: { ...emptyPlayState(account), friends: readyState().friends }, authorized: true, path: '/play/?collection=generations&friend=1' });
+    await entry.page.getByRole('button', { name: 'START RUN · 110 tRF' }).waitFor();
+    await entry.page.evaluate(() => { window.mockWallet.confirmTransactions = true; });
+    await entry.page.getByRole('button', { name: 'START RUN · 110 tRF' }).click();
+    await entry.page.locator('.rush-run[data-paused="true"]').waitFor();
+    assert.equal(new URL(entry.page.url()).searchParams.get('run'), '5');
+    assert.equal((await saved(entry.page)).savedRun.completedTicks, 0, 'confirmed entry opens a ready cabinet before advancing gameplay');
+    assert.equal((await saved(entry.page)).savedRun.run.seed, seed);
+    assert.equal((await saved(entry.page)).pending, null);
+    await entry.page.getByRole('button', { name: 'LET’S RUSH' }).click();
+    await entry.page.waitForFunction(key => JSON.parse(localStorage.getItem(key))?.savedRun?.completedTicks >= 120, stateKey(account));
+    const entryWrites = await entry.page.evaluate(() => window.mockWallet.writes);
+    assert.equal(entryWrites.length, 1, 'starting opens the wallet exactly once and does not automatically claim or close');
+    assert.equal(entryWrites[0].method, 'eth_sendTransaction');
+    assert.deepEqual(decodeFunctionData({ abi: PLAY_GAME_ABI, data: entryWrites[0].params[0].data }), { functionName: 'startRun', args: [0, 1n, 1] });
+    assert.deepEqual(entry.unexpected, []);
+    await entry.context.close();
+
+    const dashboard = await setup({ state: claimedState(), authorized: true });
+    await dashboard.page.getByText('MINT CONFIRMED', { exact: true }).waitFor();
+    assert.equal(await dashboard.page.getByRole('link', { name: 'TEST KIT', exact: true }).getAttribute('href'), '/#test-kit');
+    assert.equal(await dashboard.page.getByRole('link', { name: /PLAY TESTNET/ }).first().getAttribute('href'), '/play/');
+    assert.equal(await dashboard.page.getByRole('button', { name: /^(EASY|NORMAL|DEGEN)$|START FREE RUN|START RUN|APPROVE 110|PLAY RUN|RESUME RUN/ }).count(), 0, 'dashboard holds assets and records without new-entry controls');
+    assert.equal(await dashboard.page.getByRole('button', { name: /Play with test/ }).count(), 0, 'dashboard holdings must be nonselectable');
+    assert.ok(await dashboard.page.locator('.friend-card').count() >= 2, 'dashboard shows both owned test collections');
+    await screenshot(dashboard.page, 'dashboard-desktop.png');
+    await dashboard.page.setViewportSize({ width: 390, height: 844 });
+    assert.equal(await dashboard.page.evaluate(() => document.documentElement.scrollWidth > innerWidth), false);
+    await screenshot(dashboard.page, 'dashboard-mobile.png');
+    await dashboard.page.goto(`${origin}/play/?run=5`);
+    await dashboard.page.getByText('MINT CONFIRMED', { exact: true }).waitFor();
+    await screenshot(dashboard.page, 'play-result-mobile.png');
+    await dashboard.page.setViewportSize({ width: 1440, height: 1100 });
+    await screenshot(dashboard.page, 'play-result-desktop.png');
+    await noWrites(dashboard.page);
+    assert.deepEqual(dashboard.unexpected, []);
+    await dashboard.context.close();
     for (const collection of [0, 1]) {
-        const loss = await setup({ state: lostState(collection), mobile: collection === 1, serverReady: false });
+        const loss = await setup({ state: lostState(collection), mobile: collection === 1, serverReady: false, path: '/play/?run=5' });
         await connect(loss.page);
         const close = loss.page.getByRole('button', { name: 'CLOSE FINISHED RUN' });
         await close.waitFor();
         await loss.page.locator('button:enabled').filter({ hasText: 'CLOSE FINISHED RUN' }).waitFor();
         assert.equal(await close.isEnabled(), true, 'a lost run can be closed while the verifier is unavailable');
-        await loss.page.getByText(/2 \/ 3 starts left today/).waitFor();
         assert.equal(await loss.page.getByRole('button', { name: /START (FREE RUN|RUN · 110 tRF)|APPROVE 110 tRF/ }).count(), 0, 'show the required close action instead of a disabled start');
         assert.equal(await loss.page.getByText('Abandon this run', { exact: true }).count(), 0);
         assert.equal(await loss.page.getByText(/Claim window:/).count(), 0);
@@ -366,7 +450,6 @@ try {
         assert.equal(await close.isEnabled(), true);
         assert.deepEqual((await saved(loss.page)).savedRun, before.savedRun);
         assert.equal((await saved(loss.page)).pending, null);
-        await loss.page.getByText(/2 \/ 3 starts left today/).waitFor();
 
         // Confirm only abandonment; no approval or new entry may be triggered afterward.
         await loss.page.evaluate(() => { window.mockWallet.confirmTransactions = true; });
@@ -381,8 +464,8 @@ try {
         assert.equal((await saved(loss.page)).history[0].status, 'confirmed');
         await loss.page.getByText(/2 \/ 3 starts left today/).waitFor();
         loss.setServerReady(true);
-        await loss.page.getByRole('button', { name: 'REFRESH' }).click();
-        await loss.page.waitForFunction(() => [...document.querySelectorAll('button')].some(button => /^START (FREE RUN|RUN · 110 tRF)/.test(button.textContent.trim()) && !button.disabled));
+        await loss.page.getByRole('button', { name: /^(REFRESH ↻|CHECK AGAIN)$/ }).first().click();
+        await loss.page.waitForFunction(() => [...document.querySelectorAll('button')].some(button => /^START (FREE RUN|RUN · 110 tRF)/.test(button.getAttribute('aria-label') ?? button.textContent.trim()) && !button.disabled));
         assert.equal(await start.isEnabled(), true, 'a confirmed close unlocks the next entry without consuming an attempt');
         const writes = await loss.page.evaluate(() => window.mockWallet.writes);
         assert.equal(writes.length, 2, 'only the rejected close and explicitly retried close open the wallet');
@@ -399,13 +482,36 @@ try {
         assert.deepEqual(loss.unexpected, []);
         await loss.context.close();
     }
-    const bad = await setup({ state: readyState(), runtimeMismatch: true });
+    const directReconnect = await setup({ state: readyState(), path: '/play/?run=5' });
+    await directReconnect.page.getByRole('button', { name: 'CONNECT WALLET' }).click();
+    await directReconnect.page.getByRole('button', { name: 'PLAY RUN' }).waitFor();
+    await directReconnect.page.waitForFunction(() => [...document.querySelectorAll('button')].some(button => /PLAY RUN/.test(button.textContent) && !button.disabled));
+    assert.equal(await directReconnect.page.evaluate(() => window.mockWallet.prompts), 1);
+    await noWrites(directReconnect.page);
+    assert.deepEqual(directReconnect.unexpected, []);
+    await directReconnect.context.close();
+    for (const path of ['/play/?run=5', '/play/?collection=generations&friend=1']) {
+        const wrongNetwork = await setup({ state: readyState(), authorized: true, chain: '0x1', path });
+        await wrongNetwork.page.getByRole('button', { name: 'SWITCH TO TESTNET' }).waitFor();
+        const playBeforeSwitch = wrongNetwork.page.getByRole('button', { name: 'PLAY RUN' });
+        if (await playBeforeSwitch.count()) assert.equal(await playBeforeSwitch.isDisabled(), true);
+        await wrongNetwork.page.getByRole('button', { name: 'SWITCH TO TESTNET' }).click();
+        await wrongNetwork.page.getByRole('button', { name: 'PLAY RUN' }).waitFor();
+        await wrongNetwork.page.waitForFunction(() => [...document.querySelectorAll('button')].some(button => /PLAY RUN/.test(button.textContent) && !button.disabled));
+        assert.equal(await wrongNetwork.page.evaluate(() => window.mockWallet.chain), '0xb626');
+        assert.equal(await wrongNetwork.page.evaluate(() => window.mockWallet.prompts), 0, 'switching networks must not reopen account authorization');
+        await noWrites(wrongNetwork.page);
+        assert.deepEqual(wrongNetwork.unexpected, []);
+        await wrongNetwork.context.close();
+    }
+    const bad = await setup({ state: readyState(), runtimeMismatch: true, path: '/play/?run=5' });
     await connect(bad.page);
     await bad.page.getByText(/Unexpected .* runtime/).waitFor();
-    assert.equal(await bad.page.getByRole('button', { name: 'PLAY RUN' }).isDisabled(), true);
+    const blockedPlay = bad.page.getByRole('button', { name: 'PLAY RUN' });
+    if (await blockedPlay.count()) assert.equal(await blockedPlay.isDisabled(), true);
     await noWrites(bad.page);
     await bad.context.close();
-    const off = await setup({ state: { ...emptyPlayState(account), friends: readyState().friends }, serverReady: false });
+    const off = await setup({ state: { ...emptyPlayState(account), friends: readyState().friends }, serverReady: false, path: '/play/?collection=generations&friend=1' });
     await connect(off.page);
     await off.page.getByText(/Run verification is temporarily unavailable/).waitFor();
     assert.equal(await off.page.getByRole('button', { name: 'START RUN · 110 tRF' }).isDisabled(), true);
@@ -413,7 +519,7 @@ try {
     assert.deepEqual(off.unexpected, []);
     await off.context.close();
     assert.deepEqual(errors, []);
-    console.log('Play browser checks passed: desktop/mobile UI, silent wallet restoration across test kit/arcade/reload, persistent cross-tab disconnect, provider revocation and account/network changes, pinned runtime verification, saved play/reload, keyboard/touch, pause/resume, external-tab checkpoint isolation, account isolation, known/hashless recovery, NFT/mode choice, both collections’ lost-run close/rejection/confirmation without extra entries or automatic transactions, runtime and unavailable-verifier gating. All RPC/wallet/API traffic mocked; no transactions submitted.');
+    console.log('Play browser checks passed: desktop/mobile UI, collection → NFT artwork → mode/cabinet flow, dashboard holdings and results without play controls, silent wallet restoration across test kit/dashboard/play/reload, persistent cross-tab disconnect, provider revocation and account/network changes, pinned runtime verification, saved play/reload, keyboard/touch, pause/resume, external-tab checkpoint isolation, account isolation, known/hashless recovery, NFT/mode choice, confirmed paid entry opening paused gameplay, direct saved-run reconnect and wrong-network recovery, both collections’ lost-run close/rejection/confirmation without extra entries or automatic transactions, runtime and unavailable-verifier gating. All RPC/wallet/API traffic mocked; no transactions submitted.');
 }
 finally {
     await browser.close();

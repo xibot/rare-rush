@@ -1,18 +1,20 @@
 # Rare Rush testnet game
 
-The independent app at `https://testnet.rarerush.app`, deployed only to XIBOT’s `rarerush-testnet` Vercel project. `/` provides test faucets; `/play/` connects the existing runner to the deployed Robinhood testnet contracts (chain 46630). The main vibeathon arcade at `rarerush.app` is unchanged.
+The independent app at `https://testnet.rarerush.app`, deployed only to XIBOT’s `rarerush-testnet` Vercel project. `/` provides test faucets; `/dashboard/` shows wallet balances, test NFT holdings, saved results, recovery and recent transactions; `/play/` opens the main-arcade-style collection → Friend → difficulty → run flow, connected to the deployed Robinhood testnet contracts (chain 46630). The main vibeathon arcade at `rarerush.app` is unchanged.
 
 ## Play
 
 1. Connect a browser wallet and switch to Robinhood testnet.
 2. Get free test ETH from the linked official faucet; mint a test Genesis or Generations NFT in the test kit. Generations also needs test RF.
-3. Open `/play/`, choose the test NFT and difficulty. Generations approves exactly 110 tRF, then pays 110 tRF to start (100 to prizes / 10 to treasury). Genesis starts free.
-4. Wait for the confirmed start, then play. The contract seed initializes the unchanged 120 Hz game engine. Each NFT gets three starts per UTC day; losing or abandoning consumes the attempt and entry fee.
+3. Open **Play Testnet**, choose Genesis or Generations, then choose your pictured test Friend and difficulty in the arcade cabinet. Generations approves exactly 110 tRF, then pays 110 tRF to start (100 to prizes / 10 to treasury). Genesis starts free.
+4. Wait for the confirmed start, then tap **Let’s Rush** to play. The local game timer stays paused while you return from your wallet. The contract seed initializes the unchanged 120 Hz game engine. Each NFT gets three starts per UTC day; losing or abandoning consumes the attempt and entry fee.
 5. Survive the timer with at least one heart. Authorize verification with a gas-free wallet signature, then submit the reward claim transaction. Confirmed claims mint valueless test RARERUSH.
 
 After a loss, choose **Close finished run** and confirm the wallet transaction to release the run's onchain slot. Closing uses test ETH gas but no additional daily attempt or tRF entry fee; it does not refund the used attempt or entry. The next run is a separate explicit start. Closing also works while the verifier is unavailable. If the claim window has already expired, a new run can be started without closing the old one.
 
 All test assets are separate from mainnet Rare Friends. Test characters use cosmetic canonical artwork and do not assert ownership of the corresponding mainnet NFT. They do not become mainnet assets. No public liquidity pool is live.
+
+The Dashboard is a holdings and run-record screen: it has no difficulty picker, entry approval or new-run button. **View Run** opens the saved run in the arcade. Query links such as `/play/?collection=genesis&friend=1` select only verified owned test NFTs; `/play/?run=5` opens only a matching durable saved run. Use Dashboard recovery to retrieve another owned onchain run.
 
 ## Local setup
 
@@ -57,7 +59,7 @@ Run inputs and completed tick count are saved locally; resuming reconstructs the
 
 Pending writes are saved before opening the wallet and block duplicate actions. Receipt recovery checks exact sender, nonce, contract, calldata, events and two canonical confirmations. A hashless wallet response can retry the same transaction at the same nonce or cancel that nonce with a zero-value self-transfer. Never delete a pending checkpoint to resend with a new nonce.
 
-NFT discovery is bounded. Confirmed IDs from the test kit are remembered; missing IDs can be entered manually and ownership is checked. Wallet connections restore silently between the test kit and arcade, on reload, and when returning to the page. Only connection intent is saved; the wallet supplies its currently permitted accounts and network. Disconnect is remembered across testnet pages and tabs until an explicit reconnect. Revoked permissions or a locked/unavailable wallet clear the connected UI; restoration never opens a permission prompt, switches networks, signs, or sends a transaction.
+NFT discovery is bounded. Confirmed IDs from the test kit are remembered; missing IDs can be entered manually and ownership is checked. Wallet connections restore silently between the test kit, dashboard and arcade, on reload, and when returning to the page. Only connection intent is saved; the wallet supplies its currently permitted accounts and network. Disconnect is remembered across testnet pages and tabs until an explicit reconnect. Revoked permissions or a locked/unavailable wallet clear the connected UI; restoration never opens a permission prompt, switches networks, signs, or sends a transaction.
 
 Test economics: 1.024B cap, 102.4M launch allocation, 921.6M gameplay allocation. Rewards begin at 10 base tokens per coin, halve each 10,000 claimed pickups, and floor at 1 base token before mode/Genesis bonuses. Easy 120 s/0.75×; Normal 90 s/1×; Degen 60 s/2×; Genesis 100×. These are provisional test settings, not final mainnet economics.
 

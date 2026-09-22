@@ -1,9 +1,11 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { createPublicClient, createWalletClient, custom, formatUnits, http, isHash, parseAbi, type Address, type EIP1193Provider, type Hash } from 'viem';
 import { RunCanvas, TestFriendAvatar } from './RunCanvas.tsx';
+import { ArcadeCabinet } from './ArcadeCabinet.tsx';
+import { CollectionChoice, CollectionFriends } from './CollectionEntry.tsx';
 import { createRecorder, type Replay, type RunSnapshot as EngineSnapshot } from './recorder.ts';
 import { TESTNET_CHAIN, PLAY_GAME_ABI, verifyPlayContracts, readRun, readOwnedFriend, discoverFriends, approveEntry, startRun, claimRun, abandonRun, recoverPending, retryHashlessPending, cancelHashlessPending } from './chain.ts';
-import { PLAY_CONTRACTS, type Collection, type Difficulty, type PlayState, type FriendSelection, type SavedRun } from './types.ts';
+import { PLAY_CONTRACTS, type Collection, type Difficulty, type PlayState, type FriendSelection } from './types.ts';
 import { loadPlayState, savePlayState, validateVerifiedClaim } from './storage.ts';
 import { createAuthorization, authorizationTypedData } from '../shared/authorization.ts';
 import { EXPLORER_URL, RPC_URL, assertWalletContext } from '../safety.ts';
@@ -29,7 +31,16 @@ function message(error: unknown) {
   return e.shortMessage ?? e.message ?? 'Something did not connect. Try again when ready.';
 }
 
+type PlayRoute = { collection: Collection|null; friendId: string|null; runId: string|null };
+function readPlayRoute(): PlayRoute {
+  const params = new URLSearchParams(location.search);
+  const id = (value: string|null) => value && /^[1-9][0-9]*$/.test(value) ? value : null;
+  return { collection: params.get('collection') === 'genesis' ? 1 : params.get('collection') === 'generations' ? 0 : null, friendId: id(params.get('friend')), runId: id(params.get('run')) };
+}
+
 export function App() {
+  const dashboard = location.pathname.startsWith('/dashboard');
+  const [route, setRoute] = useState(readPlayRoute);
   const [account, setAccount] = useState<Address|null>(null);
   const [chainId, setChainId] = useState<number|null>(null);
   const [state, setState] = useState<PlayState|null>(null);
@@ -63,6 +74,28 @@ export function App() {
   const liveSaved = run && !['claimed','abandoned'].includes(run.status) && !expired;
   const needsRunClose = !!liveSaved && run?.status === 'lost';
   const canWrite = !!account && chainId === 46630 && verified && !busy && !pending;
+
+  function navigatePlay(next: Partial<PlayRoute> = {}) {
+    const params = new URLSearchParams();
+    if (next.collection != null) params.set('collection', next.collection === 1 ? 'genesis' : 'generations');
+    if (next.friendId) params.set('friend', next.friendId);
+    if (next.runId) params.set('run', next.runId);
+    history.pushState(null, '', `/play/${params.size ? `?${params}` : ''}`);
+    setActive(false);
+    setRoute(readPlayRoute());
+    window.scrollTo(0, 0);
+  }
+  useEffect(() => {
+    const changed = () => { setActive(false); setRoute(readPlayRoute()); };
+    window.addEventListener('popstate', changed);
+    return () => window.removeEventListener('popstate', changed);
+  }, []);
+  useEffect(() => {
+    const next = !dashboard && verified && chainId === 46630 && route.collection != null && route.friendId
+      ? state?.friends.find(f => f.collection === route.collection && f.tokenId === route.friendId) ?? null : null;
+    setSelected(previous => previous?.collection === next?.collection && previous?.tokenId === next?.tokenId ? previous : next);
+    if (route.collection != null) setCollection(route.collection);
+  }, [dashboard, verified, chainId, route.collection, route.friendId, state?.friends]);
 
   const onState = useCallback((next: PlayState) => {
     if (next.account.toLowerCase() === currentAccount.current?.toLowerCase()) setState(next);
@@ -105,7 +138,7 @@ export function App() {
     savePlayState(localStorage, saved);
     if (requestEpoch !== epoch.current || who.toLowerCase() !== currentAccount.current?.toLowerCase()) return;
     setRefreshCount(n=>n+1); setVerified(true); setBalances({rf,rush,allowance}); setState(saved);
-    setSelected(previous => previous && friends.some(f=>f.collection===previous.collection&&f.tokenId===previous.tokenId) ? previous : friends[0] ?? null);
+    setSelected(previous => previous && friends.some(f=>f.collection===previous.collection&&f.tokenId===previous.tokenId) ? previous : null);
     if (saved.savedRun) {
       const s = saved.savedRun;
       const recording = createRecorder(s.run.seed, MODES[s.run.difficulty], s.replay, s.completedTicks);
@@ -222,42 +255,141 @@ export function App() {
     const a=document.createElement('a');a.href=url;a.download=`rare-rush-run-${run.run.runId}.json`;a.click();URL.revokeObjectURL(url);
   }
   const claimFresh=run?.claim && Number(run.claim.deadline)*1000>now+15000;
-  return <div className="lab-shell play-shell">
-    <header className="site-header"><a className="brand" href="/" aria-label="Rare Rush testnet home"><img src="/assets/rare-friend.svg" width="60" height="60" alt=""/><span><strong>RARE<span>RUSH</span></strong><small>BY XIBOT</small></span></a><nav><a href="/">TEST KIT</a><a href="/play/" className="outline-link">ARCADE ↗</a></nav></header>
-    <main><div className="play-heading"><div><span className="eyebrow">ROBINHOOD TESTNET / PLAY → VERIFY → MINT</span><h1>MAKE YOUR<br/><span>RUN COUNT.</span></h1></div><p>Real testnet transactions.<br/>Valueless test tokens. Same big rush.</p></div>
+  const showStoredRun = !!run && (route.runId === run.run.runId || (!!selected && !!liveSaved));
+  const arcade = !dashboard && verified && chainId === 46630 && (showStoredRun || !!selected);
+  function chooseFriend(friend: FriendSelection) { navigatePlay({collection:friend.collection,friendId:friend.tokenId}); }
+  function resumeRun() {
+    if (!run) return;
+    try {
+      createRecorder(run.run.seed,MODES[run.run.difficulty],run.replay,run.completedTicks);
+      setError(''); setPlaybackSession(++playbackPermit.current); setActive(true);
+    } catch(e) {setError(message(e));}
+  }
+  async function closeRun() {
+    if (!run) return;
+    const friend = {collection:run.run.collection,tokenId:run.run.tokenId};
+    await abandonRun(context(),run.run.runId);
+    if(account && currentAccount.current===account) {
+      await refresh(account);
+      if (currentAccount.current !== account) return;
+      setInfo('Run closed. Your remaining daily attempts are unchanged. Choose your Friend and start when ready.');
+      if (!dashboard) chooseFriend(friend);
+    }
+  }
+  const walletControls = <>{!account ? <button className="primary-button" disabled={!!busy} onClick={()=>void action('Connecting wallet…',()=>syncWallet(true))}>CONNECT WALLET ↗</button> : <>
+    {chainId!==46630 ? <button className="primary-button" disabled={!!busy} onClick={()=>void action('Switching to testnet…',async()=>{
+      const p=wallet();
+      try {await p.request({method:'wallet_switchEthereumChain',params:[{chainId:'0xb626'}]});}
+      catch(e) {
+        if((e as {code?:number}).code!==4902)throw e;
+        await p.request({method:'wallet_addEthereumChain',params:[{chainId:'0xb626',chainName:'Robinhood Testnet',nativeCurrency:{name:'Test Ether',symbol:'ETH',decimals:18},rpcUrls:[RPC_URL],blockExplorerUrls:[EXPLORER_URL]}]});
+        await p.request({method:'wallet_switchEthereumChain',params:[{chainId:'0xb626'}]});
+      }
+      await syncWallet();
+    })}>SWITCH TO TESTNET</button> : <button className="outline-button" disabled={!!busy||active} onClick={()=>void action('Refreshing…',()=>refresh(account))}>REFRESH ↻</button>}
+    <button className="text-button" disabled={!!busy||active} onClick={()=>walletSession.current?.disconnect()}>DISCONNECT</button>
+  </>}</>;
+  const feedback = <>
+    {(busy||error||info)&&<div className={`feedback ${error?'error':''}`} role="status">{error||busy||info}</div>}
+    {server==='unavailable'&&<div className="feedback">Run verification is temporarily unavailable. Starts are paused on this page; your existing replay stays saved. <button className="text-button" onClick={()=>void checkServer()}>CHECK AGAIN</button></div>}
+  </>;
+  const pendingPanel = pending && <section className="play-panel pending-panel">
+    <span className="eyebrow">TRANSACTION RECOVERY</span><h2>{pending.kind.toUpperCase()} PENDING</h2><p>Your transaction is saved. Check confirmation before starting another action.</p>
+    {pending.hash ? <a href={`${EXPLORER_URL}/tx/${pending.hash}`} target="_blank" rel="noreferrer">View transaction ↗</a> : <label>Paste the transaction hash from your wallet<input value={pendingHash} onChange={e=>setPendingHash(e.target.value)} placeholder="0x…"/></label>}
+    <button className="primary-button" disabled={!!busy||chainId!==46630} onClick={()=>void action('Checking transaction…',async()=>{
+      if(pendingHash&&!isHash(pendingHash))throw new Error('Enter a valid transaction hash.');
+      await recoverPending(context(),pendingHash?pendingHash as Hash:undefined); if(account)await refresh(account);
+    })}>CHECK CONFIRMATION ↗</button>
+    {!pending.hash&&<details className="recovery"><summary>My wallet did not return a transaction hash</summary><p>Retry sends the same action with its original nonce. It cannot execute twice. If you no longer want it, cancel that nonce with a zero-value transaction using test gas.</p><div className="play-actions">
+      <button className="outline-button" disabled={!!busy||chainId!==46630} onClick={()=>void action('Retry the same transaction in your wallet…',async()=>{await retryHashlessPending(context());if(account)await refresh(account);})}>RETRY SAME TRANSACTION</button>
+      <button className="outline-button" disabled={!!busy||chainId!==46630} onClick={()=>void action('Confirm cancellation in your wallet…',async()=>{await cancelHashlessPending(context());if(account)await refresh(account);})}>CANCEL RESERVED NONCE</button>
+    </div></details>}
+  </section>;
+  const manualFriend = <details className="recovery"><summary>Missing a Friend? Add its test NFT ID</summary><div className="manual-friend">
+    <label>Collection<select value={collection} onChange={e=>setCollection(Number(e.target.value) as Collection)}><option value="0">Generations</option><option value="1">Genesis</option></select></label>
+    <label>Test NFT ID<input inputMode="numeric" value={manualId} onChange={e=>setManualId(e.target.value)} placeholder="1"/></label>
+    <button className="outline-button" disabled={!canWrite} onClick={()=>void action('Checking ownership…',async()=>{
+      if(!account||!/^[1-9][0-9]*$/.test(manualId))throw new Error('Enter a valid test NFT ID.');
+      await readOwnedFriend(client,account,collection,manualId);
+      const saved=loadPlayState(localStorage,account), friend={collection,tokenId:manualId};
+      if(!saved.friends.some(f=>f.collection===collection&&f.tokenId===manualId))saved.friends.push(friend);
+      savePlayState(localStorage,saved);onState(saved);
+      if (currentAccount.current !== account) return;
+      setManualId('');
+      if(!dashboard)chooseFriend(friend);
+    })}>ADD FRIEND</button>
+  </div></details>;
+  const runSummary = run && <>
+    <span className="eyebrow">{run.status==='claimed'?'MINT CONFIRMED':run.status==='abandoned'?'RUN CLOSED':expired?'CLAIM WINDOW CLOSED':run.status==='survived'?'TIMER BEATEN. RUSH EARNED.':run.status==='lost'?'DOWN, BUT STILL RARE.':'YOUR RUN IS SAVED'}</span>
+    <h2>{run.status==='claimed'?'KEEP IT RARE.':run.status==='survived'?'CLAIM YOUR RUSH.':run.status==='lost'?'NEXT RUN. BIGGER RUSH.':run.status==='abandoned'||expired?'READY FOR THE NEXT?':'READY TO RUSH?'}</h2>
+    {!dashboard&&stats?.status==='finished'&&<div className="result-score">{stats.score.toLocaleString()}<span>POINTS</span></div>}
+    {stats&&<div className="result-stats"><span><b>{Math.floor(stats.distance)}m</b>DISTANCE</span><span><b>{stats.coins}</b>COINS</span><span><b>{stats.hearts}</b>HEARTS</span></div>}
+    {run.reward&&<p className="reward-total">+{amount(run.reward,6)} tRARERUSH minted</p>}
+    {quote!==null&&run.status==='survived'&&<p className="reward-total">Estimated reward: {amount(quote,6)} tRARERUSH</p>}
+    {liveSaved&&run.status==='survived'&&<div className="play-actions">
+      <button className={claimFresh?'outline-button':'primary-button'} disabled={!canWrite||server!=='ready'} onClick={()=>void action('Authorize verification in your wallet…',verifyRun)}>{claimFresh?'VERIFY AGAIN':'VERIFY RUN ↗'}</button>
+      {claimFresh&&<button className="primary-button" disabled={!canWrite} onClick={()=>void action('Confirm your reward claim…',async()=>{await claimRun(context(),run.claim!);if(account)await refresh(account);})}>CLAIM tRARERUSH ↗</button>}
+    </div>}
+    {run.status==='lost'&&<p>Only runs that survive the timer can mint rewards. This attempt and any entry fee have been used.{needsRunClose?' Close this finished run below to play again.':''}</p>}
+    {needsRunClose&&<>
+      <p id="run-close-note">Closing uses no extra daily attempt or tRF entry fee — only test ETH gas.</p>
+      <button className={dashboard?'primary-button':'primary'} aria-describedby="run-close-note" disabled={!canWrite} onClick={()=>void action('Close the finished run in your wallet…',closeRun)}>CLOSE FINISHED RUN ↗</button>
+    </>}
+    {!dashboard&&liveSaved&&run.status!=='lost'&&run.status!=='survived'&&<button className="primary" disabled={!canWrite} onClick={resumeRun}>{run.completedTicks?'RESUME RUN':'PLAY RUN'} ↗</button>}
+    {!dashboard&&!liveSaved&&<button className="primary" onClick={()=>chooseFriend({collection:run.run.collection,tokenId:run.run.tokenId})}>PICK YOUR NEXT RUN <span>↗</span></button>}
+    {liveSaved&&run.status!=='lost'&&<p className="tiny">Claim window: {Math.max(0,Math.ceil((Number(run.run.claimUntil)*1000-now)/60000))} min remaining. Pausing does not extend it.</p>}
+    {!['claimed','abandoned','lost'].includes(run.status)&&<details className="recovery"><summary>Abandon this run</summary><p>This uses no additional entry fee, but ends this run permanently and keeps its daily attempt used.</p><button className="outline-button" disabled={!canWrite} onClick={()=>void action('Abandoning run…',closeRun)}>CONFIRM ABANDON</button></details>}
+    {dashboard ? <a className="outline-link view-run-link" href={`/play/?run=${run.run.runId}`}>VIEW RUN ↗</a> : <button className="text-button" onClick={()=>navigatePlay()}>Back to collections</button>}
+  </>;
+  const runHeading = run && <div className="play-section-heading"><span className="eyebrow">RUN #{run.run.runId} / {MODES[run.run.difficulty].toUpperCase()} / TEST {run.run.collection===1?'GENESIS':'GENERATIONS'} #{run.run.tokenId}</span><button className="text-button" onClick={exportReplay}>SAVE REPLAY ↓</button></div>;
+  const footer = <footer><span>RARE RUSH <b>BY XIBOT</b></span><span>TEST IDEAS. KEEP IT RARE.</span><a href="/#test-kit">BACK TO TEST KIT ↗</a></footer>;
+  return <div className={`lab-shell play-shell ${dashboard?'dashboard-shell':arcade?'arcade-page':'entry-shell'}`}>
+    {!arcade&&<header className="site-header"><a className="brand" href="/" aria-label="Rare Rush testnet home"><img src="/assets/rare-friend.svg" width="60" height="60" alt=""/><span><strong>RARE<span>RUSH</span></strong><small>BY XIBOT</small></span></a><nav aria-label="Main navigation"><a href="/#test-kit">TEST KIT</a><a href={dashboard?'/play/':'/dashboard/'} className="outline-link">{dashboard?'PLAY TESTNET ↗':'DASHBOARD'}</a></nav></header>}
+    {dashboard ? <main>
+      <div className="play-heading"><div><span className="eyebrow">ROBINHOOD TESTNET / YOUR DASHBOARD</span><h1>MAKE YOUR<br/><span>RUN COUNT.</span></h1></div><p>Your Friends. Your rewards.<br/>Every rush, in one place.</p></div>
       <div className="test-banner"><strong>TESTNET ONLY · 46630</strong><span>Test NFTs use cosmetic Rare Friends artwork. These are separate from your real NFTs.</span></div>
-      <div className="play-wallet"><span>{account?short(account):'CONNECT. PICK A FRIEND. RUSH.'}</span><div className="play-actions">{!account?<button className="primary-button" disabled={!!busy} onClick={()=>void action('Connecting wallet…',()=>syncWallet(true))}>CONNECT WALLET ↗</button>:<>{chainId!==46630?<button className="primary-button" disabled={!!busy} onClick={()=>void action('Switching to testnet…',async()=>{const p=wallet();try{await p.request({method:'wallet_switchEthereumChain',params:[{chainId:'0xb626'}]});}catch(e){if((e as {code?:number}).code!==4902)throw e;await p.request({method:'wallet_addEthereumChain',params:[{chainId:'0xb626',chainName:'Robinhood Testnet',nativeCurrency:{name:'Test Ether',symbol:'ETH',decimals:18},rpcUrls:[RPC_URL],blockExplorerUrls:[EXPLORER_URL]}]});await p.request({method:'wallet_switchEthereumChain',params:[{chainId:'0xb626'}]});}await syncWallet();})}>SWITCH TO TESTNET</button>:<button className="outline-button" disabled={!!busy||active} onClick={()=>void action('Refreshing…',()=>refresh(account))}>REFRESH ↻</button>}<button className="text-button" disabled={!!busy||active} onClick={()=>{walletSession.current?.disconnect();}}>DISCONNECT</button></>}</div></div>
+      <div className="play-wallet"><span>{account?short(account):'YOUR TESTNET WALLET'}</span><div className="play-actions">{walletControls}</div></div>
       <div className="play-meta"><span>tRF <b>{account?amount(balances.rf,18):'—'}</b></span><span>tRARERUSH <b>{account?amount(balances.rush,6):'—'}</b></span><span className={server==='ready'?'ready':''}>VERIFIER {server==='ready'?'READY':server==='checking'?'CHECKING':'UNAVAILABLE'}</span></div>
-      {(busy||error||info)&&<div className={`feedback ${error?'error':''}`} role="status">{error||busy||info}</div>}
-      {server==='unavailable'&&<div className="feedback">Run verification is temporarily unavailable. Starts are paused on this page; your existing replay stays saved. <button className="text-button" onClick={()=>void checkServer()}>CHECK AGAIN</button></div>}
-      {pending&&<section className="play-panel pending-panel"><span className="eyebrow">TRANSACTION RECOVERY</span><h2>{pending.kind.toUpperCase()} PENDING</h2><p>Your transaction is saved. Check confirmation before starting another action.</p>{pending.hash?<a href={`${EXPLORER_URL}/tx/${pending.hash}`} target="_blank" rel="noreferrer">View transaction ↗</a>:<label>Paste the transaction hash from your wallet<input value={pendingHash} onChange={e=>setPendingHash(e.target.value)} placeholder="0x…"/></label>}<button className="primary-button" disabled={!!busy||chainId!==46630} onClick={()=>void action('Checking transaction…',async()=>{if(pendingHash&&!isHash(pendingHash))throw new Error('Enter a valid transaction hash.');await recoverPending(context(),pendingHash?pendingHash as Hash:undefined);if(account)await refresh(account);})}>CHECK CONFIRMATION ↗</button>{!pending.hash&&<details className="recovery"><summary>My wallet did not return a transaction hash</summary><p>Retry sends the same action with its original nonce. It cannot execute twice. If you no longer want it, cancel that nonce with a zero-value transaction using test gas.</p><div className="play-actions"><button className="outline-button" disabled={!!busy||chainId!==46630} onClick={()=>void action('Retry the same transaction in your wallet…',async()=>{await retryHashlessPending(context());if(account)await refresh(account);})}>RETRY SAME TRANSACTION</button><button className="outline-button" disabled={!!busy||chainId!==46630} onClick={()=>void action('Confirm cancellation in your wallet…',async()=>{await cancelHashlessPending(context());if(account)await refresh(account);})}>CANCEL RESERVED NONCE</button></div></details>}</section>}
-      {run&&<section className="saved-run"><div className="play-section-heading"><span className="eyebrow">RUN #{run.run.runId} / {MODES[run.run.difficulty].toUpperCase()} / TEST {run.run.collection===1?'GENESIS':'GENERATIONS'} #{run.run.tokenId}</span><button className="text-button" onClick={exportReplay}>SAVE REPLAY ↓</button></div>
-        {active?<RunCanvas key={run.run.runId} seed={run.run.seed} difficulty={MODES[run.run.difficulty]} collection={run.run.collection} tokenId={run.run.tokenId} runId={run.run.runId} initialReplay={run.replay} completedTicks={run.completedTicks} onProgress={progress} onFinish={finish}/>:<div className="play-panel run-result"><span className="eyebrow">{run.status==='claimed'?'MINT CONFIRMED':run.status==='abandoned'?'RUN ABANDONED':expired?'CLAIM WINDOW CLOSED':run.status==='survived'?'TIMER BEATEN. RUSH EARNED.':run.status==='lost'?'DOWN, BUT STILL RARE.':'YOUR RUN IS SAVED'}</span><h2>{run.status==='claimed'?'KEEP IT RARE.':run.status==='survived'?'CLAIM YOUR RUSH.':run.status==='lost'?'NEXT RUN. BIGGER RUSH.':'READY TO RUSH?'}</h2>{stats&&<div className="result-stats"><span><b>{Math.floor(stats.distance)}m</b>DISTANCE</span><span><b>{stats.coins}</b>COINS</span><span><b>{stats.hearts}</b>HEARTS</span></div>}
-        {run.reward&&<p className="reward-total">+{amount(run.reward,6)} tRARERUSH minted</p>}
-        {quote!==null&&run.status==='survived'&&<p className="reward-total">Estimated reward: {amount(quote,6)} tRARERUSH</p>}
-        {liveSaved&&run.status!=='lost'&&run.status!=='survived'&&<button className="primary-button" disabled={!canWrite} onClick={()=>{try{createRecorder(run.run.seed,MODES[run.run.difficulty],run.replay,run.completedTicks);setError('');setPlaybackSession(++playbackPermit.current);setActive(true);}catch(e){setError(message(e));}}}> {run.completedTicks?'RESUME RUN':'PLAY RUN'} ↗</button>}
-        {liveSaved&&run.status==='survived'&&<div className="play-actions"><button className={claimFresh?'outline-button':'primary-button'} disabled={!canWrite||server!=='ready'} onClick={()=>void action('Authorize verification in your wallet…',verifyRun)}>{claimFresh?'VERIFY AGAIN':'VERIFY RUN ↗'}</button>{claimFresh&&<button className="primary-button" disabled={!canWrite} onClick={()=>void action('Confirm your reward claim…',async()=>{await claimRun(context(),run.claim!);if(account)await refresh(account);})}>CLAIM tRARERUSH ↗</button>}</div>}
-        {run.status==='lost'&&<p>Only runs that survive the timer can mint rewards. This attempt and any entry fee have been used.{needsRunClose?' Close this finished run below to play again.':''}</p>}
-        {liveSaved&&run.status!=='lost'&&<p className="tiny">Claim window: {Math.max(0,Math.ceil((Number(run.run.claimUntil)*1000-now)/60000))} min remaining. Pausing does not extend it.</p>}
-        {!['claimed','abandoned','lost'].includes(run.status)&&<details className="recovery"><summary>Abandon this run</summary><p>This uses no additional entry fee, but ends this run permanently and keeps its daily attempt used.</p><button className="outline-button" disabled={!canWrite} onClick={()=>void action('Abandoning run…',async()=>{await abandonRun(context(),run.run.runId);if(account)await refresh(account);})}>CONFIRM ABANDON</button></details>}
-        </div>}
-      </section>}
-      {!active&&(!liveSaved||run?.status==='lost')&&<section className="play-panel"><div className="play-section-heading"><div><span className="eyebrow">01 / CHOOSE YOUR TEST FRIEND</span><h2>YOUR CREW.</h2></div><a href="/#test-kit">MINT TEST FRIENDS ↗</a></div><p className="tiny">{account?'Select a test NFT you own. Genesis is free; Generations costs 110 tRF.':'Connect your wallet to find your test Friends.'}</p>
-        <div className="friend-grid">{state?.friends.map(friend=><button key={`${friend.collection}:${friend.tokenId}`} className={`friend-card ${selected?.collection===friend.collection&&selected.tokenId===friend.tokenId?'selected':''}`} disabled={!!busy||!!pending} onClick={()=>setSelected(friend)}><TestFriendAvatar collection={friend.collection} tokenId={friend.tokenId}/><strong>{friend.collection===1?'GENESIS':'GENERATIONS'} #{friend.tokenId}</strong><small>{friend.collection===1?'FREE ENTRY · 100× REWARDS':'110 tRF ENTRY'}</small></button>)}</div>
-        <details className="recovery"><summary>Missing a Friend? Add its test NFT ID</summary><div className="manual-friend"><label>Collection<select value={collection} onChange={e=>setCollection(Number(e.target.value) as Collection)}><option value="0">Generations</option><option value="1">Genesis</option></select></label><label>Test NFT ID<input inputMode="numeric" value={manualId} onChange={e=>setManualId(e.target.value)} placeholder="1"/></label><button className="outline-button" disabled={!canWrite} onClick={()=>void action('Checking ownership…',async()=>{if(!account||!/^[1-9][0-9]*$/.test(manualId))throw new Error('Enter a valid test NFT ID.');await readOwnedFriend(client,account,collection,manualId);const saved=loadPlayState(localStorage,account);const friend={collection,tokenId:manualId};if(!saved.friends.some(f=>f.collection===collection&&f.tokenId===manualId))saved.friends.push(friend);savePlayState(localStorage,saved);onState(saved);setSelected(friend);setManualId('');})}>ADD FRIEND</button></div></details>
-        <div className="mode-section"><span className="eyebrow">02 / PICK YOUR PACE</span><div className="play-modes">{MODES.map((mode,i)=><button key={mode} aria-pressed={difficulty===i} className={difficulty===i?'selected':''} disabled={!!busy||!!pending} onClick={()=>setDifficulty(i as Difficulty)}><strong>{mode.toUpperCase()}</strong><span>{durations[i]}s · {multipliers[i]}</span></button>)}</div></div>
-        {selected&&<p className="tiny">{nftInfo?`${nftInfo.left} / 3 starts left today for this NFT.`:'Checking daily attempts…'} {selected.collection===1?'Genesis earns 100× rewards.':'Entry: 100 tRF to prizes + 10 tRF to treasury.'}</p>}
-        {needsRunClose?<>
-          <p className="tiny" id="run-close-note">Your last run is finished, but still open on testnet. Close it once to unlock your next start. Closing uses no extra daily attempt or tRF entry fee — only test ETH gas.</p>
-          <button className="primary-button full" aria-describedby="run-close-note" disabled={!canWrite} onClick={()=>void action('Close the finished run in your wallet…',async()=>{
-            await abandonRun(context(),run!.run.runId);
-            if(account&&currentAccount.current===account){await refresh(account);setInfo('Run closed. Your remaining daily attempts are unchanged. Choose your Friend and start when ready.');}
-          })}>CLOSE FINISHED RUN ↗</button>
-        </>:selected?.collection===0&&balances.allowance<ENTRY?<button className="primary-button full" disabled={!canWrite||server!=='ready'||!!liveSaved||!nftInfo?.left||balances.rf<ENTRY} onClick={()=>void action('Approve exactly 110 tRF in your wallet…',async()=>{await approveEntry(context());if(account)await refresh(account);})}>APPROVE 110 tRF ↗</button>:<button className="primary-button full" disabled={!canWrite||server!=='ready'||!selected||!!liveSaved||!nftInfo?.left||(selected.collection===0&&balances.rf<ENTRY)} onClick={()=>void action('Confirm your testnet run…',async()=>{if(!selected)return;await startRun(context(),{...selected,difficulty});setStats(null);setQuote(null);if(account)await refresh(account);})}>START {selected?.collection===1?'FREE RUN':'RUN · 110 tRF'} ↗</button>}
-        <p className="tiny">Every start uses one daily attempt. Losing or abandoning a run does not refund its fee. All assets here are test-only.</p>
-      </section>}
-      {account&&!active&&<details className="play-panel recovery"><summary>Recover a run from its onchain ID</summary><p>Recover a confirmed start from another session. A saved replay on this device is kept when the ID matches.</p><label>Run ID<input value={recoverId} onChange={e=>setRecoverId(e.target.value)} inputMode="numeric"/></label><button className="outline-button" disabled={!canWrite} onClick={()=>void action('Recovering run…',recoverRunById)}>RECOVER RUN</button></details>}
+      {feedback}{pendingPanel}
+      {run&&<section className="saved-run">{runHeading}<div className="play-panel run-result">{runSummary}</div></section>}
+      <section className="play-panel"><div className="play-section-heading"><div><span className="eyebrow">YOUR TEST NFT HOLDINGS</span><h2>YOUR CREW.</h2></div><a href="/#test-kit">MINT TEST FRIENDS ↗</a></div><p className="tiny">{account?'Your test Friends are ready in Play Testnet.':'Connect your wallet to find your test Friends.'}</p>
+        <div className="friend-grid">{state?.friends.map(friend=><article key={`${friend.collection}:${friend.tokenId}`} className="friend-card"><TestFriendAvatar collection={friend.collection} tokenId={friend.tokenId}/><strong>{friend.collection===1?'GENESIS':'GENERATIONS'} #{friend.tokenId}</strong><small>{friend.collection===1?'FREE ENTRY · 100× REWARDS':'110 tRF ENTRY'}</small></article>)}</div>
+        {account&&manualFriend}
+      </section>
+      {account&&<details className="play-panel recovery"><summary>Recover a run from its onchain ID</summary><p>Recover a confirmed start from another session. A saved replay on this device is kept when the ID matches.</p><label>Run ID<input value={recoverId} onChange={e=>setRecoverId(e.target.value)} inputMode="numeric"/></label><button className="outline-button" disabled={!canWrite} onClick={()=>void action('Recovering run…',recoverRunById)}>RECOVER RUN</button></details>}
       {!!state?.history.length&&<div className="recent-txs"><span className="tiny">RECENT TRANSACTIONS</span>{state.history.slice(-4).reverse().map(tx=><a key={tx.hash} href={`${EXPLORER_URL}/tx/${tx.hash}`} target="_blank" rel="noreferrer">{tx.kind.toUpperCase()} · {tx.status.toUpperCase()} ↗</a>)}</div>}
-    </main><footer><span>RARE RUSH <b>BY XIBOT</b></span><span>TEST IDEAS. KEEP IT RARE.</span><a href="/">BACK TO TEST KIT ↗</a></footer>
+    </main> : arcade ? <main className="arcade-route">
+      {(busy||error||info||server==='unavailable')&&<div className="arcade-feedback">{feedback}</div>}
+      {pendingPanel}
+      {showStoredRun&&run ? <>
+        {active ? <RunCanvas key={run.run.runId} seed={run.run.seed} difficulty={MODES[run.run.difficulty]} collection={run.run.collection} tokenId={run.run.tokenId} runId={run.run.runId} initialReplay={run.replay} completedTicks={run.completedTicks} onProgress={progress} onFinish={finish}/> :
+          <ArcadeCabinet difficulty={MODES[run.run.difficulty]} collection={run.run.collection} tokenId={run.run.tokenId} runId={run.run.runId} snapshot={stats??undefined}><div className="game-overlay result-screen"><div className="result-card testnet-result">{runSummary}</div></div></ArcadeCabinet>}
+        <div className="arcade-run-heading">{runHeading}</div>
+      </> : selected && <ArcadeCabinet difficulty={MODES[difficulty]} collection={selected.collection} tokenId={selected.tokenId}>
+        <div className="start-screen"><div className="start-title"><span className="eyebrow">ENDLESS WORLD. {durations[difficulty]} SECONDS.</span><h1>RARE<sup>✦</sup><br/><span>RUSH</span></h1><span className="mobile-friend"><TestFriendAvatar collection={selected.collection} tokenId={selected.tokenId}/></span><div className="selected-friend">{selected.collection===1?'GENESIS':'FRIEND'} #{selected.tokenId}<span>TESTNET</span></div></div>
+          <div className="start-card"><div className="start-card-heading"><span className="card-kicker">YOUR NEXT HIGH SCORE STARTS HERE</span><button className="start-back" onClick={()=>navigatePlay({collection:selected.collection})}>BACK</button></div><h2>Run. Collect.<br/>{' '}Stay rare.</h2>
+            <div className="difficulty-picker" aria-label="Difficulty">{MODES.map((mode,i)=><button key={mode} aria-pressed={difficulty===i} disabled={!!busy||!!pending} onClick={()=>setDifficulty(i as Difficulty)}><strong>{mode.toUpperCase()}</strong><span>{durations[i]}s · {multipliers[i]}</span></button>)}</div>
+            <p className="mode-description">{['Room to learn · coin trails','Mixed obstacles · scattered coins','Faster obstacles · wild coin routes'][difficulty]}<br/>{multipliers[difficulty]} rewards · 3 hearts</p>
+            {selected.collection===0&&balances.allowance<ENTRY ? <button className="primary" disabled={!canWrite||server!=='ready'||!!liveSaved||!nftInfo?.left||balances.rf<ENTRY} onClick={()=>void action('Approve exactly 110 tRF in your wallet…',async()=>{await approveEntry(context());if(account)await refresh(account);})}>APPROVE 110 tRF <span>↗</span></button> : <button className="primary" aria-label={`START ${selected.collection===1?'FREE RUN':'RUN · 110 tRF'}`} disabled={!canWrite||server!=='ready'||!!liveSaved||!nftInfo?.left||(selected.collection===0&&balances.rf<ENTRY)} onClick={()=>void action('Confirm your testnet run…',async()=>{
+              const who=account;
+              const next=await startRun(context(),{...selected,difficulty});
+              if(who!==currentAccount.current)return;
+              setStats(null);setQuote(null); if(who)await refresh(who);
+              if(who===currentAccount.current&&next.savedRun) { navigatePlay({runId:next.savedRun.run.runId}); setPlaybackSession(++playbackPermit.current); setActive(true); }
+            })}>LET’S RUSH <span>↗</span></button>}
+            <small className="entry-note">{selected.collection===1?'FREE ENTRY · 100× GENESIS REWARDS':'110 tRF · 100 prizes + 10 treasury'}<br/>{nftInfo?`${nftInfo.left} / 3 starts left today for this NFT.`:'Checking daily attempts…'}</small>
+            {selected.collection===0&&balances.rf<ENTRY&&<small className="entry-note">Need test RF? <a href="/#test-kit">Open the Test Kit ↗</a></small>}
+            <small className="entry-note">Each start uses an attempt. Entry fees are not refunded.</small>
+          </div>
+        </div>
+      </ArcadeCabinet>}
+    </main> : <>
+      {route.collection==null ? <CollectionChoice onChoose={collection=>navigatePlay({collection})}/> : <CollectionFriends collection={route.collection} account={account} busy={!!busy||!!pending||(!verified&&!!account)} friends={verified?state?.friends??[]:[]} walletControls={walletControls} feedback={feedback} onBack={()=>navigatePlay()} onChoose={chooseFriend}>{manualFriend}</CollectionFriends>}
+      {route.collection==null&&<div className="entry-notices">{route.runId&&!arcade&&<div className="play-wallet"><span>LOAD YOUR SAVED RUN</span><div className="play-actions">{walletControls}</div></div>}{feedback}</div>}
+      {pendingPanel}
+      {run&&<div className="entry-run-link"><span>{liveSaved?'You have a saved run.':'Your last run is saved.'}</span><a href={`/play/?run=${run.run.runId}`}>VIEW RUN #{run.run.runId} ↗</a></div>}
+      {route.runId&&(!run||route.runId!==run.run.runId)&&<p className="entry-notices">{account?'This run is not saved in this browser. Recover it from your Dashboard.':'Connect your wallet to load your saved run.'} <a href="/dashboard/">DASHBOARD ↗</a></p>}
+    </>}
+    {!arcade&&footer}
   </div>;
 }

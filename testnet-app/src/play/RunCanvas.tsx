@@ -8,7 +8,7 @@ import { FIXED_STEP, type Pace } from '../../generated/games/rare-rush/engine.ts
 import { advanceRecorder, createRecorder, exportReplay, queueControls, releaseControls, snapshotRun,
   type DifficultyId, type Replay, type RunSnapshot } from './recorder.ts';
 import { testRunArt } from './art.ts';
-import './play.css';
+import { ArcadeCabinet } from './ArcadeCabinet.tsx';
 
 export type RunCanvasProps = {
   seed: Hex;
@@ -18,6 +18,7 @@ export type RunCanvasProps = {
   runId: string | bigint;
   initialReplay?: Replay;
   completedTicks?: number;
+  onHome?: () => void;
   onProgress: (replay: Replay, snapshot: RunSnapshot) => void;
   onFinish: (replay: Replay, snapshot: RunSnapshot) => void;
 };
@@ -120,7 +121,7 @@ function RunSession(props: RunCanvasProps) {
   useEffect(() => {
     const element = shell.current;
     if (!element) return;
-    const resize = () => setViewWidth(element.clientWidth < 760 ? 520 : 960);
+    const resize = () => setViewWidth(element.clientWidth <= 600 ? 520 : 960);
     resize();
     const observer = new ResizeObserver(resize);
     observer.observe(element);
@@ -205,8 +206,6 @@ function RunSession(props: RunCanvasProps) {
     return () => cancelAnimationFrame(animation);
   }, [paused, recording]);
 
-  const remaining = Math.max(0, Math.ceil(run.duration - run.elapsed));
-  const timer = `${Math.floor(remaining / 60).toString().padStart(2, '0')}:${(remaining % 60).toString().padStart(2, '0')}`;
   const biome = Math.min(2, Math.floor(run.elapsed / run.duration * 3));
   const growth = run.growth;
   const spriteFrame = reduced || paused ? 0 : Math.floor(run.elapsed * 12) % 8;
@@ -214,36 +213,41 @@ function RunSession(props: RunCanvasProps) {
   const height = run.player.slide ? 30 : 60 * growth;
   const live = !paused && !isFinished;
   const label = isFinished ? (run.finishReason === 'time' ? 'TIMER SURVIVED' : 'OUT OF HEARTS') : hasStarted ? 'RUN PAUSED' : 'YOUR RUN IS READY';
+  const returnHome = () => { pause(); if (props.onHome) props.onHome(); else window.location.assign('/'); };
+  const touchControls = <>
+    <button type="button" className="touch-pace" disabled={!live} onPointerDown={event => touchDown(event, 'touch-left')} onPointerUp={() => heldInput('touch-left', false)} onPointerCancel={() => heldInput('touch-left', false)} onLostPointerCapture={() => heldInput('touch-left', false)} aria-label="Hold to slow down">←<span>SLOW</span></button>
+    <button type="button" disabled={!live} onPointerDown={event => touchDown(event, 'touch-slide')} onPointerUp={() => heldInput('touch-slide', false)} onPointerCancel={() => heldInput('touch-slide', false)} onLostPointerCapture={() => heldInput('touch-slide', false)} aria-label="Hold to slide">↓<span>SLIDE</span></button>
+    <button type="button" className="touch-jump" disabled={!live} onPointerDown={event => { event.preventDefault(); pressJump(); }} aria-label="Jump; tap twice to double jump">↑<span>JUMP ×2</span></button>
+    <button type="button" className="touch-pace" disabled={!live} onPointerDown={event => touchDown(event, 'touch-right')} onPointerUp={() => heldInput('touch-right', false)} onPointerCancel={() => heldInput('touch-right', false)} onLostPointerCapture={() => heldInput('touch-right', false)} aria-label="Hold to speed up">→<span>FAST</span></button>
+  </>;
+  const world = <svg ref={stage} className="world-svg rush-run-world" viewBox={`0 0 ${viewWidth} 500`} preserveAspectRatio="none" tabIndex={0} role="img" aria-label="Runner world. Space or up to jump. Down to slide. Left slows down, right speeds up." onPointerDown={event => { if (live) { event.preventDefault(); stage.current?.focus({ preventScroll: true }); pressJump(); } }}>
+    <WorldArt distance={run.distance} elapsed={run.elapsed * 1000} reducedMotion={reduced || !hasStarted} biome={biome}/>
+    {run.entities.map(entity => <EntityArt key={entity.id} entity={entity} elapsed={run.elapsed} reduced={reduced}/>)}
+    <g transform={!hasStarted ? `translate(${viewWidth === 960 ? 265 : 200} 0)` : undefined} opacity={run.invulnerable > 0 ? reduced ? .6 : Math.floor(run.elapsed * 12) % 2 ? .35 : 1 : 1}>
+      <ellipse cx={center} cy="403" rx={32 * growth} ry="3" fill="#000"/>
+      {run.magnet > 0 && <circle cx={center} cy={run.player.y - height / 2} r={58 * growth} fill="none" stroke="#ccff00" strokeDasharray="3 10"/>}
+      {run.shield > 0 && <rect x={center - 38 * growth} y={run.player.y - height - 10} width={76 * growth} height={height + 16} fill="none" stroke="#ccff00" strokeWidth="2"/>}
+      <g data-character="friend" data-slide={run.player.slide} data-growth={growth.toFixed(3)} transform={`translate(${center - 32 * growth} ${run.player.y - height}) scale(${4 * growth} ${run.player.slide ? 2 : 4 * growth})`}>
+        {props.collection === 1 ? <GenesisRunnerSprite portraitUrl={art.portraitUrl} bodyId={art.bodyId} frame={spriteFrame} walking={live && !reduced}/> : <FriendSprite sprites={art.sprites} frame={spriteFrame} walking={live && !reduced}/>}
+      </g>
+    </g>
+  </svg>;
+  const overlays = hasStarted ? <>
+    <div className="run-score"><span>SCORE</span><strong>{run.score.toLocaleString()}</strong><small>{run.coins} COINS <b>×{run.combo} CHAIN</b></small></div>
+    <div className="run-modifiers"><span>PACE <b>{run.speedMultiplier.toFixed(2)}×</b></span><span>SIZE <b>{growth.toFixed(2)}×</b></span><div className="growth-meter" role="meter" aria-label="Friend size" aria-valuemin={1} aria-valuemax={1.75} aria-valuenow={growth}><i style={{width:`${(growth - 1) / .75 * 100}%`}}/></div></div>
+    {notice && live && <div className="pickup-notice" role="status">{notice}</div>}
+    <div className="run-progress"><i style={{ width: `${run.elapsed / run.duration * 100}%` }}/></div>
+  </> : undefined;
 
   return <section ref={shell} className="rush-run" aria-label="Rare Rush testnet run" data-run-id={props.runId.toString()} data-status={run.status} data-paused={paused}>
-    <div className="rush-run-top"><div><span className="rush-run-tag">ONCHAIN TEST RUN #{props.runId.toString()}</span><strong>{art.label}</strong></div><div className="rush-run-options"><button type="button" onClick={() => setReduced(value => !value)} aria-pressed={reduced}>FX {reduced ? 'OFF' : 'ON'}</button><button type="button" onClick={paused ? resume : pause} disabled={isFinished}>{paused ? '▶ RESUME' : 'Ⅱ PAUSE'}</button></div></div>
-    <div className="rush-run-hud"><div><span>{mode.label.toUpperCase()} · TIME</span><strong className={remaining < 15 ? 'urgent' : ''}>{timer}</strong></div><div><span>DISTANCE</span><strong>{Math.floor(run.distance).toString().padStart(4, '0')}<small>m</small></strong></div><div><span>COINS COLLECTED</span><strong className="rush-run-coins">{run.coins}<small>✦</small></strong></div><div><span>KEEP IT RARE</span><strong className="rush-run-hearts" aria-label={`${run.hearts} hearts remaining`}>{[0, 1, 2].map(index => <b key={index} className={index >= run.hearts ? 'lost' : ''}>♥</b>)}</strong></div></div>
-    <div className="rush-run-field">
-      <svg ref={stage} className="rush-run-world" viewBox={`0 0 ${viewWidth} 500`} preserveAspectRatio="none" tabIndex={0} role="img" aria-label="Runner world. Space or up to jump. Down to slide. Left slows down, right speeds up." onPointerDown={event => { if (live) { event.preventDefault(); stage.current?.focus({ preventScroll: true }); pressJump(); } }}>
-        <WorldArt distance={run.distance} elapsed={run.elapsed * 1000} reducedMotion={reduced} biome={biome}/>
-        {run.entities.map(entity => <EntityArt key={entity.id} entity={entity} elapsed={run.elapsed} reduced={reduced}/>)}
-        <g opacity={run.invulnerable > 0 ? reduced ? .6 : Math.floor(run.elapsed * 12) % 2 ? .35 : 1 : 1}>
-          <ellipse cx={center} cy="403" rx={32 * growth} ry="3" fill="#000"/>
-          {run.magnet > 0 && <circle cx={center} cy={run.player.y - height / 2} r={58 * growth} fill="none" stroke="#ccff00" strokeDasharray="3 10"/>}
-          {run.shield > 0 && <rect x={center - 38 * growth} y={run.player.y - height - 10} width={76 * growth} height={height + 16} fill="none" stroke="#ccff00" strokeWidth="2"/>}
-          <g data-character="friend" data-slide={run.player.slide} data-growth={growth.toFixed(3)} transform={`translate(${center - 32 * growth} ${run.player.y - height}) scale(${4 * growth} ${run.player.slide ? 2 : 4 * growth})`}>
-            {props.collection === 1 ? <GenesisRunnerSprite portraitUrl={art.portraitUrl} bodyId={art.bodyId} frame={spriteFrame} walking={live && !reduced}/> : <FriendSprite sprites={art.sprites} frame={spriteFrame} walking={live && !reduced}/>}
-          </g>
-        </g>
-      </svg>
-      <div className="rush-run-zone"><span>0{biome + 1}</span>{['GARDEN COMMONS', 'CIRCUIT COURTYARD', 'CRYSTAL MESA'][biome]}</div>
-      <div className="rush-run-score"><span>SCORE</span><strong>{run.score.toLocaleString()}</strong><small>{run.bonusCoins} BONUS · ×{run.combo} CHAIN</small></div>
-      <div className="rush-run-modifiers"><span>PACE <b>{run.speedMultiplier.toFixed(2)}×</b></span><span>SIZE <b>{growth.toFixed(2)}×</b></span></div>
-      {notice && live && <div className="rush-run-notice" role="status">{notice}</div>}
-      <div className="rush-run-progress"><i style={{ width: `${run.elapsed / run.duration * 100}%` }}/></div>
-      {(paused || isFinished) && <div className="rush-run-overlay"><div className="rush-run-card"><span>{label}</span><h2>{isFinished ? run.finishReason === 'time' ? <>RUN COMPLETE.<br/><em>KEEP IT RARE.</em></> : <>DOWN, BUT<br/><em>STILL RARE.</em></> : hasStarted ? <>TAKE A BREATHER.<br/><em>THEN RUSH.</em></> : <>RUN. COLLECT.<br/><em>STAY RARE.</em></>}</h2>
-        {isFinished ? <p>{run.finishReason === 'time' ? 'Your inputs are saved. Verify this run below to claim the test rewards you earned.' : 'This run ended before the timer. No reward claim is available. Your next high score is waiting.'}</p> : <><p>{hasStarted ? 'Your local run is paused. The onchain claim window keeps counting down.' : `${mode.seconds} seconds. Three hearts. Double-jump, dodge, and collect as many coins as you can.`}</p><button type="button" className="rush-run-primary" onClick={resume}>{hasStarted ? 'KEEP RUNNING' : 'LET’S RUSH'} <span>↗</span></button><small>The onchain claim window continues while paused.</small></>}
-        {saveError && <p className="rush-run-error" role="alert">{saveError}</p>}
-        {saveError && isFinished && <button type="button" className="rush-run-primary" onClick={() => persistSafely(true)}>RETRY SAVING RUN <span>↗</span></button>}
-      </div></div>}
-    </div>
-    <div className="rush-run-bottom"><div className="rush-run-keys"><span><kbd>SPACE</kbd> JUMP ×2</span><span><kbd>↓</kbd> SLIDE</span><span><kbd>←</kbd><kbd>→</kbd> PACE</span></div><span className="rush-run-reward-note">{props.collection === 1 ? 'GENESIS 100×' : 'GENERATIONS'} · {mode.rewardLabel} MODE</span></div>
-    <div className="rush-run-touch" aria-label="Touch controls"><button type="button" disabled={!live} onPointerDown={event => touchDown(event, 'touch-left')} onPointerUp={() => heldInput('touch-left', false)} onPointerCancel={() => heldInput('touch-left', false)} onLostPointerCapture={() => heldInput('touch-left', false)} aria-label="Hold to slow down">←<span>SLOW</span></button><button type="button" disabled={!live} onPointerDown={event => touchDown(event, 'touch-slide')} onPointerUp={() => heldInput('touch-slide', false)} onPointerCancel={() => heldInput('touch-slide', false)} onLostPointerCapture={() => heldInput('touch-slide', false)} aria-label="Hold to slide">↓<span>SLIDE</span></button><button type="button" className="rush-run-jump" disabled={!live} onPointerDown={event => { event.preventDefault(); pressJump(); }} aria-label="Jump; tap twice to double jump">↑<span>JUMP ×2</span></button><button type="button" disabled={!live} onPointerDown={event => touchDown(event, 'touch-right')} onPointerUp={() => heldInput('touch-right', false)} onPointerCancel={() => heldInput('touch-right', false)} onLostPointerCapture={() => heldInput('touch-right', false)} aria-label="Hold to speed up">→<span>FAST</span></button></div>
-    <p className="rush-run-disclaimer">Canonical artwork is cosmetic. Test NFT IDs are separate from mainnet Rare Friends. Rewards require a surviving, verified run.</p>
+    <ArcadeCabinet difficulty={props.difficulty} collection={props.collection} tokenId={props.tokenId} runId={props.runId} snapshot={run} world={world} fieldOverlays={overlays} onHome={returnHome} touchControls={touchControls}
+      topActions={<><button type="button" onClick={() => setReduced(value => !value)} aria-pressed={reduced} title="Reduce background motion">FX {reduced ? 'OFF' : 'ON'}</button><button type="button" onClick={paused ? resume : pause} disabled={isFinished} aria-label={paused ? '▶ RESUME' : 'Ⅱ PAUSE'}>{paused ? '▶' : 'Ⅱ'}</button></>}>
+      {paused && !hasStarted && !isFinished && <div className="start-screen">
+        <div className="start-title"><span className="eyebrow">ENDLESS WORLD. {mode.seconds} SECONDS.</span><h1>RARE<br/><span>RUSH</span><sup>✦</sup></h1><span className="mobile-friend"><TestFriendAvatar collection={props.collection} tokenId={props.tokenId}/></span><div className="selected-friend">{props.collection === 1 ? 'GENESIS' : 'FRIEND'} #{props.tokenId.toString()}<span>{props.collection === 1 ? '100× REWARDS' : art.sprites.familyName}</span></div></div>
+        <div className="start-card confirmed-start-card"><span className="card-kicker">{label}</span><h2>Run. Collect.<br/>{' '}Stay rare.</h2><div className="quick-stats"><span>MODE<b>{mode.label}</b></span><span>TIME<b>{mode.seconds}s</b></span><span>HEARTS<b>3</b></span></div><button type="button" className="primary" onClick={resume}>LET’S RUSH <span>↗</span></button><small className="entry-note">Your testnet entry is confirmed. Ready when you are.</small><small className="run-window-note">The onchain claim window continues while paused.</small>{saveError && <p className="run-save-error" role="alert">{saveError}</p>}</div>
+      </div>}
+      {paused && hasStarted && !isFinished && <div className="game-overlay rush-run-overlay"><div className="pause-card"><span className="eyebrow">{label}</span><h2>PAUSED</h2><p>Your local timer is paused.<br/>The onchain claim window keeps counting down.</p><button type="button" className="primary" onClick={resume}>KEEP RUNNING <span>▶</span></button>{saveError && <p className="run-save-error" role="alert">{saveError}</p>}</div></div>}
+      {isFinished && <div className="game-overlay result-screen"><div className="result-card"><span className="eyebrow">{mode.label.toUpperCase()} · {label}</span><h2>{run.finishReason === 'time' ? 'KEEP IT RARE.' : 'DOWN, BUT STILL RARE.'}</h2><div className="result-score">{run.score.toLocaleString()}<span>POINTS</span></div><div className="results-grid"><div><b>{Math.floor(run.distance)}m</b><span>DISTANCE</span></div><div><b>{run.coins}</b><span>COINS · {run.bonusCoins} BONUS</span></div><div><b>{run.hearts}</b><span>HEARTS</span></div></div><p>{run.finishReason === 'time' ? 'Your inputs are saved. Verify this run to claim the test rewards you earned.' : 'This run ended before the timer. No reward claim is available. Your next high score is waiting.'}</p>{saveError && <p className="run-save-error" role="alert">{saveError}</p>}{saveError && <button type="button" className="primary" onClick={() => persistSafely(true)}>RETRY SAVING RUN <span>↗</span></button>}</div></div>}
+    </ArcadeCabinet>
   </section>;
 }

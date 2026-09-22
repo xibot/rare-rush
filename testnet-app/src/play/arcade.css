@@ -1,0 +1,384 @@
+/* Main arcade geometry and visual language, scoped to the testnet cabinet. */
+.testnet-arcade-shell{position:relative;width:calc(100% - 48px);max-width:960px;aspect-ratio:3/2;min-height:640px;margin:24px auto;border:1px solid #fff;box-shadow:0 0 0 5px #000,0 0 0 6px #fff;background:#000}
+.testnet-arcade{--rush-font-display:Silkscreen,monospace;--rush-font-mono:Sometype,monospace;--rush-font-body:Archivo,sans-serif;--lime:#ccff00}
+.testnet-arcade p{line-height:1.4}.testnet-arcade a{color:inherit;text-decoration:none}.testnet-arcade a:focus-visible{outline:3px solid #ccff00;outline-offset:3px}
+.testnet-arcade *{box-sizing:border-box}
+.testnet-arcade button,.testnet-arcade input{font:inherit}
+.testnet-arcade button{cursor:pointer;touch-action:manipulation;border-radius:0}
+.testnet-arcade button:disabled{opacity:.35;cursor:default}
+.testnet-arcade button:focus-visible,.testnet-arcade [tabindex]:focus-visible{outline:3px solid #ccff00;outline-offset:3px}
+.testnet-arcade button:hover:not(:disabled){text-decoration:underline}
+.testnet-arcade button:active:not(:disabled){transform:translateY(1px)}
+.testnet-arcade{position:relative;width:100%;height:100%;overflow:hidden;color:#fff;background:#000;font:14px/1.4 ui-monospace,SFMono-Regular,Consolas,monospace;user-select:none;-webkit-user-select:none}
+.testnet-arcade .run-modifiers{position:absolute;right:27px;top:17px;width:117px;padding:7px 9px;background:#000;border:1px solid #fff;pointer-events:none;font-size:10px}
+.testnet-arcade .run-modifiers>span{display:flex;justify-content:space-between;gap:12px;line-height:1.8}
+.testnet-arcade .run-modifiers b{color:#ccff00;font-size:12px;font-variant-numeric:tabular-nums}
+.testnet-arcade .growth-meter{height:4px;margin-top:5px;background:#fff3}
+.testnet-arcade .growth-meter i{display:block;height:100%;background:#ccff00}
+.testnet-arcade .arcade-top{height:68px;position:absolute;inset:0 0 auto;display:flex;align-items:center;justify-content:space-between;padding:0 26px;border-bottom:1px solid #fff;z-index:3;background:#000}
+.testnet-arcade .arcade-logo{display:flex;align-items:center;gap:10px;flex-shrink:0;white-space:nowrap}
+.testnet-arcade button.arcade-logo{appearance:none;border:0;background:transparent;color:inherit;font:inherit;text-align:left;padding:0;margin:0;min-height:44px}
+.testnet-arcade button.arcade-logo:hover:not(:disabled){text-decoration:none}
+.testnet-arcade .arcade-logo>.brand-icon{width:42px;height:42px}
+.testnet-arcade .arcade-logo>.brand-name{font:400 20px/1 var(--rush-font-display);letter-spacing:0}
+.testnet-arcade .arcade-logo .brand-name>span{color:#ccff00}
+.testnet-arcade .arcade-logo small{display:block;margin-top:7px;font:400 8px/1 var(--rush-font-mono);letter-spacing:2.2px}
+.testnet-arcade .wordmark{display:flex;align-items:center;gap:7px;font-size:20px;font-weight:900;letter-spacing:-1px}
+.testnet-arcade .wordmark>span{color:#ccff00;margin-left:-7px}
+.testnet-arcade .wordmark small{border-left:1px solid #fff;margin-left:9px;padding-left:15px;letter-spacing:1px;font-size:10px;max-width:100px;font-weight:400}
+.testnet-arcade .pixel-logo{width:24px;height:30px;margin-right:5px;overflow:visible}
+.testnet-arcade .top-actions{display:flex;align-items:center;gap:8px}
+.testnet-arcade .top-actions button{height:34px;min-width:34px;background:#000;border:1px solid #fff;color:#fff;font-size:11px;font-weight:700;padding:5px 8px}
+.testnet-arcade .top-actions button[aria-pressed=true]{background:#fff;color:#000}
+.testnet-arcade .preview-tag{font-size:10px;letter-spacing:1px;color:#000;background:#ccff00;margin-right:10px;border:1px solid #ccff00;padding:4px 8px}
+.testnet-arcade .hud{position:absolute;inset:68px 0 auto;z-index:2;display:grid;grid-template-columns:1fr 1.2fr 1.35fr 1fr;height:82px;background:#fff;color:#000;border-bottom:1px solid #000;padding:14px 28px;gap:16px}
+.testnet-arcade .hud>div{border-right:1px solid #000}
+.testnet-arcade .hud>div:last-child{border:0;text-align:right}
+.testnet-arcade .hud span{display:block;font-size:10px;letter-spacing:1px}
+.testnet-arcade .hud strong{display:block;font-size:27px;letter-spacing:1px;line-height:1.3;font-weight:700}
+.testnet-arcade .hud strong small{font-size:14px;margin-left:8px}
+.testnet-arcade .hud em{font-style:normal}
+.testnet-arcade .hud .token-hud strong{display:inline-block;background:#ccff00;padding:0 6px}
+.testnet-arcade .life-hud strong{display:flex;justify-content:flex-end;gap:9px}
+.testnet-arcade .life-hud b{font-size:26px;color:#000}
+.testnet-arcade .life-hud .lost{color:#ccc}
+.testnet-arcade .hud .urgent{background:#000;color:#fff}
+.testnet-arcade .playfield{position:absolute;top:150px;bottom:116px;left:0;right:0;overflow:hidden;background:#000}
+.testnet-arcade .world-svg{width:100%;height:100%;display:block;touch-action:none;outline:none!important}
+.testnet-arcade .zone-label{position:absolute;left:26px;top:16px;display:flex;gap:9px;align-items:center;font-size:10px;letter-spacing:1px;color:#fff;background:#000;padding:3px 5px}
+.testnet-arcade .zone-label>span:first-child{border:1px solid #fff;padding:1px 5px;color:#ccff00}
+.testnet-arcade .zone-line{display:block;width:35px;height:1px;background:#fff}
+.testnet-arcade .run-score{position:absolute;top:55px;left:27px;display:flex;flex-direction:column;pointer-events:none;background:#000;padding:3px 6px}
+.testnet-arcade .run-score>span{font-size:10px;letter-spacing:1.5px}
+.testnet-arcade .run-score strong{font-size:24px}
+.testnet-arcade .run-score small{font-size:11px}
+.testnet-arcade .run-score b{color:#ccff00;margin-left:12px}
+.testnet-arcade .run-progress{position:absolute;bottom:0;left:0;right:0;height:3px;background:#000}
+.testnet-arcade .run-progress i{display:block;height:100%;background:#ccff00}
+.testnet-arcade .pickup-notice{position:absolute;top:35%;left:50%;transform:translateX(-50%);white-space:nowrap;color:#000;background:#ccff00;border:2px solid #000;padding:6px 12px;font-weight:800;font-size:18px;pointer-events:none}
+.testnet-arcade .start-screen{position:absolute;top:175px;left:48px;right:45px;bottom:145px;display:grid;grid-template-columns:1fr 1fr;gap:64px;align-items:center;z-index:2;pointer-events:none}
+.testnet-arcade .start-screen>div{pointer-events:auto}
+.testnet-arcade .start-title{position:relative;max-width:350px;background:#000;border:1px solid #fff;padding:17px 20px}
+.testnet-arcade .eyebrow{font-size:10px;letter-spacing:1px;color:#ccff00;font-weight:700}
+.testnet-arcade .start-title h1{position:relative;font-family:inherit;font-size:72px;line-height:.98;letter-spacing:-5px;margin:14px 0;color:#fff;font-weight:900}
+.testnet-arcade .start-title h1>span{color:#ccff00}
+.testnet-arcade .start-title sup{font-size:25px;position:absolute;top:4px;margin-left:10px;letter-spacing:0;color:#ccff00}
+.testnet-arcade .selected-friend{display:flex;gap:9px;align-items:center;font-size:10px;margin-top:16px;white-space:nowrap}
+.testnet-arcade .selected-friend>span{border:1px solid #fff;padding:3px 5px;font-size:10px}
+.testnet-arcade .mobile-friend{display:none}
+.testnet-arcade .start-card{position:relative;background:#fff;color:#000;border:2px solid #000;outline:1px solid #fff;padding:16px 22px;box-shadow:6px 6px 0 #000}
+.testnet-arcade .card-kicker{font-size:10px;letter-spacing:.3px}
+.testnet-arcade .start-card h2{font-family:inherit;font-size:26px;line-height:1.12;letter-spacing:-1px;margin:10px 0 16px;font-weight:900}
+.testnet-arcade .quick-stats{display:flex;justify-content:space-between;margin-bottom:14px;padding-top:10px;border-top:1px solid #000;gap:12px}
+.testnet-arcade .quick-stats span{display:flex;flex-direction:column;font-size:10px;letter-spacing:.2px;white-space:nowrap}
+.testnet-arcade .quick-stats b{font-size:22px;line-height:1.3}
+.testnet-arcade .start-card-heading{display:flex;align-items:center;justify-content:space-between;gap:10px;min-width:0}
+.testnet-arcade .start-card-heading .card-kicker{flex:1;min-width:0}
+.testnet-arcade .start-card .start-back{appearance:none;flex:0 0 auto;min-width:58px;min-height:44px;padding:8px 10px;border:1px solid #000;background:#fff;color:#000;font:400 11px/1.4 var(--rush-font-mono);text-align:center;box-shadow:none}
+.testnet-arcade .start-card .start-back:hover:not(:disabled){background:#ccff00;text-decoration:none}
+.testnet-arcade .start-card .start-back:focus-visible{outline-color:#000;outline-offset:-3px}
+.testnet-arcade .primary{border:2px solid #000;background:#ccff00;color:#000;padding:11px 16px;font-size:14px;font-weight:900;letter-spacing:.5px;box-shadow:3px 3px 0 #000;display:flex;align-items:center;justify-content:space-between;gap:20px;min-height:48px;width:100%}
+.testnet-arcade .primary>span{font-size:22px;line-height:1}
+.testnet-arcade .entry-note{display:block;margin-top:12px;font-size:10px;line-height:1.4;text-align:center}
+.testnet-arcade .text-button{border:0;background:transparent;color:inherit;padding:10px 12px;font-size:12px}
+.testnet-arcade .arcade-bottom{position:absolute;bottom:48px;left:0;right:0;height:68px;z-index:3;background:#fff;color:#000;border-top:1px solid #000;display:flex;align-items:center;padding:0 27px;gap:20px}
+.testnet-arcade .keyboard-controls{display:flex;gap:24px;font-size:11px}
+.testnet-arcade .keyboard-controls>span{display:flex;gap:8px;align-items:center}
+.testnet-arcade .keyboard-controls small{font-size:9px;max-width:43px;line-height:1.4}
+.testnet-arcade kbd{font-family:inherit;padding:5px 6px;color:#000;border:1px solid #000;border-bottom:3px solid #000;font-size:10px;background:#fff}
+.testnet-arcade .economy-bar{display:flex;margin-left:auto;align-items:center;gap:16px}
+.testnet-arcade .economy-bar>span{font-size:10px;max-width:130px}
+.testnet-arcade .economy-bar b{font-size:13px;background:#ccff00;padding:1px 3px}
+.testnet-arcade .economy-bar button{background:none;border:0;color:#000;font:11px ui-monospace,monospace;padding:10px 0;white-space:nowrap}
+.testnet-arcade .economy-bar button>span{margin-left:4px}
+.testnet-arcade .touch-controls{display:none}
+.testnet-arcade .game-overlay{position:absolute;inset:150px 0 116px;display:grid;place-items:center;background:#fff;color:#000;z-index:4;padding:14px}
+.testnet-arcade .game-overlay .eyebrow{color:#000;background:#ccff00;padding:3px 5px}
+.testnet-arcade .game-overlay h2{font-family:inherit;font-size:26px;letter-spacing:-1px;line-height:1.2;margin:12px 0;font-weight:900}
+.testnet-arcade .loading-screen{display:flex;flex-direction:column;gap:10px;text-align:center}
+.testnet-arcade .loading-screen p{max-width:420px;overflow-wrap:anywhere}
+.testnet-arcade .loading-screen button{max-width:240px}
+.testnet-arcade .loading-pixel{width:28px;height:28px;border:5px solid #000;box-shadow:7px 7px 0 #ccff00;animation:arcade-blink 1s steps(2) infinite}
+.testnet-arcade .result-card{max-width:460px;width:100%;text-align:center}
+.testnet-arcade .result-card h2{font-size:20px;margin:9px 0}
+.testnet-arcade .result-score{font-size:40px;font-weight:900;line-height:1.05}
+.testnet-arcade .result-score>span{display:block;font-size:10px;letter-spacing:2px;margin-top:5px}
+.testnet-arcade .results-grid{display:grid;grid-template-columns:1fr 1fr 1fr;margin:14px 0 8px;border-top:1px solid #000;border-bottom:1px solid #000;padding:10px 0}
+.testnet-arcade .results-grid>div{display:flex;flex-direction:column;border-right:1px solid #000}
+.testnet-arcade .results-grid>div:last-child{border:0}
+.testnet-arcade .results-grid b{font-size:20px}
+.testnet-arcade .results-grid span{font-size:10px;margin-top:3px}
+.testnet-arcade .result-card p{font-size:12px;margin:8px 0 13px}
+.testnet-arcade .result-card>small{font-size:10px;display:block}
+.testnet-arcade .pause-card{max-width:330px;width:100%;text-align:center}
+.testnet-arcade .pause-card p{font-size:13px}
+.testnet-arcade .pause-card h2{font-size:48px;margin:10px 0}
+.testnet-arcade .error-toast{position:absolute;bottom:130px;left:20px;right:20px;z-index:9;background:#fff;color:#000;border:3px solid #000;outline:2px solid #ccff00;padding:14px;font-size:12px}
+.testnet-arcade .rf-frame-scrim{background:#000c;color:#000;padding:20px;font:14px/1.5 ui-monospace,monospace}
+.testnet-arcade .rf-frame-menu{background:#fff;border:2px solid #000;outline:1px solid #fff;max-width:550px;box-shadow:6px 6px 0 #000}
+.testnet-arcade .rf-frame-menu-heading{padding:12px 18px;border-bottom:1px solid #000;background:#ccff00}
+.testnet-arcade .rf-frame-menu-heading h2{font-size:15px;font-family:inherit}
+.testnet-arcade .rf-frame-menu-heading button{color:#000;border:1px solid #000;background:#fff;min-width:44px;min-height:44px}
+.testnet-arcade .rf-frame-menu-body{padding:20px;user-select:text}
+.testnet-arcade .rules-panel dt{font-size:12px;font-weight:800;margin-top:16px;letter-spacing:.3px}
+.testnet-arcade .rules-panel dd{margin:5px 0 14px;font-size:14px}
+.testnet-arcade .fine-print{font-size:12px!important;line-height:1.6}
+.testnet-arcade .lab-stat{display:flex;flex-direction:column;background:#ccff00;border:1px solid #000;padding:14px}
+.testnet-arcade .lab-stat>span{font-size:11px;letter-spacing:1px}
+.testnet-arcade .lab-stat strong{font-size:33px}
+.testnet-arcade .lab-stat small{font-size:14px}
+.testnet-arcade .scenario-buttons{display:flex;gap:6px;margin:13px 0 8px;flex-wrap:wrap}
+.testnet-arcade .scenario-buttons button{background:#fff;color:#000;border:1px solid #000;min-height:42px;font-size:11px;padding:8px}
+.testnet-arcade .scenario-buttons button:hover:not(:disabled){background:#ccff00}
+.testnet-arcade .ledger{margin:20px 0}
+.testnet-arcade .ledger>div{display:flex;justify-content:space-between;border-bottom:1px solid #000;padding:10px 0;gap:10px;font-size:12px}
+.testnet-arcade .ledger dd{margin:0;text-align:right;font-weight:700}
+.testnet-arcade .future-note{background:#fff;border:1px solid #000;padding:14px;margin-top:18px;font-size:12px}
+.testnet-arcade .future-note>b{font-size:11px;letter-spacing:.6px;background:#ccff00}
+.testnet-arcade .future-note>p{margin:7px 0 0!important}
+@keyframes arcade-blink{50%{opacity:.4}}
+.testnet-arcade.reduce-motion *{animation:none!important;transition:none!important}
+@media(max-width:600px){
+.testnet-arcade .arcade-top{height:60px;padding:0 14px}
+.testnet-arcade .wordmark{font-size:16px;gap:4px;letter-spacing:-.8px}
+.testnet-arcade .wordmark>span{margin-left:-4px}
+.testnet-arcade .wordmark small{display:none}
+.testnet-arcade .pixel-logo{width:19px;height:25px;margin-right:2px}
+.testnet-arcade .top-actions{gap:5px}
+.testnet-arcade .top-actions button{font-size:10px;min-width:29px;padding:4px 5px;height:32px}
+.testnet-arcade .preview-tag{position:absolute;top:68px;right:14px;font-size:8px;margin:0;padding:2px 4px;border-color:#000}
+.testnet-arcade .hud{top:60px;height:91px;grid-template-columns:1fr 1fr 1.1fr;padding:26px 15px 10px;gap:10px}
+.testnet-arcade .hud span{font-size:9px;letter-spacing:.1px}
+.testnet-arcade .hud strong{font-size:22px}
+.testnet-arcade .hud>div:nth-child(3){border:0}
+.testnet-arcade .hud strong small{font-size:11px;margin-left:3px}
+.testnet-arcade .hud .life-hud{position:absolute;right:16px;top:62px}
+.testnet-arcade .life-hud>span{display:none}
+.testnet-arcade .life-hud strong{gap:5px}
+.testnet-arcade .life-hud b{font-size:14px}
+.testnet-arcade .token-hud strong{font-size:20px}
+.testnet-arcade .playfield{top:151px;bottom:171px}
+.testnet-arcade .zone-label{left:12px;top:12px;font-size:9px;letter-spacing:.4px}
+.testnet-arcade .zone-line{width:20px}
+.testnet-arcade .run-score{left:12px;top:48px}
+.testnet-arcade .run-score strong{font-size:23px}
+.testnet-arcade .run-score small{font-size:10px}
+.testnet-arcade .pickup-notice{font-size:14px;top:30%;padding:5px 8px}
+.testnet-arcade .start-screen{top:188px;left:24px;right:24px;bottom:188px;display:flex;flex-direction:column;justify-content:center;align-items:stretch;gap:14px}
+.testnet-arcade .start-title{display:flex;flex-wrap:wrap;align-items:flex-end;justify-content:space-between;gap:7px;max-width:none;min-height:105px;padding:12px 78px 12px 12px}
+.testnet-arcade .start-title>.eyebrow{width:100%;white-space:nowrap;font-size:9px;letter-spacing:.1px}
+.testnet-arcade .start-title h1{font-size:34px;letter-spacing:-2px;margin:0;line-height:1}
+.testnet-arcade .start-title h1 br{display:none}
+.testnet-arcade .start-title h1>span{margin-left:5px}
+.testnet-arcade .start-title sup{display:none}
+.testnet-arcade .mobile-friend{display:block;position:absolute;right:11px;top:26px;width:56px;height:56px;background:#fff;border:1px solid #fff;padding:4px}
+.testnet-arcade .selected-friend{font-size:9px;gap:5px;margin:0;width:100%;white-space:nowrap}
+.testnet-arcade .selected-friend>span{font-size:9px;padding:1px 4px}
+.testnet-arcade .start-card{padding:16px 18px}
+.testnet-arcade .card-kicker{font-size:9px;letter-spacing:0}
+.testnet-arcade .start-card h2{font-size:22px;margin:8px 0 12px;letter-spacing:-.8px}
+.testnet-arcade .start-card h2 br{display:none}
+.testnet-arcade .quick-stats{padding-top:9px;margin-bottom:12px}
+.testnet-arcade .quick-stats b{font-size:20px}
+.testnet-arcade .quick-stats span{font-size:9px}
+.testnet-arcade .primary{min-height:47px;padding:10px 14px;font-size:13px}
+.testnet-arcade .entry-note{font-size:10px;line-height:1.4;margin-top:11px}
+.testnet-arcade .arcade-bottom{bottom:47px;height:124px;padding:10px 16px;display:flex;flex-direction:column;gap:11px;align-items:stretch}
+.testnet-arcade .keyboard-controls{display:none}
+.testnet-arcade .touch-controls{display:flex;gap:12px}
+.testnet-arcade .touch-controls>button{height:66px;flex:1;border:2px solid #000;background:#fff;color:#000;font-size:25px;display:flex;gap:13px;align-items:center;justify-content:center;touch-action:none;box-shadow:2px 2px 0 #000}
+.testnet-arcade .touch-controls>button>span{font-size:13px;font-weight:800;letter-spacing:1px}
+.testnet-arcade .touch-controls small{font-size:10px}
+.testnet-arcade .touch-controls>button:last-child{background:#ccff00}
+.testnet-arcade .economy-bar{justify-content:space-between;gap:10px;margin-left:0}
+.testnet-arcade .economy-bar>span{font-size:9px;max-width:none}
+.testnet-arcade .economy-bar button{font-size:11px;padding:0;min-height:22px}
+.testnet-arcade .economy-bar b{font-size:11px}
+.testnet-arcade .game-overlay{inset:151px 0 171px;padding:20px}
+.testnet-arcade .result-card h2{font-size:20px}
+.testnet-arcade .result-score{font-size:36px}
+.testnet-arcade .results-grid{margin:12px 0}
+.testnet-arcade .results-grid b{font-size:18px}
+.testnet-arcade .results-grid span{font-size:9px}
+.testnet-arcade .result-card>small{font-size:10px}
+.testnet-arcade .game-overlay .eyebrow{font-size:9px}
+.testnet-arcade .pause-card h2{font-size:42px}
+.testnet-arcade .rf-frame-scrim{padding:10px}
+.testnet-arcade .rf-frame-menu-body{padding:15px}
+.testnet-arcade .rf-frame-menu-heading{padding:8px 12px}
+.testnet-arcade .rf-frame-menu-heading h2{font-size:13px}
+.testnet-arcade .error-toast{bottom:180px;font-size:12px}
+}
+@media(max-width:600px) and (max-height:680px){
+.testnet-arcade .start-screen{top:176px;bottom:180px;gap:9px}
+.testnet-arcade .start-title{min-height:82px;padding:8px 70px 8px 10px;gap:4px}
+.testnet-arcade .start-title h1{font-size:30px}
+.testnet-arcade .start-title>.eyebrow{font-size:8px}
+.testnet-arcade .mobile-friend{width:49px;height:49px;top:19px;right:10px}
+.testnet-arcade .start-card{padding:11px 14px}
+.testnet-arcade .card-kicker{display:none}
+.testnet-arcade .start-card h2{font-size:16px;margin:3px 0 8px;letter-spacing:-.5px}
+.testnet-arcade .quick-stats{padding-top:7px;margin-bottom:9px}
+.testnet-arcade .quick-stats b{font-size:18px}
+.testnet-arcade .quick-stats span{font-size:9px}
+.testnet-arcade .entry-note{font-size:9px;margin-top:9px}
+.testnet-arcade .result-card h2{font-size:17px}
+.testnet-arcade .result-card .result-score{font-size:30px}
+.testnet-arcade .results-grid{padding:7px 0;margin:8px 0}
+.testnet-arcade .result-card>small{display:none}
+.testnet-arcade .result-card p{font-size:11px}
+.testnet-arcade .result-card .text-button{padding:8px}
+}
+.testnet-arcade .keyboard-controls{gap:18px}
+.testnet-arcade .keyboard-controls>span{gap:5px;white-space:nowrap}
+.testnet-arcade .keyboard-controls>span:last-child{font-size:10px}
+@media(max-width:600px){
+.testnet-arcade .run-modifiers{right:12px;top:12px;width:101px;padding:5px 7px;font-size:9px}
+.testnet-arcade .run-modifiers b{font-size:11px}
+.testnet-arcade .touch-controls{gap:8px}
+.testnet-arcade .touch-controls>button{min-width:0;gap:5px}
+.testnet-arcade .touch-controls>button>span{font-size:11px;letter-spacing:0}
+.testnet-arcade .touch-controls small{font-size:9px}
+.testnet-arcade .touch-controls>button:last-child{background:#fff}
+.testnet-arcade .touch-controls>.touch-jump{background:#ccff00}
+.testnet-arcade .touch-controls>.touch-pace{flex:0 0 48px;flex-direction:column;gap:0;font-size:22px}
+.testnet-arcade .touch-controls>.touch-pace>span{font-size:9px}
+.testnet-arcade .touch-controls>.touch-pace:active:not(:disabled){background:#ccff00}
+}
+.testnet-arcade{font-family:var(--rush-font-mono);font-synthesis:none}
+.testnet-arcade .wordmark,.testnet-arcade .start-title h1,.testnet-arcade .game-overlay h2,.testnet-arcade .start-card h2,.testnet-arcade .result-score{font-family:var(--rush-font-display);font-weight:400;letter-spacing:0}
+.testnet-arcade .wordmark{font-size:18px;gap:5px}
+.testnet-arcade .wordmark>span{margin-left:-5px}
+.testnet-arcade .wordmark small{font-family:var(--rush-font-mono)}
+.testnet-arcade .start-title h1{font-size:64px;line-height:1.08}
+.testnet-arcade .start-card h2{font-size:24px;line-height:1.3}
+.testnet-arcade .primary{font-family:var(--rush-font-display);font-weight:400;letter-spacing:0;font-size:14px}
+.testnet-arcade .economy-bar button,.testnet-arcade .rf-frame-scrim{font-family:var(--rush-font-mono)}
+.testnet-arcade .rf-frame-menu-heading h2{font-family:var(--rush-font-display);font-weight:400;font-size:14px}
+.testnet-arcade .rules-panel p,.testnet-arcade .rules-panel dd,.testnet-arcade .economy-panel p,.testnet-arcade .fine-print{font-family:var(--rush-font-body)}
+@media(max-width:600px){
+.testnet-arcade .wordmark{font-size:14px}
+.testnet-arcade .start-title h1{font-size:28px}
+.testnet-arcade .start-card h2{font-size:16px}
+.testnet-arcade .primary{font-size:12px}
+.testnet-arcade .game-overlay h2{font-size:20px}
+.testnet-arcade .result-card h2{font-size:16px}
+.testnet-arcade .pause-card h2{font-size:36px}
+.testnet-arcade .rf-frame-menu-heading h2{font-size:12px}
+}
+@media(max-width:600px) and (max-height:680px){
+.testnet-arcade .start-title h1{font-size:24px}
+.testnet-arcade .start-card h2{font-size:12px}
+.testnet-arcade .result-card h2{font-size:14px}
+.testnet-arcade .result-card .result-score{font-size:28px}
+}
+.testnet-arcade .difficulty-picker{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:6px;border-top:1px solid #000;padding-top:10px}
+.testnet-arcade .difficulty-picker button{display:flex;flex-direction:column;justify-content:center;gap:3px;min-width:0;min-height:48px;padding:6px 3px;background:#fff;color:#000;border:1px solid #000}
+.testnet-arcade .difficulty-picker button[aria-pressed=true]{background:#ccff00;box-shadow:inset 0 -3px #000}
+.testnet-arcade .difficulty-picker :is(b,strong){font:400 12px/1.2 var(--rush-font-display)}
+.testnet-arcade .difficulty-picker span{font:10px/1.3 var(--rush-font-mono)}
+.testnet-arcade .mode-description{font-size:10px;line-height:1.5;margin:7px 0 11px}
+.testnet-arcade .mode-description>span{display:block;font-size:9px}
+@media(max-width:600px){
+.testnet-arcade .difficulty-picker{gap:5px;padding-top:8px}
+.testnet-arcade .difficulty-picker :is(b,strong){font-size:10px}
+.testnet-arcade .difficulty-picker span{font-size:9px}
+.testnet-arcade .mode-description{font-size:9px;margin:6px 0 9px}
+.testnet-arcade .mode-description>span{display:none}
+}
+@media(max-width:600px) and (max-height:680px){
+.testnet-arcade .difficulty-picker{padding-top:7px}
+.testnet-arcade .difficulty-picker button{min-height:44px;padding:4px 2px}
+.testnet-arcade .difficulty-picker :is(b,strong){font-size:9px}
+.testnet-arcade .difficulty-picker span{font-size:8px}
+.testnet-arcade .mode-description{font-size:8px;margin:5px 0 8px}
+}
+@media(max-width:600px){
+.testnet-arcade[data-screen=ready] .zone-label{visibility:hidden}
+}
+@media(max-width:600px){
+.testnet-arcade .arcade-logo{gap:7px}
+.testnet-arcade .arcade-logo>.brand-icon{width:32px;height:32px}
+.testnet-arcade .arcade-logo>.brand-name{font-size:14px}
+.testnet-arcade .arcade-logo small{font-size:7px;letter-spacing:1.6px;margin-top:5px}
+}
+.testnet-arcade .result-card p{margin:6px 0 9px}
+.testnet-arcade .result-actions{display:grid;gap:8px}
+.testnet-arcade .result-actions+small{margin-top:6px}
+.testnet-arcade .change-difficulty{display:flex;align-items:center;justify-content:center;gap:10px;width:100%;min-height:44px;border:2px solid #000;background:#fff;color:#000;padding:9px 12px;font:400 12px/1.4 var(--rush-font-display)}
+.testnet-arcade .change-difficulty:hover{background:#f0f0f0}
+.testnet-arcade .change-difficulty>span{font:20px/1 var(--rush-font-mono)}
+@media(max-width:600px) and (max-height:680px){
+.testnet-arcade .result-screen{padding:10px 20px}
+.testnet-arcade .result-actions{gap:6px}
+.testnet-arcade .result-actions .primary{min-height:44px;padding:8px 14px}
+.testnet-arcade .change-difficulty{font-size:11px;padding:8px 12px}
+}
+@media(max-width:600px) and (max-height:680px){
+.testnet-arcade .start-card{padding:6px 14px}
+.testnet-arcade .start-card-heading{justify-content:flex-end}
+.testnet-arcade .start-card h2{position:absolute;top:21px;left:14px;right:86px;margin:0;font-size:12px;line-height:1.3}
+.testnet-arcade .start-card .difficulty-picker{padding-top:4px}
+.testnet-arcade .start-card .mode-description{margin:3px 0 4px}
+.testnet-arcade .start-card .entry-note{margin-top:6px}
+}
+@media(min-width:601px){
+.testnet-arcade .start-card{padding:12px 20px}
+.testnet-arcade .start-card h2{font-size:20px;line-height:1.2;margin:6px 0 10px}
+}
+/* Local host toolbar replaces the main application's simulated wallet bar. */
+.testnet-arcade .arcade-toolbar{position:absolute;bottom:10px;left:15px;right:15px;display:flex;align-items:center;gap:10px;font:10px/1.5 var(--rush-font-mono);color:#fff;background:#000}
+.testnet-arcade .arcade-toolbar>*{border:1px solid #fff;padding:5px 8px;white-space:nowrap;background:#000;color:#fff}
+.testnet-arcade .arcade-toolbar a{min-height:32px;display:flex;align-items:center}
+.testnet-arcade .economy-bar>span{max-width:none;white-space:nowrap}
+.testnet-arcade .economy-bar a{font:11px var(--rush-font-mono);white-space:nowrap;padding:10px 0}
+.testnet-arcade .arcade-logo:hover{color:#fff;text-decoration:none}
+.testnet-arcade button:not(:disabled):hover{transform:none}
+.testnet-arcade .eyebrow{display:inline;gap:0;line-height:1.4}
+.testnet-arcade .start-title h1{margin:14px 0;letter-spacing:0}
+.testnet-arcade .start-title h1 span{color:#ccff00}
+.testnet-arcade .start-card h2,.testnet-arcade .game-overlay h2{color:#000}
+.testnet-arcade .start-title .mobile-friend{width:56px;height:56px}
+.testnet-arcade .start-title .mobile-friend svg{width:100%;height:100%}
+.testnet-arcade .run-save-error{font:11px/1.5 var(--rush-font-mono);border-top:1px solid #000;padding-top:10px;overflow-wrap:anywhere}
+.testnet-arcade .run-window-note{font:10px/1.4 var(--rush-font-mono);display:block;margin-top:10px}
+.testnet-arcade .start-card .run-window-note{font-size:9px;text-align:center}
+.testnet-arcade .arcade-help{overflow:auto;z-index:8}
+.testnet-arcade .arcade-help h2{font-size:24px}
+.testnet-arcade .arcade-help p{font-size:12px}
+.testnet-arcade .result-screen{overflow:auto}
+@media(max-width:700px){.testnet-arcade-shell{width:100%;height:100dvh;min-height:640px;max-width:none;margin:0;border:0;box-shadow:none;aspect-ratio:auto}}
+@media(max-width:600px){
+ .testnet-arcade .arcade-toolbar{bottom:7px;left:9px;right:9px;gap:5px;font-size:9px}
+ .testnet-arcade .arcade-toolbar>*{padding:5px}.testnet-arcade .arcade-toolbar a{min-height:32px}
+ .testnet-arcade .arcade-toolbar>span:first-child{font-size:8px}
+ .testnet-arcade .economy-bar a{font-size:10px;padding:0;min-height:22px}
+ .testnet-arcade .start-title h1{margin:0}
+ .testnet-arcade .start-card .run-window-note{font-size:8px;margin-top:7px}
+}
+@media(pointer:coarse) and (min-width:601px){
+ .testnet-arcade .keyboard-controls{display:none}
+ .testnet-arcade .touch-controls{display:flex;gap:8px}
+ .testnet-arcade .touch-controls>button{min-height:44px;min-width:60px;border:1px solid #000;background:#fff;color:#000;touch-action:none;padding:8px;font:12px var(--rush-font-mono)}
+ .testnet-arcade .touch-controls .touch-jump{background:#ccff00}
+ .testnet-arcade .touch-controls>button>span{margin-left:5px;font-size:10px}
+}
+
+/* Onchain entry notes need a little extra room without covering the controls. */
+@media(min-width:601px){.testnet-arcade .start-screen{grid-template-rows:minmax(0,1fr)}}
+@media(max-width:600px) and (max-height:680px){
+ .testnet-arcade .start-screen{top:160px;bottom:177px;gap:8px}
+ .testnet-arcade .start-title{min-height:64px;padding-top:7px;padding-bottom:7px;gap:3px}
+ .testnet-arcade .start-title .mobile-friend{width:49px;height:49px;top:12px}
+ .testnet-arcade .start-card{padding-top:4px;padding-bottom:4px}
+ .testnet-arcade .start-card .primary{min-height:44px;padding:8px 12px}
+ .testnet-arcade .start-card .mode-description{line-height:1.25}
+ .testnet-arcade .start-card .entry-note{line-height:1.3;font-size:8px}
+ .testnet-arcade .start-card .entry-note:last-child{font-size:8px}
+ .testnet-arcade .confirmed-start-card h2{position:static;margin:3px 0 7px;font-size:12px;line-height:1.3}
+}
+@media(max-width:600px) and (max-height:680px){
+ .testnet-arcade[data-screen=result] .touch-controls{display:none}
+ .testnet-arcade[data-screen=result] .arcade-bottom{height:44px;justify-content:center}
+ .testnet-arcade[data-screen=result] .playfield,.testnet-arcade[data-screen=result] .game-overlay{bottom:91px}
+}
