@@ -70,7 +70,7 @@ function Docs() {
   const [difficulty, setDifficulty] = useState<Difficulty>('normal');
   return <div className="rush-docs" id="top">
     <a className="docs-skip" href="#start">Skip to the guide</a>
-    <header className="docs-header"><a className="docs-logo" href="/" aria-label="Rare Rush by Xibot home"><BrandMark/></a><nav aria-label="Main navigation"><a href="/">HOME</a><a href="/pitch/">PITCH</a><a href="https://testnet.rarerush.app">PLAY TESTNET</a><a className="docs-cta" href="/arcade/">PLAY MVP ↗</a></nav></header>
+    <header className="docs-header"><a className="docs-logo" href="/" aria-label="Rare Rush by Xibot home"><BrandMark/></a><nav aria-label="Main navigation"><a href="/">HOME</a><a href="/pitch/">PITCH</a><a className="nav-testnet" href="https://testnet.rarerush.app">TRY TESTNET</a><a className="docs-cta nav-arcade" href="/arcade/">PLAY ARCADE ↗</a></nav></header>
     <main>
       <section className="docs-hero" aria-labelledby="docs-title"><div><div className="docs-eyebrow">THE PLAYER’S FIELD GUIDE</div><h1 id="docs-title">RARE RUSH<span>101.</span></h1><p>Small Friend. Big adventure. Everything you need to jump in, get bigger, and make your next run a little rarer.</p><span className="docs-badge">PLAYABLE NOW · TOKEN ECONOMY IN DEMO</span></div><Cover/></section>
       <div className="docs-layout">

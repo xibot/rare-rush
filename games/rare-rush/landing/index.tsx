@@ -9,7 +9,7 @@ function Landing() {
   return <div className="rush-landing" id="top">
     <header className="landing-header">
       <a className="landing-logo" href="#top" aria-label="Rare Rush by Xibot home"><BrandMark/></a>
-      <nav aria-label="Main navigation"><a href="#how-to-play">HOW TO PLAY</a><a className="header-docs" href="./docs/">DOCS</a><a href="./pitch/">PITCH</a><a href="https://testnet.rarerush.app">PLAY TESTNET</a><a className="header-play" href="./arcade/">PLAY MVP <span>↗</span></a></nav>
+      <nav aria-label="Main navigation"><a href="#how-to-play">HOW TO PLAY</a><a className="header-docs" href="./docs/">DOCS</a><a href="./pitch/">PITCH</a><a className="nav-testnet" href="https://testnet.rarerush.app">TRY TESTNET</a><a className="header-play nav-arcade" href="./arcade/">PLAY ARCADE <span>↗</span></a></nav>
     </header>
 
     <main>

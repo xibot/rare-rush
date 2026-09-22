@@ -55,7 +55,7 @@ function Pitch() {
     <a className="pitch-skip" href="#pitch-title">Skip to the pitch</a>
     <header className="pitch-header">
       <a className="pitch-logo" href="/" aria-label="Rare Rush by Xibot home"><BrandMark/></a>
-      <nav aria-label="Main navigation"><a href="/">HOME</a><a href="/docs/">DOCS</a><a href="/pitch/" aria-current="page">PITCH</a><a href="https://testnet.rarerush.app">PLAY TESTNET</a><a className="pitch-header-play" href="/arcade/">PLAY MVP <span aria-hidden="true">↗</span></a></nav>
+      <nav aria-label="Main navigation"><a href="/">HOME</a><a href="/docs/">DOCS</a><a href="/pitch/" aria-current="page">PITCH</a><a className="nav-testnet" href="https://testnet.rarerush.app">TRY TESTNET</a><a className="pitch-header-play nav-arcade" href="/arcade/">PLAY ARCADE <span aria-hidden="true">↗</span></a></nav>
     </header>
 
     <main>

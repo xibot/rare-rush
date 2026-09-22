@@ -1,3 +1,4 @@
+@import '../navigation.css';
 .rush-pitch{max-width:1480px;margin:auto;padding:0 48px;font-family:var(--rush-font-mono);--pitch-line:#ffffff45;--pitch-muted:#b9b9b9}
 .rush-pitch p{font:400 16px/1.65 var(--rush-font-body)}
 .rush-pitch h1,.rush-pitch h2,.rush-pitch h3,.rush-pitch h4{font-family:var(--rush-font-display);font-weight:400;margin:0;letter-spacing:0}

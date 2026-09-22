@@ -1,0 +1,70 @@
+:is(.landing-header, .docs-header, .pitch-header, .genesis-header, .rush-entry-header) nav a.nav-testnet {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 44px;
+  padding: 12px 14px;
+  border: 1px solid #ccff00;
+  border-radius: 0;
+  background: #ccff00;
+  color: #000;
+  white-space: nowrap;
+  text-decoration: none;
+}
+
+:is(.landing-header, .docs-header, .pitch-header, .genesis-header, .rush-entry-header) nav a.nav-testnet:hover {
+  background: #fff;
+  border-color: #fff;
+  color: #000;
+  text-decoration: none;
+}
+
+:is(.landing-header, .docs-header, .pitch-header) nav a.nav-arcade {
+  background: #000;
+  color: #fff;
+  border-color: #fff;
+  white-space: nowrap;
+  text-decoration: none;
+}
+
+:is(.landing-header, .docs-header, .pitch-header) nav a.nav-arcade:is(:hover, :focus-visible) {
+  background: #ccff00;
+  color: #000;
+  border-color: #ccff00;
+  text-decoration: none;
+}
+
+:is(.landing-header, .pitch-header) nav a.nav-arcade:is(:hover, :focus-visible) > span {
+  color: #000;
+}
+
+.pitch-header nav > a {
+  display: flex;
+  align-items: center;
+  min-height: 44px;
+}
+
+/* Keep both calls to action together on the smallest phones. */
+@media (max-width: 380px) {
+  header:is(.landing-header, .docs-header, .pitch-header) nav {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 8px 12px;
+  }
+
+  header:is(.landing-header, .docs-header, .pitch-header) nav > a {
+    justify-content: center;
+  }
+
+  header.pitch-header nav {
+    grid-template-columns: repeat(6, minmax(0, 1fr));
+  }
+
+  header.pitch-header nav > a {
+    grid-column: span 2;
+  }
+
+  header.pitch-header nav > :is(.nav-testnet, .nav-arcade) {
+    grid-column: span 3;
+  }
+}
