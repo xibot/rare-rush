@@ -1,5 +1,5 @@
-node_modules
-artifacts
-test
-.env*
-.vercel
+/node_modules
+/artifacts
+/test
+/.env*
+/.vercel
