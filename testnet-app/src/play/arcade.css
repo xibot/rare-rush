@@ -1,6 +1,6 @@
 /* Main arcade geometry and visual language, scoped to the testnet cabinet. */
 .testnet-arcade-shell{position:relative;width:calc(100% - 48px);max-width:960px;aspect-ratio:3/2;min-height:640px;margin:24px auto;border:1px solid #fff;box-shadow:0 0 0 5px #000,0 0 0 6px #fff;background:#000}
-.testnet-arcade{--rush-font-display:Silkscreen,monospace;--rush-font-mono:Sometype,monospace;--rush-font-body:Archivo,sans-serif;--lime:#ccff00}
+.testnet-arcade{--rush-font-display:Silkscreen,monospace;--rush-font-mono:Sometype,monospace;--rush-font-body:Sometype,monospace;--lime:#ccff00}
 .testnet-arcade p{line-height:1.4}.testnet-arcade a{color:inherit;text-decoration:none}.testnet-arcade a:focus-visible{outline:3px solid #ccff00;outline-offset:3px}
 .testnet-arcade *{box-sizing:border-box}
 .testnet-arcade button,.testnet-arcade input{font:inherit}
