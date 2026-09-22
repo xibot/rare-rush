@@ -19,6 +19,18 @@
   text-decoration: none;
 }
 
+:is(.genesis-header, .rush-entry-header) nav a.nav-testnet {
+  background: transparent;
+  border-color: #fff;
+  color: #fff;
+}
+
+:is(.genesis-header, .rush-entry-header) nav a.nav-testnet:is(:hover, :focus-visible) {
+  background: #ccff00;
+  border-color: #ccff00;
+  color: #000;
+}
+
 :is(.landing-header, .docs-header, .pitch-header) nav a.nav-arcade {
   display: inline-flex;
   align-items: center;
