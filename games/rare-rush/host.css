@@ -1,4 +1,5 @@
 @import './fonts.css';
+@import './arcade-frame.css';
 :root{--rf-game-max-width:960px;--rf-game-aspect-ratio:3 / 2;color-scheme:dark}
 html:has(.rf-game-frame),body:has(.rf-game-frame){background:#000!important;color:#fff}
 body:has(.rf-game-frame){min-height:100dvh;display:grid;place-items:center;padding:24px;margin:0}

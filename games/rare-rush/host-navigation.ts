@@ -35,7 +35,11 @@ function enhanceGenerationsEntry(): void {
       }
       frame.classList.toggle('rush-generations-frame', framePickerOpen);
     }
+    const leavingPicker = document.body.classList.contains('rush-generations-selecting') && !pickerOpen;
     document.body.classList.toggle('rush-generations-selecting', pickerOpen);
+    if (leavingPicker) requestAnimationFrame(() => {
+      if (!document.body.classList.contains('rush-generations-selecting')) window.scrollTo(0, 0);
+    });
     if (!pickerOpen) cleanupFriendPortraits();
   };
 

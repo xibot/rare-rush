@@ -1,5 +1,5 @@
 import { parseArcadeNavigation } from '../navigation';
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { createRoot } from 'react-dom/client';
 import { createFriendPublicClient, createFriendWalletSession } from '@rarefriends/friendsdk/wallet';
 import { BrandMark } from '../BrandMark';
@@ -40,6 +40,7 @@ function GenesisHost() {
   const [status, setStatus] = useState<'idle' | 'loading' | 'ready' | 'verifying' | 'playing'>('idle');
   const [error, setError] = useState(''), [refresh, setRefresh] = useState(0), [manualId, setManualId] = useState('');
   const [active, setActive] = useState<{ identity: GenesisIdentity; key: number; revision: number } | null>(null);
+  useLayoutEffect(() => { if (active) window.scrollTo(0, 0); }, [active?.key]);
   const [checking, setChecking] = useState(false);
   const iframe = useRef<HTMLIFrameElement>(null);
   const operation = useRef(0), revision = useRef(wallet.revision), sessionKey = useRef(0);
