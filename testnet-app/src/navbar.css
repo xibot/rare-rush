@@ -20,6 +20,22 @@
 .site-header nav .outline-link > span { color: var(--lime); margin-left: 18px; font-size: 17px; }
 .site-header a:hover { transform: none; text-decoration: underline; }
 .site-header a:focus-visible { outline-offset: 5px; }
+.site-header nav a { white-space: nowrap; }
+.site-header nav .arcade-link {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 44px;
+  padding: 12px 14px;
+  border: 1px solid var(--lime);
+  border-radius: 0;
+  background: var(--lime);
+  color: #000;
+  text-decoration: none;
+}
+.site-header nav .arcade-link:hover { background: #fff; border-color: #fff; color: #000; text-decoration: none; }
+.site-header nav .play-link:is(:hover, :focus-visible) { background: var(--lime); border-color: var(--lime); color: #000; text-decoration: none; }
+.site-header nav .play-link:is(:hover, :focus-visible) > span { color: #000; }
 
 .entry-shell .site-header { height: auto; min-height: 100px; gap: 20px; border-color: #fff6; }
 .entry-shell .brand { gap: 13px; }
@@ -54,13 +70,14 @@
   .site-header nav a { min-height: 44px; display: flex; align-items: center; }
   .site-header nav .outline-link { font-size: 10px; padding: 10px 12px; }
   .site-header nav .outline-link > span { margin-left: 8px; font-size: 14px; }
-  .entry-shell .site-header { padding: 0; flex-wrap: nowrap; }
-  .entry-shell .site-header nav { width: auto; }
   .entry-shell .site-header nav .outline-link { padding: 0; font-size: 11px; }
-}
-
-/* Keep the longer testnet navigation readable on the narrowest phones. */
-@media (max-width: 359px) {
   .entry-shell .site-header { padding: 17px 0 12px; flex-wrap: wrap; row-gap: 12px; }
   .entry-shell .site-header nav { width: 100%; }
+}
+
+/* Keep the two game destinations together on the smallest phones. */
+@media (max-width: 380px) {
+  .lab-shell:not(.entry-shell) .site-header nav { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px 12px; }
+  .lab-shell:not(.entry-shell) .site-header nav > a:first-child { grid-column: 1 / -1; }
+  .site-header nav a { justify-content: center; }
 }
