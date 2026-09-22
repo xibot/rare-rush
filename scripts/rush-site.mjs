@@ -18,6 +18,12 @@ export async function buildRushSite({ outdir = path.join(project, 'dist'), watch
   const game = await buildGame(path.join(project, 'games/rare-rush'), { outdir: path.join(outdir, 'play'), watch });
   let page;
   try {
+    // Give SDK-generated pages the same browser-title format as the rest of the site.
+    for (const filename of ['index.html', 'game.html']) {
+      const filenamePath = path.join(outdir, 'play', filename);
+      const html = await readFile(filenamePath, 'utf8');
+      await writeFile(filenamePath, html.replace(/<title>[^<]*<\/title>/, '<title>Rare Rush | Generations Arcade</title>'));
+    }
     // Add site chrome to the SDK host without changing its runtime or sandbox document.
     const gameHostPath = path.join(outdir, 'play/index.html');
     const gameHostHTML = await readFile(gameHostPath, 'utf8');
