@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { createPublicClient, createWalletClient, custom, formatUnits, getAddress, http, isHash, parseAbi, type Address, type EIP1193Provider, type Hash } from 'viem';
+import { createPublicClient, createWalletClient, custom, formatUnits, http, isHash, parseAbi, type Address, type EIP1193Provider, type Hash } from 'viem';
 import { RunCanvas, TestFriendAvatar } from './RunCanvas.tsx';
 import { createRecorder, type Replay, type RunSnapshot as EngineSnapshot } from './recorder.ts';
 import { TESTNET_CHAIN, PLAY_GAME_ABI, verifyPlayContracts, readRun, readOwnedFriend, discoverFriends, approveEntry, startRun, claimRun, abandonRun, recoverPending, retryHashlessPending, cancelHashlessPending } from './chain.ts';
@@ -7,6 +7,7 @@ import { PLAY_CONTRACTS, type Collection, type Difficulty, type PlayState, type 
 import { loadPlayState, savePlayState, validateVerifiedClaim } from './storage.ts';
 import { createAuthorization, authorizationTypedData } from '../shared/authorization.ts';
 import { EXPLORER_URL, RPC_URL, assertWalletContext } from '../safety.ts';
+import { createWalletSession } from '../wallet-session.ts';
 
 const client = createPublicClient({ chain: TESTNET_CHAIN, transport: http(RPC_URL, { timeout: 12000, retryCount: 1 }), cacheTime: 0 });
 const tokenAbi = parseAbi(['function balanceOf(address) view returns(uint256)', 'function allowance(address,address) view returns(uint256)']);
@@ -50,7 +51,7 @@ export function App() {
   const [refreshCount,setRefreshCount]=useState(0);
   const [playbackSession,setPlaybackSession]=useState(0);
   const playbackPermit=useRef(0);
-  const connectionIntent=useRef(false);
+  const walletSession=useRef<ReturnType<typeof createWalletSession>|null>(null);
   const [quote, setQuote] = useState<bigint|null>(null);
   const [nftInfo, setNftInfo] = useState<{left:number;activeRun:string}|null>(null);
   const currentAccount = useRef<Address|null>(null);
@@ -112,33 +113,30 @@ export function App() {
     await checkServer();
   }
   async function syncWallet(prompt = false) {
-    if(prompt)connectionIntent.current=true;
-    const readEpoch = ++epoch.current;
-    const provider = wallet();
-    const accounts = await provider.request({method:prompt?'eth_requestAccounts':'eth_accounts'});
-    const network = Number(await provider.request({method:'eth_chainId'}));
-    const who = accounts[0] ? getAddress(accounts[0]) : null;
-    if (readEpoch !== epoch.current) return;
-    currentAccount.current = who;
-    setActive(false); setVerified(false); setStats(null); setSelected(null); setState(null); setAccount(who); setChainId(network);
-    if (who) {
-      setState(loadPlayState(localStorage, who));
-      if (network === 46630) await refresh(who);
-    }
+    if (prompt) await walletSession.current?.connect();
+    else await walletSession.current?.sync(true);
   }
   useEffect(() => { void checkServer(); const timer=setInterval(()=>setNow(Date.now()),1000); return()=>clearInterval(timer); }, []);
   useEffect(() => {
-    const p=(window as Window & {ethereum?:WalletProvider}).ethereum;
-    if(!p)return;
-    const changed=()=>{
-      if(!connectionIntent.current)return;
-      playbackPermit.current++;
-      // Invalidate the active renderer immediately, even while a wallet request is open.
-      epoch.current++; currentAccount.current=null; setActive(false); setVerified(false);
-      setAccount(null); setState(null); setSelected(null); setStats(null);
-      void syncWallet().catch(e=>setError(message(e)));
-    };
-    p.on?.('accountsChanged',changed);p.on?.('chainChanged',changed);
+    const session=createWalletSession({
+      invalidated() {
+        playbackPermit.current++;
+        // Invalidate the active renderer immediately, even while a wallet request is open.
+        epoch.current++; currentAccount.current=null; setActive(false); setVerified(false);
+        setAccount(null); setChainId(null); setState(null); setSelected(null); setStats(null);
+        setBalances({rf:0n,rush:0n,allowance:0n}); setError(''); setInfo('');
+      },
+      async changed({account:who,chainId:network}) {
+        currentAccount.current=who; setAccount(who); setChainId(network);
+        if(who) {
+          setState(loadPlayState(localStorage,who));
+          if(network===46630) await refresh(who);
+        }
+      },
+      error(e) {setError(message(e));},
+    });
+    walletSession.current=session;
+    session.start();
     const storageChanged=(e:StorageEvent)=>{
       const who=currentAccount.current;
       if(who && e.key?.includes(who.toLowerCase())) {
@@ -148,7 +146,7 @@ export function App() {
       }
     };
     window.addEventListener('storage',storageChanged);
-    return()=>{p.removeListener?.('accountsChanged',changed);p.removeListener?.('chainChanged',changed);window.removeEventListener('storage',storageChanged);};
+    return()=>{session.stop();walletSession.current=null;window.removeEventListener('storage',storageChanged);};
   }, []);
   useEffect(() => {
     let cancelled=false;
@@ -227,7 +225,7 @@ export function App() {
     <header className="site-header"><a className="brand" href="/" aria-label="Rare Rush testnet home"><img src="/assets/rare-friend.svg" width="60" height="60" alt=""/><span><strong>RARE<span>RUSH</span></strong><small>BY XIBOT</small></span></a><nav><a href="/">TEST KIT</a><a href="/play/" className="outline-link">ARCADE ↗</a></nav></header>
     <main><div className="play-heading"><div><span className="eyebrow">ROBINHOOD TESTNET / PLAY → VERIFY → MINT</span><h1>MAKE YOUR<br/><span>RUN COUNT.</span></h1></div><p>Real testnet transactions.<br/>Valueless test tokens. Same big rush.</p></div>
       <div className="test-banner"><strong>TESTNET ONLY · 46630</strong><span>Test NFTs use cosmetic Rare Friends artwork. These are separate from your real NFTs.</span></div>
-      <div className="play-wallet"><span>{account?short(account):'CONNECT. PICK A FRIEND. RUSH.'}</span><div className="play-actions">{!account?<button className="primary-button" disabled={!!busy} onClick={()=>void action('Connecting wallet…',()=>syncWallet(true))}>CONNECT WALLET ↗</button>:<>{chainId!==46630?<button className="primary-button" disabled={!!busy} onClick={()=>void action('Switching to testnet…',async()=>{const p=wallet();try{await p.request({method:'wallet_switchEthereumChain',params:[{chainId:'0xb626'}]});}catch(e){if((e as {code?:number}).code!==4902)throw e;await p.request({method:'wallet_addEthereumChain',params:[{chainId:'0xb626',chainName:'Robinhood Testnet',nativeCurrency:{name:'Test Ether',symbol:'ETH',decimals:18},rpcUrls:[RPC_URL],blockExplorerUrls:[EXPLORER_URL]}]});await p.request({method:'wallet_switchEthereumChain',params:[{chainId:'0xb626'}]});}await syncWallet();})}>SWITCH TO TESTNET</button>:<button className="outline-button" disabled={!!busy||active} onClick={()=>void action('Refreshing…',()=>refresh(account))}>REFRESH ↻</button>}<button className="text-button" disabled={!!busy||active} onClick={()=>{connectionIntent.current=false;playbackPermit.current++;epoch.current++;currentAccount.current=null;setAccount(null);setState(null);setVerified(false);setActive(false);}}>DISCONNECT</button></>}</div></div>
+      <div className="play-wallet"><span>{account?short(account):'CONNECT. PICK A FRIEND. RUSH.'}</span><div className="play-actions">{!account?<button className="primary-button" disabled={!!busy} onClick={()=>void action('Connecting wallet…',()=>syncWallet(true))}>CONNECT WALLET ↗</button>:<>{chainId!==46630?<button className="primary-button" disabled={!!busy} onClick={()=>void action('Switching to testnet…',async()=>{const p=wallet();try{await p.request({method:'wallet_switchEthereumChain',params:[{chainId:'0xb626'}]});}catch(e){if((e as {code?:number}).code!==4902)throw e;await p.request({method:'wallet_addEthereumChain',params:[{chainId:'0xb626',chainName:'Robinhood Testnet',nativeCurrency:{name:'Test Ether',symbol:'ETH',decimals:18},rpcUrls:[RPC_URL],blockExplorerUrls:[EXPLORER_URL]}]});await p.request({method:'wallet_switchEthereumChain',params:[{chainId:'0xb626'}]});}await syncWallet();})}>SWITCH TO TESTNET</button>:<button className="outline-button" disabled={!!busy||active} onClick={()=>void action('Refreshing…',()=>refresh(account))}>REFRESH ↻</button>}<button className="text-button" disabled={!!busy||active} onClick={()=>{walletSession.current?.disconnect();}}>DISCONNECT</button></>}</div></div>
       <div className="play-meta"><span>tRF <b>{account?amount(balances.rf,18):'—'}</b></span><span>tRARERUSH <b>{account?amount(balances.rush,6):'—'}</b></span><span className={server==='ready'?'ready':''}>VERIFIER {server==='ready'?'READY':server==='checking'?'CHECKING':'UNAVAILABLE'}</span></div>
       {(busy||error||info)&&<div className={`feedback ${error?'error':''}`} role="status">{error||busy||info}</div>}
       {server==='unavailable'&&<div className="feedback">Run verification is temporarily unavailable. Starts are paused on this page; your existing replay stays saved. <button className="text-button" onClick={()=>void checkServer()}>CHECK AGAIN</button></div>}

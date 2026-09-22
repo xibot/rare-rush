@@ -1,9 +1,10 @@
-import { createPublicClient, createWalletClient, custom, defineChain, formatUnits, getAddress, http, isAddress, isHash, type Address, type EIP1193Provider, type Hash, type TransactionReceipt } from 'viem';
+import { createPublicClient, createWalletClient, custom, defineChain, formatUnits, http, isAddress, isHash, type Address, type EIP1193Provider, type Hash, type TransactionReceipt } from 'viem';
 import { tokenAbi, nftAbi, gameAbi } from './abi.ts';
 import { mintedIds, type PendingMint } from './receipts.ts';
 import { CHAIN_ID, CONTRACT_KEYS, EXPLORER_URL, FAUCET_URL, RPC_URL, actionBlockReason, assertRewardEconomics, assertWalletContext, escapeHtml as e, faucetReady, parseConfig, type PublicConfig } from './safety.ts';
 import './style.css';
 import { loadPlayState, savePlayState } from './play/storage.ts';
+import { createWalletSession } from './wallet-session.ts';
 
 type BrowserProvider = EIP1193Provider & { on?: (event: string, listener: (...args: unknown[]) => void) => void };
 declare global { interface Window { ethereum?: BrowserProvider } }
@@ -20,9 +21,19 @@ const state = {
   pending: null as PendingMint | null,
 };
 let contextVersion = 0;
-let walletReadVersion = 0;
-let connectionIntent = false;
-let observedProvider: BrowserProvider | undefined;
+const walletSession = createWalletSession({
+  invalidated() {
+    contextVersion++;
+    state.account = null; state.walletChain = null; state.friends = []; state.balances = null; state.readyForFaucet = null;
+    render();
+  },
+  async changed({ account, chainId }) {
+    state.account = account; state.walletChain = chainId; state.error = ''; state.message = '';
+    render();
+    if (account) await refresh();
+  },
+  error(error) { state.error = errorMessage(error); render(); },
+});
 const short = (value: string) => `${value.slice(0, 6)}…${value.slice(-4)}`;
 const number = (value: bigint, decimals: number) => Number(formatUnits(value, decimals)).toLocaleString('en-US', { maximumFractionDigits: decimals === 18 ? 5 : 3 });
 const blockReason = () => state.pending ? 'A transaction is pending. Refresh its status before minting again.' : actionBlockReason({ ...state, contracts: state.config?.contracts ?? null });
@@ -83,40 +94,19 @@ function render() {
 function provider() {
   const value = window.ethereum;
   if (!value) throw new Error('Open this page in a wallet browser, or install a browser wallet, then connect.');
-  if (observedProvider !== value) {
-    observedProvider = value;
-    value.on?.('accountsChanged', () => { if (!connectionIntent) return; contextVersion++; state.friends = []; state.balances = null; state.readyForFaucet = null; void syncWallet(value); });
-    value.on?.('chainChanged', () => { if (!connectionIntent) return; contextVersion++; state.balances = null; state.readyForFaucet = null; void syncWallet(value); });
-  }
   return value;
 }
 
-async function syncWallet(wallet: BrowserProvider) {
-  const version = contextVersion;
-  const readVersion = ++walletReadVersion;
-  try {
-    const [accounts, chainId] = await Promise.all([wallet.request({ method: 'eth_accounts' }), wallet.request({ method: 'eth_chainId' })]);
-    if (!connectionIntent || version !== contextVersion || readVersion !== walletReadVersion) return;
-    state.account = accounts[0] ? getAddress(accounts[0]) : null;
-    state.walletChain = Number(chainId);
-    render();
-    if (state.account) await refresh();
-  } catch (error) { if (connectionIntent && version === contextVersion && readVersion === walletReadVersion) { state.error = errorMessage(error); render(); } }
-}
 async function connect() {
-  connectionIntent = true; contextVersion++;
   state.error = ''; state.busy = true; render();
   try {
-    const wallet = provider();
-    await wallet.request({ method: 'eth_requestAccounts' });
-    await syncWallet(wallet);
+    await walletSession.connect();
   } catch (error) { state.error = errorMessage(error); }
   finally { state.busy = false; render(); }
 }
 function disconnect() {
-  connectionIntent = false; walletReadVersion++;
-  contextVersion++;
-  state.account = null; state.walletChain = null; state.balances = null; state.friends = []; state.readyForFaucet = null; state.error = ''; state.message = 'Disconnected from this page.'; render();
+  walletSession.disconnect();
+  state.error = ''; state.message = 'Disconnected from Rare Rush testnet.'; render();
 }
 async function switchNetwork() {
   state.error = ''; state.busy = true; render();
@@ -128,7 +118,7 @@ async function switchNetwork() {
       await wallet.request({ method: 'wallet_addEthereumChain', params: [{ chainId: `0x${CHAIN_ID.toString(16)}`, chainName: chain.name, nativeCurrency: chain.nativeCurrency, rpcUrls: [RPC_URL], blockExplorerUrls: [EXPLORER_URL] }] });
       await wallet.request({ method: 'wallet_switchEthereumChain', params: [{ chainId: `0x${CHAIN_ID.toString(16)}` }] });
     }
-    await syncWallet(wallet);
+    await walletSession.sync(true);
   } catch (error) { state.error = errorMessage(error); }
   finally { state.busy = false; render(); }
 }
@@ -303,6 +293,6 @@ async function init() {
     } catch { /* Ignore malformed browser storage. */ }
     await verifyContracts();
   } catch (error) { state.error = errorMessage(error); }
-  finally { state.configLoading = false; render(); }
+  finally { state.configLoading = false; render(); walletSession.start(); }
 }
 void init();

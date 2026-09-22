@@ -24,12 +24,13 @@ async function mockConfig(page, config = undeployedConfig) {
 
 async function mockWallet(page, chain = '0xb626') {
   await page.addInitScript(chain => {
-    window.mockWallet = { account: '0x00000000000000000000000000000000000000a1', chain, listeners: {}, writes: [], requests: [] };
+    window.mockWallet = { authorized: false, account: '0x00000000000000000000000000000000000000a1', chain, listeners: {}, writes: [], requests: [] };
     window.ethereum = {
       on(event, listener) { window.mockWallet.listeners[event] = listener; },
       async request({ method, params }) {
         window.mockWallet.requests.push(method);
-        if (method === 'eth_requestAccounts' || method === 'eth_accounts') return [window.mockWallet.account];
+        if (method === 'eth_requestAccounts') { window.mockWallet.authorized = true; return [window.mockWallet.account]; }
+        if (method === 'eth_accounts') return window.mockWallet.authorized ? [window.mockWallet.account] : [];
         if (method === 'eth_chainId') return window.mockWallet.chain;
         if (method === 'wallet_switchEthereumChain') { window.mockWallet.chain = params[0].chainId; return null; }
         if (method === 'eth_sendTransaction') {

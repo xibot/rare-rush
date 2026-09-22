@@ -55,7 +55,7 @@ Run inputs and completed tick count are saved locally; resuming reconstructs the
 
 Pending writes are saved before opening the wallet and block duplicate actions. Receipt recovery checks exact sender, nonce, contract, calldata, events and two canonical confirmations. A hashless wallet response can retry the same transaction at the same nonce or cancel that nonce with a zero-value self-transfer. Never delete a pending checkpoint to resend with a new nonce.
 
-NFT discovery is bounded. Confirmed IDs from the test kit are remembered; missing IDs can be entered manually and ownership is checked. Browser disconnect resets this page's session; the wallet controls its own site permissions.
+NFT discovery is bounded. Confirmed IDs from the test kit are remembered; missing IDs can be entered manually and ownership is checked. Wallet connections restore silently between the test kit and arcade, on reload, and when returning to the page. Only connection intent is saved; the wallet supplies its currently permitted accounts and network. Disconnect is remembered across testnet pages and tabs until an explicit reconnect. Revoked permissions or a locked/unavailable wallet clear the connected UI; restoration never opens a permission prompt, switches networks, signs, or sends a transaction.
 
 Test economics: 1.024B cap, 102.4M launch allocation, 921.6M gameplay allocation. Rewards begin at 10 base tokens per coin, halve each 10,000 claimed pickups, and floor at 1 base token before mode/Genesis bonuses. Easy 120 s/0.75×; Normal 90 s/1×; Degen 60 s/2×; Genesis 100×. These are provisional test settings, not final mainnet economics.
 
