@@ -45,8 +45,8 @@ function render() {
   root.innerHTML = `
     <div class="lab-shell">
       <header class="site-header">
-        <a class="brand" href="https://rarerush.app" aria-label="Rare Rush home"><img src="/assets/rare-friend.svg" width="60" height="60" alt=""/><span><strong>RARE<span>RUSH</span></strong><small>BY XIBOT</small></span></a>
-        <nav aria-label="Main navigation"><a href="/play/">PLAY TESTNET ↗</a><a href="https://rarerush.app" class="outline-link">BACK TO ARCADE ↗</a></nav>
+        <a class="brand" href="/" aria-label="Rare Rush testnet home"><img src="/assets/rare-friend.svg" width="60" height="60" alt=""/><span><strong>RARE<span>RUSH</span></strong><small>BY XIBOT</small></span></a>
+        <nav aria-label="Main navigation"><a href="/play/">PLAY TESTNET ↗</a><a href="/play/" class="outline-link">ARCADE ↗</a></nav>
       </header>
       <main>
         <section class="hero" aria-labelledby="hero-title">
