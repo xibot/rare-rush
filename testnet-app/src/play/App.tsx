@@ -4,6 +4,7 @@ import { createPublicClient, createWalletClient, custom, formatUnits, http, isHa
 import { RunCanvas, TestFriendAvatar } from './RunCanvas.tsx';
 import { ArcadeCabinet } from './ArcadeCabinet.tsx';
 import { CollectionChoice, CollectionFriends } from './CollectionEntry.tsx';
+import { SiteHeader } from '../SiteHeader.tsx';
 import { createRecorder, type Replay, type RunSnapshot as EngineSnapshot } from './recorder.ts';
 import { TESTNET_CHAIN, PLAY_GAME_ABI, verifyPlayContracts, readRun, readOwnedFriend, discoverFriends, entryAllowance, approveEntry, startRun, claimRun, abandonRun, recoverPending, retryHashlessPending, cancelHashlessPending } from './chain.ts';
 import { PLAY_CONTRACTS, ENGINE_VERSION, type Collection, type Difficulty, type PlayState, type FriendSelection } from './types.ts';
@@ -362,8 +363,9 @@ export function App() {
   </>;
   const runHeading = run && <div className="play-section-heading"><span className="eyebrow">RUN #{run.run.runId} / {MODES[run.run.difficulty].toUpperCase()} / TEST {run.run.collection===1?'GENESIS':'GENERATIONS'} #{run.run.tokenId}</span><button className="text-button" onClick={exportReplay}>SAVE REPLAY ↓</button></div>;
   const footer = <footer><span>RARE RUSH <b>BY XIBOT</b></span><span>TEST IDEAS. KEEP IT RARE.</span><a href="/#test-kit">BACK TO TEST KIT ↗</a></footer>;
-  return <div className={`lab-shell play-shell ${dashboard?'dashboard-shell':arcade?'arcade-page':'entry-shell'}`}>
-    {!arcade&&<header className="site-header"><a className="brand" href="/" aria-label="Rare Rush testnet home"><img src="/assets/rare-friend.svg" width="60" height="60" alt=""/><span><strong>RARE<span>RUSH</span></strong><small>BY XIBOT</small></span></a><nav aria-label="Main navigation"><a href="/#test-kit">TEST KIT</a>{!dashboard&&<a href="/dashboard/" className="outline-link">DASHBOARD</a>}<a href="https://rarerush.app" className="arcade-link">TRY ARCADE</a>{dashboard&&<a href="/play/" className="outline-link play-link">PLAY TESTNET <span aria-hidden="true">↗</span></a>}</nav></header>}
+  return <>
+    {!arcade&&<SiteHeader page={dashboard?'dashboard':'play'}/>}
+    <div className={`lab-shell play-shell ${dashboard?'dashboard-shell':arcade?'arcade-page':'entry-shell'}`}>
     {dashboard ? <main>
       <div className="play-heading"><div><span className="eyebrow">ROBINHOOD TESTNET / YOUR DASHBOARD</span><h1>MAKE YOUR<br/><span>RUN COUNT.</span></h1></div><p>Your Friends. Your rewards.<br/>Every rush, in one place.</p></div>
       <div className="test-banner"><strong>TESTNET ONLY · 46630</strong><span>Test NFTs use cosmetic Rare Friends artwork. These are separate from your real NFTs.</span></div>
@@ -419,5 +421,5 @@ export function App() {
       {route.runId&&(!run||route.runId!==run.run.runId)&&<p className="entry-notices">{account?'This run is not saved in this browser. Recover it from your Dashboard.':'Connect your wallet to load your saved run.'} <a href="/dashboard/">DASHBOARD ↗</a></p>}
     </>}
     {!arcade&&footer}
-  </div>;
+  </div></>;
 }

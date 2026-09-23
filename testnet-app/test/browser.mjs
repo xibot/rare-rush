@@ -112,7 +112,7 @@ try {
   await page.getByText('CONTRACTS AWAITING DEPLOYMENT', { exact: true }).waitFor();
   assert.equal(await page.getByRole('link', { name: 'DASHBOARD', exact: true }).getAttribute('href'), '/dashboard/');
   assert.equal(await page.getByRole('link', { name: 'PLAY TESTNET', exact: false }).first().getAttribute('href'), '/play/');
-  assert.equal(await page.getByRole('link', { name: /ARCADE/ }).count(), 0, 'test kit navigation must stay in the testnet flow');
+  assert.equal(await page.getByRole('link', { name: 'TRY ARCADE', exact: true }).getAttribute('href'), 'https://rarerush.app');
   assert.equal(await page.locator('#claim-rf').isDisabled(), true);
   assert.equal(await page.locator('#mint-genesis').isDisabled(), true);
   assert.equal(await page.locator('#mint-generations').isDisabled(), true);

@@ -1,85 +1,97 @@
-/* Match the public landing header; collection pages use its entry header sizes. */
-.lab-shell:not(.entry-shell):not(.arcade-page) { max-width: 1480px; padding-inline: 48px; }
+/* One header across the Testnet site, using the original landing proportions. */
+.site-header-shell {
+  box-sizing: border-box;
+  width: 100%;
+  max-width: 1480px;
+  margin: 0 auto;
+  padding: 0 48px;
+  background: #000;
+  color: #fff;
+}
 .site-header {
-  --lime: #ccff00;
+  box-sizing: border-box;
   height: 102px;
   border-bottom: 1px solid #ffffff50;
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: 24px;
+  --lime: #ccff00;
+  font: 400 16px Sometype, monospace;
+  letter-spacing: normal;
 }
-.brand { display: flex; align-items: center; gap: 12px; }
-.brand img { width: 42px; height: 42px; }
-.brand > span { display: block; line-height: 1; }
-.brand strong { display: block; font: 400 20px/1 var(--pixel); letter-spacing: 0; }
-.brand strong span { color: var(--lime); }
-.brand small { display: block; margin-top: 7px; font: 400 8px/1 Sometype, monospace; letter-spacing: 2.2px; }
-.site-header nav { display: flex; align-items: center; gap: 32px; font-size: 11px; letter-spacing: .5px; }
-.site-header nav .outline-link { padding: 13px 17px; font-size: inherit; }
-.site-header nav .outline-link > span { color: var(--lime); margin-left: 18px; font-size: 17px; }
-.site-header a:hover { transform: none; text-decoration: underline; }
-.site-header a:focus-visible { outline-offset: 5px; }
-.site-header nav a { white-space: nowrap; }
-.site-header nav .arcade-link {
+header.site-header a {
+  box-sizing: border-box;
+  color: inherit;
+  text-decoration: none;
+  text-underline-offset: auto;
+  transform: none;
+  transition: none;
+  -webkit-tap-highlight-color: transparent;
+}
+header.site-header a:hover { color: inherit; text-decoration: underline; transform: none; }
+header.site-header a:focus-visible { outline: 3px solid #ccff00; outline-offset: 5px; }
+.site-header .site-logo { display: flex; align-items: center; gap: 12px; flex-shrink: 0; }
+.site-logo > .brand-icon { display: block; width: 42px; height: 42px; max-width: none; }
+.site-logo > .brand-name { font: 400 20px/1 var(--pixel); letter-spacing: 0; }
+.site-logo > .brand-name > span { color: #ccff00; }
+.site-logo small { display: block; margin-top: 7px; font: 400 8px/1 Sometype, monospace; letter-spacing: 2.2px; }
+.site-header nav { display: flex; gap: 32px; align-items: center; font: 400 11px Sometype, monospace; letter-spacing: .5px; }
+.site-header nav a.arcade-link {
   display: inline-flex;
   align-items: center;
   justify-content: center;
   min-height: 44px;
   padding: 12px 14px;
-  border: 1px solid var(--lime);
+  border: 1px solid #ccff00;
   border-radius: 0;
-  background: var(--lime);
+  background: #ccff00;
   color: #000;
+  white-space: nowrap;
   text-decoration: none;
 }
-.site-header nav .arcade-link:hover { background: #fff; border-color: #fff; color: #000; text-decoration: none; }
-.site-header nav .play-link:is(:hover, :focus-visible) { background: var(--lime); border-color: var(--lime); color: #000; text-decoration: none; }
-.site-header nav .play-link:is(:hover, :focus-visible) > span { color: #000; }
-
-.entry-shell .site-header { height: auto; min-height: 100px; gap: 20px; border-color: #fff6; }
-.entry-shell .brand { gap: 13px; }
-.entry-shell .brand img { width: 44px; height: 44px; }
-.entry-shell .brand strong { font-size: 24px; }
-.entry-shell .brand small { font-size: 10px; line-height: 1.5; letter-spacing: 2px; margin-top: 8px; }
-.entry-shell .site-header nav { gap: 22px; font-size: 12px; letter-spacing: 0; }
-.entry-shell .site-header nav a { min-height: 44px; display: flex; align-items: center; }
-.entry-shell .site-header nav .outline-link { border: 0; padding: 0; }
-.entry-shell .site-header nav .arcade-link { border-color: #fff; background: transparent; color: #fff; }
-.entry-shell .site-header nav .arcade-link:is(:hover, :focus-visible) { border-color: var(--lime); background: var(--lime); color: #000; text-decoration: none; }
-
-@media (max-width: 1100px) {
-  .lab-shell:not(.entry-shell):not(.arcade-page) { padding-inline: 28px; }
+.site-header nav a.arcade-link:is(:hover, :focus-visible) { background: #fff; border-color: #fff; color: #000; text-decoration: none; }
+.site-header nav a.play-link {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font: inherit;
+  padding: 13px 17px;
+  border: 1px solid #fff;
+  border-radius: 0;
+  background: #000;
+  color: #fff;
+  white-space: nowrap;
+  text-decoration: none;
 }
+.site-header nav a.play-link > span { color: #ccff00; margin-left: 18px; font-size: 17px; }
+.site-header nav a.play-link:is(:hover, :focus-visible) { background: #ccff00; color: #000; border-color: #ccff00; text-decoration: none; }
+.site-header nav a.play-link:is(:hover, :focus-visible) > span { color: #000; }
+@media (max-width: 1100px) { .site-header-shell { padding: 0 28px; } }
 @media (max-width: 800px) {
   .site-header { height: 80px; }
   .site-header nav { gap: 16px; font-size: 9px; }
 }
-@media (max-width: 700px) {
-  .entry-shell .site-header { min-height: 80px; }
-  .entry-shell .brand img { width: 36px; height: 36px; }
-  .entry-shell .brand strong { font-size: 20px; }
-  .entry-shell .site-header nav { gap: 15px; font-size: 11px; }
-}
 @media (max-width: 600px) {
-  .lab-shell:not(.entry-shell):not(.arcade-page) { padding-inline: 20px; }
+  .site-header-shell { padding: 0 20px; }
   .site-header { height: auto; min-height: 104px; padding: 17px 0 12px; flex-wrap: wrap; gap: 12px 10px; }
-  .brand { gap: 8px; }
-  .brand img { width: 32px; height: 32px; }
-  .brand strong { font-size: 16px; }
-  .brand small { font-size: 7px; letter-spacing: 1.6px; }
-  .site-header nav { width: 100%; justify-content: space-between; gap: 16px; font-size: 11px; }
-  .site-header nav a { min-height: 44px; display: flex; align-items: center; }
-  .site-header nav .outline-link { font-size: 10px; padding: 10px 12px; }
-  .site-header nav .outline-link > span { margin-left: 8px; font-size: 14px; }
-  .entry-shell .site-header nav .outline-link { padding: 0; font-size: 11px; }
-  .entry-shell .site-header { padding: 17px 0 12px; flex-wrap: wrap; row-gap: 12px; }
-  .entry-shell .site-header nav { width: 100%; }
+  .site-header .site-logo { gap: 8px; }
+  .site-logo > .brand-icon { width: 32px; height: 32px; }
+  .site-logo > .brand-name { font-size: 16px; }
+  .site-logo small { font-size: 7px; letter-spacing: 1.6px; }
+  .site-header nav { width: 100%; justify-content: space-between; gap: 12px; font-size: 11px; }
+  .site-header nav > a { min-height: 44px; display: flex; align-items: center; }
+  .site-header nav a.play-link { font-size: 10px; padding: 10px 12px; }
+  .site-header nav a.play-link > span { margin-left: 8px; font-size: 14px; }
+}
+@media (max-width: 380px) {
+  .site-header nav { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px 12px; }
+  .site-header nav > a { justify-content: center; }
+  .site-header:not(.collection-header) nav > a:first-child,
+  .site-header.collection-header nav > .arcade-link { grid-column: 1 / -1; }
 }
 
-/* Keep the two game destinations together on the smallest phones. */
-@media (max-width: 380px) {
-  .lab-shell:not(.entry-shell) .site-header nav { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px 12px; }
-  .lab-shell:not(.entry-shell) .site-header nav > a:first-child { grid-column: 1 / -1; }
-  .site-header nav a { justify-content: center; }
-}
+/* Preserve existing page content widths independently from the header. */
+.lab-shell:not(.entry-shell):not(.arcade-page) { max-width: 1480px; padding-inline: 48px; }
+@media (max-width: 1100px) { .lab-shell:not(.entry-shell):not(.arcade-page) { padding-inline: 28px; } }
+@media (max-width: 600px) { .lab-shell:not(.entry-shell):not(.arcade-page) { padding-inline: 20px; } }

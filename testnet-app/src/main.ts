@@ -4,6 +4,7 @@ import { mintedIds, type PendingMint } from './receipts.ts';
 import { CHAIN_ID, CONTRACT_KEYS, EXPLORER_URL, FAUCET_URL, RPC_URL, actionBlockReason, assertRewardEconomics, assertWalletContext, escapeHtml as e, faucetReady, parseConfig, type PublicConfig } from './safety.ts';
 import './style.css';
 import './navbar.css';
+import { siteHeaderMarkup } from './site-header.ts';
 import { loadPlayState, savePlayState } from './play/storage.ts';
 import { createWalletSession } from './wallet-session.ts';
 
@@ -55,11 +56,8 @@ function render() {
   const contracts = state.config?.contracts;
   const account = state.account;
   root.innerHTML = `
+    <div class="site-header-shell">${siteHeaderMarkup('kit')}</div>
     <div class="lab-shell">
-      <header class="site-header">
-        <a class="brand" href="/" aria-label="Rare Rush testnet home"><img src="/assets/rare-friend.svg" width="60" height="60" alt=""/><span><strong>RARE<span>RUSH</span></strong><small>BY XIBOT</small></span></a>
-        <nav aria-label="Main navigation"><a href="/dashboard/">DASHBOARD</a><a href="https://rarerush.app" class="arcade-link">TRY ARCADE</a><a href="/play/" class="outline-link play-link">PLAY TESTNET <span aria-hidden="true">↗</span></a></nav>
-      </header>
       <main>
         <section class="hero" aria-labelledby="hero-title">
           <div class="hero-copy"><span class="eyebrow"><i></i> NEXT LEVEL / TESTNET</span><h1 id="hero-title">SMALL FRIEND.<br><span>REAL TEST.</span></h1><p>The next chapter of the rush.<br>Test the tokens. Meet your test Friends.<br>Help bring play-to-mint to life.</p><a href="#test-kit" class="primary-link">BUILD YOUR TEST KIT <span>↓</span></a><span class="tiny hero-note">ROBINHOOD TESTNET · CHAIN 46630</span></div>
