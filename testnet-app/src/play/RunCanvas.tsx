@@ -6,6 +6,7 @@ import { GenesisRunnerSprite } from '../../generated/games/rare-rush/genesis/Gen
 import { difficultySettings } from '../../generated/games/rare-rush/difficulty.ts';
 import { FIXED_STEP, type Pace } from '../../generated/games/rare-rush/twist/engine.ts';
 import { DirectionScene } from '../../generated/games/rare-rush/twist/DirectionScene.tsx';
+import { canonicalAxis, headingFor } from '../../generated/games/rare-rush/twist/presentation.ts';
 import { advanceRecorder, createRecorder, exportReplay, queueControls, releaseControls, snapshotRun,
   type DifficultyId, type Replay, type RunSnapshot } from './recorder.ts';
 import { testRunArt } from './art.ts';
@@ -107,10 +108,14 @@ function RunSession(props: RunCanvasProps) {
   function heldInput(key: string, down: boolean) {
     if (pausedRef.current || recording.run.status !== 'running') return;
     if (down) pressed.current.add(key); else pressed.current.delete(key);
+    syncHeldInput();
+  }
+  function syncHeldInput() {
     const keys = pressed.current;
-    const slow = keys.has('ArrowLeft') || keys.has('KeyA') || keys.has('touch-left');
-    const fast = keys.has('ArrowRight') || keys.has('KeyD') || keys.has('touch-right');
-    const pace: Pace = slow === fast ? 0 : slow ? -1 : 1;
+    const left = keys.has('ArrowLeft') || keys.has('KeyA') || keys.has('touch-left');
+    const right = keys.has('ArrowRight') || keys.has('KeyD') || keys.has('touch-right');
+    const screenAxis: Pace = left === right ? 0 : left ? -1 : 1;
+    const pace = canonicalAxis(screenAxis, recording.run.phase, headingFor(recording.run));
     queueControls(recording, { slide: keys.has('ArrowDown') || keys.has('KeyS') || keys.has('touch-slide'), pace });
   }
   function touchDown(event: PointerEvent<HTMLButtonElement>, key: string) {
@@ -185,6 +190,9 @@ function RunSession(props: RunCanvasProps) {
       let inputChanged = false;
       while (accumulator + 1e-10 >= FIXED_STEP && recording.run.status === 'running') {
         accumulator = Math.max(0, accumulator - FIXED_STEP);
+        // Re-map held directions each tick so crossing a shaft exit does not
+        // require releasing the key. Record only canonical V2 engine inputs.
+        syncHeldInput();
         const result = advanceRecorder(recording);
         inputChanged ||= result.inputChanged;
         for (const event of result.events) {
@@ -210,18 +218,19 @@ function RunSession(props: RunCanvasProps) {
   const biome = Math.min(2, Math.floor(run.elapsed / run.duration * 3));
   const growth = run.growth;
   const vertical = run.phase !== 'side';
+  const leftward = !vertical && headingFor(run) === -1;
   const live = !paused && !isFinished;
   const label = isFinished ? (run.finishReason === 'time' ? 'TIMER SURVIVED' : 'OUT OF HEARTS') : hasStarted ? 'RUN PAUSED' : 'YOUR RUN IS READY';
   const returnHome = () => { pause(); if (props.onHome) props.onHome(); else window.location.assign('/'); };
   const touchControls = <>
-    <button type="button" className="touch-pace" disabled={!live} onPointerDown={event => touchDown(event, 'touch-left')} onPointerUp={() => heldInput('touch-left', false)} onPointerCancel={() => heldInput('touch-left', false)} onLostPointerCapture={() => heldInput('touch-left', false)} aria-label={vertical ? 'Steer left' : 'Hold to slow down'}>←<span>{vertical ? 'LEFT' : 'SLOW'}</span></button>
+    <button type="button" className="touch-pace" disabled={!live} onPointerDown={event => touchDown(event, 'touch-left')} onPointerUp={() => heldInput('touch-left', false)} onPointerCancel={() => heldInput('touch-left', false)} onLostPointerCapture={() => heldInput('touch-left', false)} aria-label={vertical ? 'Steer left' : leftward ? 'Hold to speed up' : 'Hold to slow down'}>←<span>{vertical ? 'LEFT' : leftward ? 'FAST' : 'SLOW'}</span></button>
     {vertical ? <span className="vertical-touch">{run.phase === 'up' ? '↑ AUTO LIFT' : '↓ FREE FALL'}<small>← STEER →</small></span> : <>
       <button type="button" disabled={!live} onPointerDown={event => touchDown(event, 'touch-slide')} onPointerUp={() => heldInput('touch-slide', false)} onPointerCancel={() => heldInput('touch-slide', false)} onLostPointerCapture={() => heldInput('touch-slide', false)} aria-label="Hold to slide">↓<span>SLIDE</span></button>
       <button type="button" className="touch-jump" disabled={!live} onPointerDown={event => { event.preventDefault(); pressJump(); }} aria-label="Jump; tap twice to double jump">↑<span>JUMP ×2</span></button>
     </>}
-    <button type="button" className="touch-pace" disabled={!live} onPointerDown={event => touchDown(event, 'touch-right')} onPointerUp={() => heldInput('touch-right', false)} onPointerCancel={() => heldInput('touch-right', false)} onLostPointerCapture={() => heldInput('touch-right', false)} aria-label={vertical ? 'Steer right' : 'Hold to speed up'}>→<span>{vertical ? 'RIGHT' : 'FAST'}</span></button>
+    <button type="button" className="touch-pace" disabled={!live} onPointerDown={event => touchDown(event, 'touch-right')} onPointerUp={() => heldInput('touch-right', false)} onPointerCancel={() => heldInput('touch-right', false)} onLostPointerCapture={() => heldInput('touch-right', false)} aria-label={vertical ? 'Steer right' : leftward ? 'Hold to slow down' : 'Hold to speed up'}>→<span>{vertical ? 'RIGHT' : leftward ? 'SLOW' : 'FAST'}</span></button>
   </>;
-  const world = <svg ref={stage} className="world-svg rush-run-world" viewBox={`0 0 ${viewWidth} 500`} preserveAspectRatio="none" tabIndex={0} role="img" aria-label={vertical ? `Runner world. ${run.phase === 'up' ? 'Pulled upward' : 'Free falling'} automatically. Hold left or right to steer around obstacles.` : 'Runner world. Space or up to jump. Down to slide. Left slows down, right speeds up.'} onPointerDown={event => { if (live) { event.preventDefault(); stage.current?.focus({ preventScroll: true }); pressJump(); } }}>
+  const world = <svg ref={stage} className="world-svg rush-run-world" viewBox={`0 0 ${viewWidth} 500`} preserveAspectRatio="none" tabIndex={0} role="img" aria-label={vertical ? `Runner world. ${run.phase === 'up' ? 'Pulled upward' : 'Free falling'} automatically. Hold left or right to steer around obstacles.` : `Runner world. Running ${leftward ? 'left' : 'right'}. Space or up to jump. Down to slide. ${leftward ? 'Left speeds up, right slows down.' : 'Left slows down, right speeds up.'}`} onPointerDown={event => { if (live) { event.preventDefault(); stage.current?.focus({ preventScroll: true }); pressJump(); } }}>
     {hasStarted ? <DirectionScene run={run} reducedMotion={reduced || !hasStarted} running={live} biome={biome} growth={growth} viewportWidth={viewWidth}
         renderCharacter={(frame, walking) => props.collection === 1
           ? <GenesisRunnerSprite portraitUrl={art.portraitUrl} bodyId={art.bodyId} frame={frame} walking={walking && !reduced}/>

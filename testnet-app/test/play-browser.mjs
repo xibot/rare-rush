@@ -9,6 +9,7 @@ import { advanceRecorder, createRecorder, exportReplay, queueControls, REPLAY_VE
 import { emptyPlayState, stateKey } from '../src/play/storage.ts';
 import { demoControls } from '../generated/games/rare-rush/twist/engine.ts';
 import { continuousSpin } from '../generated/games/rare-rush/twist/transition-motion.ts';
+import { headingFor, headingPlan } from '../generated/games/rare-rush/twist/presentation.ts';
 import { recordPilot } from '../../infra/testnet/test/pilot.ts';
 import { tokenAbi, nftAbi } from '../src/abi.ts';
 import { REWARD_CAP, LAUNCH_ALLOCATION, GAMEPLAY_ALLOCATION, RPC_URL } from '../src/safety.ts';
@@ -57,6 +58,29 @@ function directionState(difficulty, phase, collection = 0) {
     Object.assign(state.savedRun.run, { difficulty, claimUntil: String(now + BigInt(recording.run.duration) + 900n) });
     Object.assign(state.savedRun, { status: 'interrupted', replay: exportReplay(recording), completedTicks: recording.run._tick });
     return { state, expectedSpin: continuousSpin(recording.run) };
+}
+// Restore a legal run at a surprising left exit or just before its phase change.
+function surpriseState(phaseIndex, beforeBoundary = false) {
+    const routeSeed = toHex(1n, { size: 32 });
+    let recording = createRecorder(routeSeed, 'degen');
+    assert.deepEqual(headingPlan(recording.run), [1, -1, -1, 1]);
+    while (recording.run.status === 'running') {
+        const { axis: pace, jump, slide } = demoControls(recording.run);
+        queueControls(recording, { pace, jump, slide }); advanceRecorder(recording);
+        if (recording.run._phaseIndex === phaseIndex && (beforeBoundary || recording.run.transition?.progress > .08)) break;
+    }
+    assert.equal(recording.run._phaseIndex, phaseIndex);
+    if (beforeBoundary) {
+        const completedTicks = recording.run._tick - 1;
+        const replay = exportReplay(recording);
+        replay.frames = replay.frames.filter(frame => frame.tick < completedTicks);
+        recording = createRecorder(routeSeed, 'degen', replay, completedTicks);
+        assert.equal(recording.run._phaseIndex, phaseIndex - 1);
+    }
+    const state = readyState(0);
+    Object.assign(state.savedRun.run, { seed: routeSeed, difficulty: 2, claimUntil: String(now + 960n) });
+    Object.assign(state.savedRun, { status: 'interrupted', replay: exportReplay(recording), completedTicks: recording.run._tick });
+    return { state, heading: headingFor(recording.run), ticks: recording.run._tick };
 }
 function pendingState(hashKnown = true) { return { ...emptyPlayState(account), friends: [{ collection: 0, tokenId: '1' }], pending: { kind: 'start', to: PLAY_CONTRACTS.game, data: encodeFunctionData({ abi: PLAY_GAME_ABI, functionName: 'startRun', args: [0, 1n, 1] }), value: '0', nonce: 9, hash: hashKnown ? hash : null, createdAt: Number(now) * 1000, selection: { collection: 0, tokenId: '1', difficulty: 1 } } }; }
 for (const key of Object.keys(PLAY_CONTRACTS)) {
@@ -425,6 +449,52 @@ try {
         assert.deepEqual(v.unexpected, []);
         await v.context.close();
     }
+    // Both a first leftward exit and a continued leftward exit retain connected
+    // map geometry. On narrow screens the mirrored crop must keep the Friend visible.
+    for (const phaseIndex of [2, 4]) {
+        const fixture = surpriseState(phaseIndex);
+        const v = await setup({ state: fixture.state, mobile: true, controlledClock: true, path: '/play/?run=5' });
+        await connect(v.page);
+        await v.page.getByRole('button', { name: 'RESUME RUN' }).click();
+        await v.page.locator('.rush-run[data-phase="side"][data-paused="true"]').waitFor();
+        await v.page.clock.pauseAt(await v.page.evaluate(() => Date.now() + 100));
+        const scene = v.page.locator('[data-scene="connected-track"]');
+        assert.equal(await scene.getAttribute('data-heading'), '-1');
+        await v.page.getByRole('button', { name: 'KEEP RUNNING' }).tap();
+        await v.page.clock.runFor(1200);
+        assert.equal(await scene.getAttribute('data-transition'), 'none');
+        assert.equal(await scene.getAttribute('data-camera-x'), '-440');
+        const bounds = await v.page.locator('[data-character="friend"]').evaluate(element => {
+            const friend = element.getBoundingClientRect(), stage = element.ownerSVGElement.getBoundingClientRect();
+            return { left: friend.left, right: friend.right, stageLeft: stage.left, stageRight: stage.right };
+        });
+        assert.ok(bounds.left >= bounds.stageLeft && bounds.right <= bounds.stageRight, 'left-running Friend stays inside the mobile viewport');
+        assert.equal(await v.page.locator('[data-facing]').getAttribute('data-facing'), '-1');
+        await screenshot(v.page, `play-surprise-${phaseIndex === 2 ? 'left' : 'continued-left'}-mobile.png`);
+        await v.page.getByRole('button', { name: 'Ⅱ PAUSE' }).tap();
+        const checkpoint = (await saved(v.page)).savedRun;
+        const restored = createRecorder(checkpoint.run.seed, 'degen', checkpoint.replay, checkpoint.completedTicks);
+        assert.equal(headingFor(restored.run), -1, 'persisted canonical replay restores the same surprise');
+        await noWrites(v.page); assert.deepEqual(v.unexpected, []); await v.context.close();
+    }
+    // A key held through the phase boundary is reinterpreted each tick. It must
+    // stay screen-relative even though canonical horizontal pace changes sign.
+    const boundary = surpriseState(2, true);
+    const held = await setup({ state: boundary.state, controlledClock: true, path: '/play/?run=5' });
+    await connect(held.page);
+    await held.page.getByRole('button', { name: 'RESUME RUN' }).click();
+    await held.page.getByText('RUN PAUSED', { exact: true }).waitFor();
+    await held.page.clock.pauseAt(await held.page.evaluate(() => Date.now() + 100));
+    await held.page.getByRole('button', { name: 'KEEP RUNNING' }).click();
+    await held.page.keyboard.down('ArrowRight');
+    await held.page.clock.runFor(100);
+    await held.page.getByRole('button', { name: 'Ⅱ PAUSE' }).click();
+    await held.page.keyboard.up('ArrowRight');
+    const boundaryFrames = (await saved(held.page)).savedRun.replay.frames.filter(frame => frame.tick >= boundary.ticks);
+    assert.ok(boundaryFrames.length > 2);
+    assert.equal(boundaryFrames[0].pace, 1, 'right steers right until the shaft ends');
+    assert.ok(boundaryFrames.slice(1).every(frame => frame.pace === -1), 'the same held right key slows the new leftward corridor');
+    await noWrites(held.page); assert.deepEqual(held.unexpected, []); await held.context.close();
     for (const hashKnown of [true, false]) {
         const p = await setup({ state: pendingState(hashKnown), mobile: !hashKnown, path: '/play/?collection=generations&friend=1' });
         await connect(p.page);
@@ -607,7 +677,7 @@ try {
     assert.deepEqual(off.unexpected, []);
     await off.context.close();
     assert.deepEqual(errors, []);
-    console.log('Play browser checks passed: desktop/mobile UI, collection → NFT artwork → mode/cabinet flow, dashboard holdings and results without play controls, silent wallet restoration across test kit/dashboard/play/reload, persistent cross-tab disconnect, provider revocation and account/network changes, pinned runtime verification, saved play/reload, keyboard/touch, V2 legal-replay up/down transitions in every mode, continuous 180-degree spin, mobile shaft steering, pause/reload restoration, external-tab checkpoint isolation, account isolation, known/hashless recovery, NFT/mode choice, confirmed paid entry opening paused gameplay, direct saved-run reconnect and wrong-network recovery, both collections’ lost-run close/rejection/confirmation without extra entries or automatic transactions, runtime and unavailable-verifier gating. All RPC/wallet/API traffic mocked; no transactions submitted.');
+    console.log('Play browser checks passed: desktop/mobile UI, collection → NFT artwork → mode/cabinet flow, dashboard holdings and results without play controls, silent wallet restoration across test kit/dashboard/play/reload, persistent cross-tab disconnect, provider revocation and account/network changes, pinned runtime verification, saved play/reload, keyboard/touch, V2 legal-replay up/down transitions in every mode, continuous 180-degree spin, mobile shaft steering, first and continuing left exits with visible mobile camera crop, held-arrow remapping across shaft exits, pause/reload restoration, external-tab checkpoint isolation, account isolation, known/hashless recovery, NFT/mode choice, confirmed paid entry opening paused gameplay, direct saved-run reconnect and wrong-network recovery, both collections’ lost-run close/rejection/confirmation without extra entries or automatic transactions, runtime and unavailable-verifier gating. All RPC/wallet/API traffic mocked; no transactions submitted.');
 }
 finally {
     await browser.close();

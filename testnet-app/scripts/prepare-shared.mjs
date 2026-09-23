@@ -15,7 +15,7 @@ if (process.env.VERCEL === '1') {
 }
 const files = [
   'games/rare-rush/engine.ts', 'games/rare-rush/difficulty.ts',
-  ...['engine.ts', 'DirectionScene.tsx', 'VerticalWorld.tsx', 'TrackGate.tsx', 'transition-motion.ts'].map(name => `games/rare-rush/twist/${name}`),
+  ...['engine.ts', 'DirectionScene.tsx', 'presentation.ts', 'VerticalWorld.tsx', 'TrackGate.tsx', 'transition-motion.ts'].map(name => `games/rare-rush/twist/${name}`),
   'games/rare-rush/WorldArt.tsx', 'games/rare-rush/RunnerArt.tsx', 'games/rare-rush/CanonicalArt.tsx',
   'games/rare-rush/genesis/GenesisRunnerSprite.tsx', 'games/rare-rush/genesis/bodies.ts',
   'games/rare-rush/genesis/body-data.json', 'games/rare-rush/landing/preview-art.json',

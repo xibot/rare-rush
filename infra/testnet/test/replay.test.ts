@@ -8,6 +8,8 @@ import { ENGINE_SOURCE_PATHS, engineVersionFromSources, PROTOCOL_VERSION, type E
 import { currentEngineVersion } from '../src/engine-version.ts';
 import { recordPilot } from './pilot.ts';
 import { localFixture } from './local-fixture.ts';
+import { createRun, stepRun, demoControls, setPace, setSliding, jump, FIXED_STEP } from '../../../games/rare-rush/twist/engine.ts';
+import { headingFor, headingPlan, canonicalAxis } from '../../../games/rare-rush/twist/presentation.ts';
 
 const seed = keccak256(toHex('rare-rush-replay-test'));
 test('replays real controls deterministically for all three difficulty modes', () => {
@@ -202,4 +204,41 @@ test('public-testnet verification rejects zero or one confirmation before readin
       replay: { version: PROTOCOL_VERSION, frames: [] },
     }), /Invalid confirmation depth/);
   }
+});
+
+
+test('occasional reverse exits keep the existing V2 verifier, reward weights and contract engine version', async () => {
+  const modes = ['easy', 'normal', 'degen'] as const;
+  // These routes cover no reversal, a late reversal, and a leftward corridor
+  // continuing through the next shaft. Only canonical controls enter V2 replay.
+  const seeds = [[0, 3], [0, 2], [1, 4]];
+  for (const [difficulty, mode] of modes.entries()) {
+    for (const value of seeds[difficulty]) {
+      const contractSeed = toHex(BigInt(value), { size: 32 });
+      const run = createRun(contractSeed, mode);
+      const frames: {tick:number;pace:-1|0|1;jump:boolean;slide:boolean}[] = [];
+      const pickups: string[] = [];
+      while (run.status === 'running') {
+        const input = demoControls(run);
+        const screenPace = canonicalAxis(input.axis, run.phase, headingFor(run));
+        const pace = canonicalAxis(screenPace, run.phase, headingFor(run));
+        frames.push({ tick: run._tick, pace, jump: input.jump, slide: input.slide });
+        setSliding(run, input.slide); setPace(run, pace); if (input.jump) jump(run);
+        for (const event of stepRun(run, FIXED_STEP)) {
+          if (event.type === 'coin') pickups.push(event.rewardMultiplier === 10 ? '01' : '00');
+        }
+      }
+      const replay = { version: PROTOCOL_VERSION, frames };
+      const verified = verifyReplay(contractSeed, difficulty, replay);
+      assert.equal(verified.coins, run.coins);
+      assert.equal(verified.bonusCoins, run.bonusCoins);
+      assert.equal(verified.hearts, run.hearts);
+      assert.equal(verified.distance, Math.floor(run.distance));
+      assert.equal(verified.score, run.score);
+      assert.equal(verified.pickupKinds, `0x${pickups.join('')}`);
+      assert.equal(verified.ticks, [14400, 10800, 7200][difficulty]);
+      assert.deepEqual(headingPlan(createRun(contractSeed, mode)), headingPlan(run), 'restoring the same chain seed preserves exits');
+    }
+  }
+  assert.equal(await currentEngineVersion(), '0x907ff2967abdd97cc172f53c0c69fbcd17f22fcf4ece263e5846bf2973a3accb');
 });

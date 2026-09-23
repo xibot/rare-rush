@@ -6,6 +6,12 @@ This workspace contains the Testnet V2 app for the separate `testnet.rarerush.ap
 
 The app’s central public deployment profile is `src/shared/deployment.json`. A pending or local-rehearsal profile is not proof of deployed contracts. Hosting builds under `VERCEL=1` reject every profile whose status is not `verified`. The [V2 runbook](../docs/TESTNET-V2.md) covers preparation, rehearsal, wallet deployment, verification and activation.
 
+## Surprise exits
+
+The September 23 gameplay update adds occasional leftward sections after shaft exits, matching the approved Arcade prototype. Easy keeps them rare and late, Normal adds occasional reversals, and DEGEN has more surprises without reversing at every exit. The same seed and mode always produce the same headings. The mobile camera follows the running direction; arrow/touch controls stay relative to the screen and are converted into canonical inputs before each recorded tick.
+
+This is a rendering and input-mapping update. The V2 engine source hash, contracts, verifier, token balances, fees, daily limits, reward multipliers and replay protocol remain unchanged. Existing saved V2 runs and claims remain compatible. No new contract deployment or token migration is required.
+
 ## V2 play flow after verified activation
 
 1. Connect a browser wallet and switch to Robinhood testnet.
