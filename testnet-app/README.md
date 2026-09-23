@@ -1,6 +1,6 @@
 # Rare Rush testnet game
 
-This workspace contains the Testnet V2 app for the separate `testnet.rarerush.app` / `rarerush-testnet` target. Its new game and reward token are deployed, independently verified and activated in the app profile; final hosting checks are in progress. The main vibeathon arcade at `rarerush.app` is unchanged.
+This workspace contains the Testnet V2 app for the separate `testnet.rarerush.app` / `rarerush-testnet` target. Its new game and reward token are deployed, independently verified and activated in the app profile. Vercel deployed source commit `33a0cba` successfully to [testnet.rarerush.app](https://testnet.rarerush.app) on September 22, 2026. The main vibeathon arcade at `rarerush.app` is unchanged.
 
 `/` provides test faucets; `/dashboard/` shows holdings, saved results, recovery and transactions; `/play/` provides the collection → Friend → difficulty → run flow. V2 ports the approved directional gameplay while preserving the test economy. Its replay protocol is `rare-rush-input-v2`, and its exact source hash is `0x907ff2967abdd97cc172f53c0c69fbcd17f22fcf4ece263e5846bf2973a3accb`.
 

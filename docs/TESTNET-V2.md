@@ -1,6 +1,6 @@
-# Testnet V2 preparation and activation
+# Testnet V2 release and activation
 
-The owner deployed and bound V2 on Robinhood testnet on September 22, 2026. Independent verification passed 66 state checks and two contract guards; the app profile is activated. The site release is pending final hosting checks. No site deployment is performed by the commands below.
+The owner deployed and bound V2 on Robinhood testnet on September 22, 2026. Independent verification passed 66 state checks and two contract guards; the app profile is activated. Vercel marked deployment `dpl_3UjjtdzutC7uQA55kxTegeiV27tq` READY and assigned `https://testnet.rarerush.app` on September 22, 2026. The deployed source commit is `33a0cba`. No site deployment is performed by the commands below.
 
 - Game: `0x415b897FfF5a336A8C3a527bEEF12440eaDc6422`
 - Reward token: `0x1c3D191561a7077f944b9967553C21Dd8c26dB71`
@@ -93,3 +93,14 @@ The second path is optional in both commands. Verification uses the fixed public
 The public report is `infra/testnet/artifacts/public-deployment-v2-verification.json`. Its `contracts` and `runtimes` identify the five V2 app dependencies. The activation script performs independent public-chain verification before updating the central deployment profile, runtime pins and public config together. A prediction or local fixture cannot substitute for this step. V1 evidence remains unchanged.
 
 Run the app tests and build again after activation. A `verified` local profile is a prerequisite for a later testnet-project deployment; activation itself does not publish the site or prove the hosted verifier is healthy. Preserve the existing server-only verifier identity, canonical origin and rate limits when performing that separately authorized deployment.
+
+## Release validation
+
+- 100 root gameplay tests; 41 infrastructure contract/replay tests.
+- 77 app unit/security tests, plus both emitted/Vercel-built server-runtime tests.
+- Six full local-EVM approval/start → recorded run → authenticated verification → reward claim paths: Genesis and Generations in Easy, Normal and Degen.
+- 31 deployment-console browser scenarios; full play browser suite including six mobile up/down transition cases, continuous spin, steering and pause/reload.
+- Read-only public deployment verification: 66 state checks and two guard checks. Actual production verifier environment reported ready locally against the deployed V2 contracts.
+- No unfinished V1 run had an open claim window at the pre-release check (block 123021040).
+
+The public V2 game/token deployment and hosting release are confirmed. Full gameplay/claims were exercised on a disposable local EVM; a player’s first public V2 run is a separate wallet test. Main Arcade source/deployment was not changed by this release.

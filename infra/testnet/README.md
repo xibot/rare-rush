@@ -1,6 +1,6 @@
 # Rare Rush · Robinhood testnet infrastructure
 
-Contract and verifier infrastructure for **test assets only**. The owner deployed and bound the Testnet V2 game/token on September 22, 2026. Independent verification passed 66 state checks and two guards, and the app addresses are activated. Hosting checks are in progress. The public vibeathon arcade retains its simulated economy.
+Contract and verifier infrastructure for **test assets only**. The owner deployed and bound the Testnet V2 game/token on September 22, 2026. Independent verification passed 66 state checks and two guards, and the app addresses are activated. V2 is live at [testnet.rarerush.app](https://testnet.rarerush.app), with release checks recorded in the [V2 runbook](../../docs/TESTNET-V2.md). The public vibeathon arcade retains its simulated economy.
 
 ## What works
 
