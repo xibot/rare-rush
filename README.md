@@ -4,6 +4,8 @@ By XIBOT · [Public source repository](https://github.com/xibot/rare-rush)
 
 A retro SVG arcade runner **by XIBOT**, using canonical Rare Friends artwork. A public landing page shows a random Friend jumping, sliding and growing through an autoplay run. Choose Easy (120s), Normal (90s) or Degen (60s), with tougher obstacles, more scattered coins and higher demo rewards in harder modes. Surprise bear coins fly in at double size for 10× the current mode's demo coin reward, within the shared emission cap.
 
+The playable Arcade now follows connected horizontal, upward and free-fall tracks. Every run opens on the classic lane; surprise ceiling intakes and floor breaks lead into fast shafts with coins, obstacles and continuous character rotation. Left/right controls steer in vertical sections. The site, wallet gates, original run durations and simulated reward rules remain the same. The landing preview and the separately deployed Testnet keep their existing engines.
+
 ```sh
 npm ci
 npm run dev
@@ -23,7 +25,7 @@ The Genesis animation showcase is preserved as an unpublished draft in [drafts/g
 
 See [game instructions and exact rules](games/rare-rush/README.md), [economy design](docs/ECONOMY.md), and [submission details](docs/SUBMISSION.md).
 
-Run `npm run typecheck:rush`, `npm run test:rush`, `npm run check`, `npm run build`, `npm run test:browser`, `npm run test:landing`, `npm run test:docs`, `npm run test:pitch`, `npm run test:entry`, `npm run test:genesis`, and `npm run test:bonus` to validate Rare Rush. The unmodified FriendSDK v0.1.2 package is included for reproducibility. `dist/` is the static hosting output, with the landing page at its root, the public guide in `docs/`, the judge-facing pitch in `pitch/`, collection choice in `arcade/`, the Genesis tester host in `genesis/`, and the SDK game inside `play/`.
+Run `npm run typecheck:rush`, `npm run test:rush`, `npm run check`, `npm run build`, `npm run test:browser`, `npm run test:landing`, `npm run test:docs`, `npm run test:pitch`, `npm run test:entry`, `npm run test:genesis`, `npm run test:bonus`, and `npm run test:twist` to validate Rare Rush. The unmodified FriendSDK v0.1.2 package is included for reproducibility. `dist/` is the static hosting output, with the landing page at its root, the public guide in `docs/`, the judge-facing pitch in `pitch/`, collection choice in `arcade/`, the Genesis tester host in `genesis/`, and the SDK game inside `play/`.
 
 The Rare Rush entry was submitted to the Rare Friends Vibeathon on September 20, 2026: [submission PR #22](https://github.com/spokesz/rarefriends-vibeathon/pull/22). It is open for organizer review.
 

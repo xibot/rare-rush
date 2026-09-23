@@ -1,6 +1,6 @@
 # Rare Rush
 
-An endless sidescroller by **XIBOT**, with Easy, Normal and Degen modes, starring the player's verified Rare Friends Genesis or Generations NFT. The Generations route is built with **FriendSDK v0.1.2** for the Rare Friends Vibeathon. The landing and game share a pixel-bear coin + **RARERUSH** header with **BY XIBOT**; Rare Friends retains the artwork credit below.
+An endless runner with connected side, upward and free-fall tracks by **XIBOT**, with Easy, Normal and Degen modes, starring the player's verified Rare Friends Genesis or Generations NFT. The Generations route is built with **FriendSDK v0.1.2** for the Rare Friends Vibeathon. The landing and game share a pixel-bear coin + **RARERUSH** header with **BY XIBOT**; Rare Friends retains the artwork credit below.
 
 ## Play
 
@@ -27,12 +27,13 @@ The preview's public artwork reads are cached in `landing/preview-art.json`, wit
 - Space / ↑ / W: jump; press again in the air for a double jump. On touchscreens use JUMP or tap the world.
 - Hold ↓ / S / SLIDE: duck under floating bridges; sliding in the air fast-falls.
 - Hold → / FAST to speed up to 1.3× pace; hold ← / SLOW to ease down to 0.7×. Releasing returns smoothly to cruising speed. Opposite inputs cancel, and pausing clears held controls.
+- Every run opens on the classic lane. Seeded ceiling intakes pull the Friend upward and floor breaks lead into free fall, with classic track between shafts. Hold ← / → (LEFT / RIGHT on phones) to steer in shafts; jump and slide resume on the horizontal track. Rotation runs continuously at 180°/second from the first suction frame through the shaft, counterclockwise going up and clockwise going down; the exit eases upright. FX OFF disables this cosmetic rotation. Mobile cameras open out to show the full shaft.
 - P / Escape / pause button: pause. Leaving the tab pauses automatically.
 - The selected timer counts active play only; all modes start with three hearts. The third hit or timeout ends a run and banks the collected demo tokens. Each mode has its own session best.
 - Crystals, crates and floating bridges cost one heart. A hit grants 1.65 seconds of protection; a broken shield grants 1.35 seconds.
 - Each coin grows the Friend by 0.035×, up to 1.75× size. A damaging hit shrinks it by 0.35×, down to 1×. Shields protect size. Growth changes the sprite and its shadow; collision boxes stay forgiving, and sliding compresses its height to fit beneath bridges.
 - Each coin awards 10 × current combo points. Every five consecutive coins increases the multiplier, up to ×5. A gap of 4.5 seconds without a pickup, or a hit, breaks the chain. Distance adds one point per metre.
-- Flying surprise coins use the same pixel-bear artwork at 60 logical pixels, twice the ordinary coin's 30-pixel display size. They award 10× the selected Friend’s current ordinary token rate, subject to remaining supply. Each is still one pickup: one growth increment, one combo increment and the ordinary coin's score award. The first wave spawns after 4–6 active seconds, then every 10–15 seconds while enough flight time remains; a wave occasionally contains a staggered pair. They fly at 1.15× current world-scroll speed + 25 logical pixels/second, with a gentle vertical bob.
+- Flying surprise coins use the same pixel-bear artwork at 60 logical pixels, twice the ordinary coin's 30-pixel display size. They award 10× the selected Friend’s current ordinary token rate, subject to remaining supply. Each is still one pickup: one growth increment, one combo increment and the ordinary coin's score award. On classic tracks the first wave spawns after 4–6 active seconds, then every 10–15 seconds while enough flight time remains; a wave occasionally contains a staggered pair. They fly at 1.15× current world-scroll speed + 25 logical pixels/second, with a gentle vertical bob. Shafts add gently swaying bonus coins along the barrier openings, using the same 10× reward and single-pickup accounting.
 - S: one-hit shield lasting up to 9 seconds. M: coin magnet lasting 8 seconds, attracting coins within 155 logical pixels.
 - Garden Commons, Circuit Courtyard and Crystal Steps arrive at each third of the selected run duration. The world generates indefinitely until the run ends. Seeded coin routes become more scattered in harder modes, stay within double-jump height, and are kept out of obstacle collision boxes.
 - Sound starts muted; FX OFF disables background parallax, sprite animation and decorative animation. Obstacles still move so the runner remains playable.
@@ -62,13 +63,16 @@ npm run test:pitch
 npm run test:entry
 npm run test:genesis
 npm run test:bonus
+npm run test:twist
 ```
 
 `dist/` contains the complete static site: landing HTML/JS/CSS at the root, the public guide under `docs/`, the visual project pitch under `pitch/`, collection choice under `arcade/`, the verified Genesis tester host and its sandbox under `genesis/`, and the SDK's unchanged runtime and sandbox documents under `play/`. Host the whole folder over HTTPS, preserving relative paths and the generated sandbox CSP. `scripts/rush-site.mjs` builds and watches the site using the public SDK build API. The local server exposes only generated site files.
 
 Game tests use the SDK's automated-only fixture through the actual ownership gate. These fixtures are never included in public builds. Landing tests run without a wallet or RPC and check autoplay, coin growth, manual/automatic Friend rotation, pause, reduced motion, mobile fit and navigation through collection choice to the real wallet gates. The builder confirmed a completed real-wallet Generations run and successful play in every difficulty with all their Generations Friends on September 20, 2026. This is a builder report; a human Genesis-wallet playthrough and physical-phone check remain unconfirmed.
 
-The unit suite includes **83 tests: 38 engine, 30 economy, and 15 Genesis identity tests**, including flying bonus accounting, collection multipliers, owner-filtered discovery, fresh ownership and safe artwork reads. The Genesis browser suite tests the actual isolated host and child at desktop and phone sizes, including transfer/account-change races, network switching, RPC failure, slow verification, and browser Back recovery using test-only wallet and RPC fixtures. The browser suites also pass five playable viewport/mode cases and three landing sizes plus reduced motion, covering the shared header, visible BY XIBOT, flying bonus rendering and pause. The focused bonus browser suite also passes desktop Normal and phone Easy/Degen, verifying actual 10× payouts, single-pickup growth, flight and pause through legal controls.
+The unit suite covers the classic and Arcade direction engines, economy, Genesis identity and body selection, including flying bonus accounting, collection multipliers, owner-filtered discovery, fresh ownership and safe artwork reads. The Genesis browser suite tests the actual isolated host and child at desktop and phone sizes, including transfer/account-change races, network switching, RPC failure, slow verification, and browser Back recovery using test-only wallet and RPC fixtures. The browser suites also pass five playable viewport/mode cases and three landing sizes plus reduced motion, covering the shared header, visible BY XIBOT, flying bonus rendering and pause. The focused bonus browser suite also passes desktop Normal and phone Easy/Degen, verifying actual 10× payouts, single-pickup growth, flight and pause through legal controls.
+
+The direction engine and scene live in `twist/`. They are used only by the playable main Arcade; the original `engine.ts` still drives the landing preview, and the separate Testnet checkout retains its verified engine. Direction tests cover deterministic physics, reachable routes, handoff continuity and existing reward accounting. The focused browser suite exercises both collection hosts in all modes with legal inputs; its state instrumentation is injected into a temporary copy and never shipped.
 
 ## Assets and provenance
 
