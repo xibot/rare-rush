@@ -22,7 +22,7 @@ function Landing() {
           <small className="entry-caption">Genesis or Generations. Connect your wallet. Chase your best.</small>
         </div>
         <div className="hero-preview" id="preview">
-          <div className="preview-caption"><span><i/> WATCH A NORMAL RUN</span><span>01 / THE ENDLESS WORLD</span></div>
+          <div className="preview-caption"><span><i/> WATCH THE RARE TWIST</span><span>01 / THE ENDLESS WORLD</span></div>
           <PreviewRun/>
           <div className="preview-bottom-note"><span>YOUR NEXT RUN COULD BE BIGGER.</span><span>3 MODES. INFINITE AGAIN.</span></div>
         </div>
