@@ -20,8 +20,8 @@ body:has(.rf-game-frame)>#root{width:100%;margin:auto!important;max-width:960px}
 @media(max-width:600px){.rf-runtime-status:before{font-size:24px}}
 
 /* Collection entry uses the same full-page brand layout as the Genesis host. */
-body.rush-generations-selecting{display:block;padding:0 40px;background:#000;color:#fff}
-body.rush-generations-selecting>#root{max-width:1080px;margin:0 auto!important}
+body.rush-generations-selecting{display:block;padding:0;background:#000;color:#fff}
+body.rush-generations-selecting>#root{width:100%;max-width:none;margin:0 auto!important}
 .rf-game-frame.rush-generations-frame{max-width:none;aspect-ratio:auto;height:auto;min-height:100dvh;max-height:none;overflow:visible;contain:none;container-type:normal;border:0;box-shadow:none;background:#000}
 .rush-generations-frame>.rf-frame-chrome{display:none}
 .rush-generations-frame>.rf-frame-scrim{position:static;inset:auto;display:block;padding:0;overflow:visible;background:#000;color:#fff}
@@ -29,25 +29,17 @@ body.rush-generations-selecting>#root{max-width:1080px;margin:0 auto!important}
 .rush-generations-menu a{color:inherit;text-decoration:none}
 .rush-generations-menu a:hover{color:#ccff00}
 .rush-generations-menu a:focus-visible,.rush-generations-menu button:focus-visible{outline:3px solid #ccff00;outline-offset:4px}
-.rush-entry-header{display:flex;align-items:center;justify-content:space-between;min-height:100px;gap:20px;border-bottom:1px solid #fff6}
-.rush-entry-logo{display:flex;align-items:center;gap:13px}
-.rush-entry-logo>img{width:44px;height:44px}
-.rush-entry-logo>span{font:24px/1 var(--rush-font-display)}
-.rush-entry-logo>span>span{color:#ccff00}
-.rush-entry-logo small{display:block;font:10px/1.5 var(--rush-font-mono);letter-spacing:2px;margin-top:8px}
-.rush-entry-header nav{display:flex;align-items:center;gap:22px;font:12px var(--rush-font-mono)}
-.rush-entry-header nav a{display:flex;align-items:center;min-height:44px}
-.rush-entry-intro{padding-top:55px;max-width:920px;margin:auto}
+.rush-entry-intro{width:calc(100% - 80px);padding-top:55px;max-width:920px;margin:auto}
 .rush-entry-collection{display:flex;align-items:center;min-height:44px;margin-bottom:26px;font:12px/1.6 var(--rush-font-mono)}
 .rush-entry-kicker{display:block;color:#ccff00;font:12px/1.7 var(--rush-font-mono);margin-bottom:17px}
 .rush-entry-intro h1{font:clamp(28px,5vw,62px)/1.14 var(--rush-font-display);margin:0 0 24px}
 .rush-entry-intro h1 span{color:#ccff00}
 .rush-entry-intro>p{font:16px/1.65 var(--rush-font-body);color:#ddd;max-width:64ch;margin:0 0 30px}
-.rush-generations-menu>.rf-frame-menu-heading{border:0;background:#000;padding:0;width:100%;max-width:920px;align-self:center;justify-content:flex-end}
+.rush-generations-menu>.rf-frame-menu-heading{border:0;background:#000;padding:0;width:calc(100% - 80px);max-width:920px;align-self:center;justify-content:flex-end}
 .rush-generations-menu>.rf-frame-menu-heading:not(:has(button)){display:none}
 .rush-generations-menu>.rf-frame-menu-heading h2{position:absolute;width:1px;height:1px;overflow:hidden;clip-path:inset(50%);white-space:nowrap}
 .rush-generations-menu>.rf-frame-menu-heading button{margin-bottom:12px;min-width:44px;color:#fff;background:#000;border-color:#fff}
-.rush-generations-menu>.rf-frame-menu-body{width:100%;max-width:920px;align-self:center;border:1px solid #fff;padding:24px;overflow:visible}
+.rush-generations-menu>.rf-frame-menu-body{width:calc(100% - 80px);max-width:920px;align-self:center;border:1px solid #fff;padding:24px;overflow:visible}
 .rush-generations-menu>.rf-frame-menu-body>p:first-child{display:none}
 .rush-generations-menu .rf-frame-menu-body p{color:#ddd;font:16px/1.65 var(--rush-font-body);overflow-wrap:anywhere}
 .rush-generations-menu .rf-runtime-connection{display:flex;align-items:center;flex-wrap:wrap;gap:12px}
@@ -60,10 +52,7 @@ body.rush-generations-selecting>#root{max-width:1080px;margin:0 auto!important}
 .rush-generations-menu .rf-frame-friends button:hover,.rush-generations-menu .rf-frame-friends button[aria-pressed=true]{background:#ccff00;color:#000}
 .rush-generations-menu .rf-frame-friends small{color:inherit;font-size:10px}
 .rush-friend-portrait{width:80px;height:80px;object-fit:contain;image-rendering:pixelated;display:block}
-.rush-generations-menu>.rush-generations-caption{max-width:920px;width:100%;align-self:center;padding:0;margin:30px 0 40px;color:#ccc;font:12px/1.8 var(--rush-font-mono)}
-@media(max-width:700px){body.rush-generations-selecting{padding:0 20px}.rush-entry-header{min-height:80px}.rush-entry-logo>span{font-size:20px}.rush-entry-logo>img{width:36px;height:36px}.rush-entry-header nav{font-size:11px;gap:15px}.rush-entry-intro{padding-top:30px}.rush-entry-kicker{font-size:11px}.rush-generations-menu>.rf-frame-menu-body{padding:20px}.rush-generations-menu .rf-runtime-connection{gap:10px}.rush-generations-menu .rf-runtime-connection>button{font-size:12px;padding:12px 14px}.rush-generations-menu .rf-frame-friends{grid-template-columns:repeat(2,minmax(0,1fr))}.rush-generations-menu .rf-frame-friends button{padding:14px 8px;font-size:12px}.rush-generations-menu .rf-frame-friends small{font-size:8px}}
+.rush-generations-menu>.rush-generations-caption{max-width:920px;width:calc(100% - 80px);align-self:center;padding:0;margin:30px 0 40px;color:#ccc;font:12px/1.8 var(--rush-font-mono)}
+@media(max-width:700px){.rush-entry-intro,.rush-generations-menu>.rf-frame-menu-heading,.rush-generations-menu>.rf-frame-menu-body,.rush-generations-menu>.rush-generations-caption{width:calc(100% - 40px)}.rush-entry-intro{padding-top:30px}.rush-entry-kicker{font-size:11px}.rush-generations-menu>.rf-frame-menu-body{padding:20px}.rush-generations-menu .rf-runtime-connection{gap:10px}.rush-generations-menu .rf-runtime-connection>button{font-size:12px;padding:12px 14px}.rush-generations-menu .rf-frame-friends{grid-template-columns:repeat(2,minmax(0,1fr))}.rush-generations-menu .rf-frame-friends button{padding:14px 8px;font-size:12px}.rush-generations-menu .rf-frame-friends small{font-size:8px}}
 
 .rush-friend-portrait[hidden]{display:none}
-
-/* Keep MVP and testnet navigation visible on phones. */
-@media(max-width:600px){.rush-entry-header{flex-wrap:wrap;padding:17px 0 12px;row-gap:12px}.rush-entry-header nav{width:100%;justify-content:space-between;gap:12px}}

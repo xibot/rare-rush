@@ -1,7 +1,7 @@
 import { createRoot } from 'react-dom/client';
 import { useEffect, useRef } from 'react';
 import { decodeGenerationSprites, type GenerationSpriteManifest } from '@rarefriends/friendsdk/sprites';
-import { BrandMark } from '../BrandMark';
+import { SiteHeader } from '../SiteHeader';
 import { CanonicalProp, TokenCoin } from '../CanonicalArt';
 import { FriendSprite } from '../RunnerArt';
 import { DIFFICULTIES, DIFFICULTY_ORDER } from '../difficulty';
@@ -77,12 +77,10 @@ function GameplayClip() {
 }
 
 function Pitch() {
-  return <div className="rush-pitch" id="top">
+  return <>
     <a className="pitch-skip" href="#pitch-title">Skip to the pitch</a>
-    <header className="pitch-header">
-      <a className="pitch-logo" href="/" aria-label="Rare Rush by Xibot home"><BrandMark/></a>
-      <nav aria-label="Main navigation"><a href="/">HOME</a><a href="/docs/">DOCS</a><a href="/pitch/" aria-current="page">PITCH</a><a className="nav-testnet" href="https://testnet.rarerush.app">TRY TESTNET</a><a className="pitch-header-play nav-arcade" href="/arcade/">PLAY ARCADE <span aria-hidden="true">↗</span></a></nav>
-    </header>
+    <SiteHeader page="pitch"/>
+    <div className="rush-pitch">
 
     <main>
       <section className="pitch-hero" aria-labelledby="pitch-title">
@@ -127,7 +125,7 @@ function Pitch() {
     </main>
 
     <footer className="pitch-footer"><div><b>RARE RUSH / BY XIBOT</b><span>A PLAYABLE VIBEATHON BUILD</span></div><div><a href="https://github.com/xibot/rare-rush">EXPLORE THE SOURCE ↗</a><a href="https://github.com/spokesz/friendsdk">BUILT WITH FRIENDSDK ↗</a><a href="https://rarefriends.com/">ART & WORLD BY RARE FRIENDS ↗</a><a href="#top">BACK TO TOP ↑</a></div></footer>
-  </div>;
+  </div></>;
 }
 
 createRoot(document.getElementById('root')!).render(<Pitch/>);

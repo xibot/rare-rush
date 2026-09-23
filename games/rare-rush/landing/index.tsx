@@ -1,16 +1,14 @@
 import { createRoot } from 'react-dom/client';
 import { TokenCoin } from '../CanonicalArt';
-import { BrandMark } from '../BrandMark';
+import { SiteHeader } from '../SiteHeader';
 import PreviewRun from './PreviewRun';
 import { DIFFICULTIES, DIFFICULTY_ORDER } from '../difficulty';
 import './landing.css';
 
 function Landing() {
-  return <div className="rush-landing" id="top">
-    <header className="landing-header">
-      <a className="landing-logo" href="#top" aria-label="Rare Rush by Xibot home"><BrandMark/></a>
-      <nav aria-label="Main navigation"><a href="#how-to-play">HOW TO PLAY</a><a className="header-docs" href="./docs/">DOCS</a><a href="./pitch/">PITCH</a><a className="nav-testnet" href="https://testnet.rarerush.app">TRY TESTNET</a><a className="header-play nav-arcade" href="./arcade/">PLAY ARCADE <span>↗</span></a></nav>
-    </header>
+  return <>
+    <SiteHeader page="landing"/>
+    <div className="rush-landing">
 
     <main>
       <section className="landing-hero" aria-labelledby="hero-title">
@@ -38,7 +36,7 @@ function Landing() {
     </main>
 
     <footer className="landing-footer"><div><b>RARE RUSH / VIBEATHON BUILD</b><p>Gameplay rewards are simulated. Nothing is minted or charged.<br/>Play with your Genesis or eligible Generations NFT on Robinhood Chain.</p></div><div><a href="./pitch/">THE RARE RUSH PITCH ↗</a><a href="./docs/">RARE RUSH 101 / DOCS ↗</a><a href="https://github.com/spokesz/friendsdk">BUILT WITH FRIENDSDK ↗</a><a href="https://rarefriends.com/">ART & WORLD BY RARE FRIENDS ↗</a></div></footer>
-  </div>;
+  </div></>;
 }
 
 createRoot(document.getElementById('root')!).render(<Landing/>);

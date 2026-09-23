@@ -1,6 +1,7 @@
 import { parseArcadeNavigation } from './navigation';
 import { syncFriendPortraits, cleanupFriendPortraits } from './host-portraits';
 import { bindGenerationsAnalytics } from './host-analytics';
+import { createSdkSiteHeader } from './site-navigation';
 
 /** Site chrome for the outer SDK host. Wallet, ownership and gameplay stay in FriendSDK. */
 function enhanceGenerationsEntry(): void {
@@ -25,7 +26,8 @@ function enhanceGenerationsEntry(): void {
           const chrome = document.createElement('div');
           chrome.className = 'rush-generations-chrome';
           // Static, project-owned markup only. No wallet or RPC values enter HTML.
-          chrome.innerHTML = `<header class="rush-entry-header"><a class="rush-entry-logo" href="/" aria-label="Rare Rush by Xibot home"><img src="/favicon.svg" width="44" height="44" alt=""><span>RARE<span>RUSH</span><small>BY XIBOT</small></span></a><nav aria-label="Main navigation"><a href="/pitch/">PITCH</a><a href="/docs/">DOCS ↗</a><a class="nav-testnet" href="https://testnet.rarerush.app">TRY TESTNET</a></nav></header><div class="rush-entry-intro"><a class="rush-entry-collection" href="/arcade/">← CHOOSE COLLECTION</a><span class="rush-entry-kicker">THE NEXT GENERATION. THE SAME RUSH.</span><h1>Generations<br><span>unlocked.</span></h1><p>Bring your hardwired Generations Friend. Pick your mode. Make the run yours.</p></div>`;
+          chrome.innerHTML = `<div class="rush-entry-intro"><a class="rush-entry-collection" href="/arcade/">← CHOOSE COLLECTION</a><span class="rush-entry-kicker">THE NEXT GENERATION. THE SAME RUSH.</span><h1>Generations<br><span>unlocked.</span></h1><p>Bring your hardwired Generations Friend. Pick your mode. Make the run yours.</p></div>`;
+          chrome.prepend(createSdkSiteHeader());
           menu.prepend(chrome);
         }
         if (!menu.querySelector('.rush-generations-caption')) {

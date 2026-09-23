@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { createRoot } from 'react-dom/client';
 import { decodeGenerationSprites, type GenerationSpriteManifest } from '@rarefriends/friendsdk/sprites';
-import { BrandMark } from '../BrandMark';
+import { SiteHeader } from '../SiteHeader';
 import { CanonicalProp, TokenCoin } from '../CanonicalArt';
 import { FriendSprite } from '../RunnerArt';
 import { WorldArt } from '../WorldArt';
@@ -68,9 +68,10 @@ function RewardLab({ difficulty, onDifficulty }: { difficulty: Difficulty; onDif
 
 function Docs() {
   const [difficulty, setDifficulty] = useState<Difficulty>('normal');
-  return <div className="rush-docs" id="top">
+  return <>
     <a className="docs-skip" href="#start">Skip to the guide</a>
-    <header className="docs-header"><a className="docs-logo" href="/" aria-label="Rare Rush by Xibot home"><BrandMark/></a><nav aria-label="Main navigation"><a href="/">HOME</a><a href="/pitch/">PITCH</a><a className="nav-testnet" href="https://testnet.rarerush.app">TRY TESTNET</a><a className="docs-cta nav-arcade" href="/arcade/">PLAY ARCADE ↗</a></nav></header>
+    <SiteHeader page="docs"/>
+    <div className="rush-docs">
     <main>
       <section className="docs-hero" aria-labelledby="docs-title"><div><div className="docs-eyebrow">THE PLAYER’S FIELD GUIDE</div><h1 id="docs-title">RARE RUSH<span>101.</span></h1><p>Start sideways. Get pulled skyward. Drop into free fall. Find your next rush in Arcade, or play to mint on Testnet.</p><span className="docs-badge">ARCADE LIVE · TESTNET PLAY-TO-MINT LIVE</span></div><Cover/></section>
       <div className="docs-layout">
@@ -133,7 +134,7 @@ function Docs() {
       <section className="docs-endcap"><span className="section-kicker">YOU KNOW THE WORLD. NOW GO RUN IT.</span><h2>Less reading.<br/>More rushing.</h2><p>Your next best run is one jump away.</p><a className="docs-cta" href="/arcade/">LET’S RUSH ↗</a></section>
     </main>
     <footer className="docs-footer"><span>RARE RUSH 101 / BY XIBOT</span><span>ART & WORLD BY <a href="https://rarefriends.com/">RARE FRIENDS ↗</a> · <a href="https://github.com/spokesz/friendsdk">FRIENDSDK ↗</a></span><a href="#top">BACK TO TOP ↑</a></footer>
-  </div>;
+  </div></>;
 }
 
 createRoot(document.getElementById('root')!).render(<Docs/>);

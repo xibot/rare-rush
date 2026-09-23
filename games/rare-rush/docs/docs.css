@@ -33,18 +33,6 @@ button { color: inherit; }
 .rush-docs { max-width: 1480px; padding: 0 48px; margin: 0 auto; }
 .docs-skip { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; background: var(--lime); color: var(--ink); font: 700 13px var(--rush-font-mono); }
 .docs-skip:focus { position: fixed; z-index: 20; top: 12px; left: 20px; width: auto; height: auto; clip-path: none; padding: 14px 20px; color: var(--ink); outline-color: var(--paper); }
-.docs-header { min-height: 110px; display: flex; justify-content: space-between; align-items: center; gap: 24px; border-bottom: 1px solid #fff6; }
-.docs-logo { display: flex; align-items: center; gap: 14px; text-decoration: none; flex-shrink: 0; }
-.docs-logo:hover { color: var(--paper); }
-.docs-logo > svg { width: 48px; height: 48px; }
-.docs-logo > span { font: 400 25px/1 var(--rush-font-display); }
-.docs-logo > span > span { color: var(--lime); }
-.docs-logo small { display: block; margin-top: 10px; font: 400 11px/1 var(--rush-font-mono); letter-spacing: 2.5px; }
-.docs-header nav { display: flex; align-items: center; gap: 26px; font: 500 12px/1.4 var(--rush-font-mono); }
-.docs-header nav a { min-height: 44px; display: inline-flex; align-items: center; gap: 20px; text-decoration: none; }
-.docs-header nav a:last-child { border: 1px solid var(--paper); padding: 13px 17px; }
-.docs-header nav .docs-cta { width: auto; min-height: 44px; box-shadow: none; font: 500 12px/1.4 var(--rush-font-mono); }
-.docs-header nav a:last-child:hover { background: var(--lime); color: var(--ink); border-color: var(--lime); }
 
 .docs-hero { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); align-items: center; gap: 48px; padding: 75px 0 70px; }
 .docs-eyebrow, .section-kicker { display: flex; align-items: center; gap: 10px; margin-bottom: 22px; font: 500 12px/1.5 var(--rush-font-mono); letter-spacing: 1px; color: var(--lime); }
@@ -271,13 +259,6 @@ button { color: inherit; }
 
 @media (max-width: 680px) {
   .rush-docs { padding: 0 20px; }
-  .docs-header { min-height: 94px; gap: 14px; align-items: center; flex-wrap: wrap; padding: 20px 0 14px; }
-  .docs-logo { gap: 10px; }
-  .docs-logo > svg { width: 37px; height: 37px; }
-  .docs-logo > span { font-size: 19px; }
-  .docs-logo small { font-size: 10px; letter-spacing: 1.6px; margin-top: 7px; }
-  .docs-header nav { width: 100%; justify-content: space-between; gap: 10px; font-size: 11px; }
-  .docs-header nav a:last-child { padding: 11px; gap: 10px; }
   .docs-hero { grid-template-columns: minmax(0, 1fr); padding: 35px 0 43px; gap: 29px; }
   .docs-hero h1 { font-size: clamp(40px, 8vw, 51px); line-height: 1.14; letter-spacing: -1px; margin-bottom: 19px; }
   .docs-eyebrow { margin-bottom: 18px; font-size: 11px; }
@@ -370,11 +351,6 @@ button { color: inherit; }
 }
 
 @media (max-width: 430px) {
-  .docs-header { flex-wrap: wrap; gap: 15px; padding: 22px 0 15px; }
-  .docs-logo > span { font-size: 21px; }
-  .docs-logo > svg { width: 41px; height: 41px; }
-  .docs-header nav { width: 100%; justify-content: space-between; gap: 10px; }
-  .docs-header nav a:last-child { padding: 10px 13px; }
   .docs-hero { padding-top: 30px; }
   .docs-hero h1 { font-size: 40px; }
   .section-heading h2 { font-size: 25px; }
