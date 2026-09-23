@@ -5,8 +5,10 @@ import { chromium } from 'playwright';
 import { decodeFunctionData, encodeAbiParameters, encodeEventTopics, encodeFunctionData, encodeFunctionResult, keccak256, parseAbi, toHex } from 'viem';
 import { PLAY_CONTRACTS, ENGINE_VERSION, DEPLOYMENT_BLOCK } from '../src/play/types.ts';
 import { PLAY_GAME_ABI } from '../src/play/chain.ts';
-import { advanceRecorder, createRecorder, exportReplay } from '../src/play/recorder.ts';
+import { advanceRecorder, createRecorder, exportReplay, queueControls, REPLAY_VERSION } from '../src/play/recorder.ts';
 import { emptyPlayState, stateKey } from '../src/play/storage.ts';
+import { demoControls } from '../generated/games/rare-rush/twist/engine.ts';
+import { continuousSpin } from '../generated/games/rare-rush/twist/transition-motion.ts';
 import { recordPilot } from '../../infra/testnet/test/pilot.ts';
 import { tokenAbi, nftAbi } from '../src/abi.ts';
 import { REWARD_CAP, LAUNCH_ALLOCATION, GAMEPLAY_ALLOCATION, RPC_URL } from '../src/safety.ts';
@@ -21,7 +23,7 @@ const head = DEPLOYMENT_BLOCK + 10n, now = BigInt(Math.floor(Date.now() / 1000))
 const fullTokenAbi = [...tokenAbi, ...parseAbi(['function allowance(address,address) view returns(uint256)', 'function approve(address,uint256) returns(bool)'])];
 const fullNftAbi = [...nftAbi, ...parseAbi(['function generation(uint256) view returns(uint256)'])];
 const runFixture = (collection = 0) => ({ runId: '5', player: account, tokenId: '1', seed, startedAt: String(now), claimUntil: String(now + 990n), collection, difficulty: 1, claimed: false, verifierEpoch: '1', abandoned: false });
-function readyState(collection = 0) { return { ...emptyPlayState(account), friends: [{ collection: 0, tokenId: '1' }, { collection: 1, tokenId: '2' }], savedRun: { run: runFixture(collection), replay: { version: 'rare-rush-input-v1', frames: [] }, completedTicks: 0, status: 'ready' } }; }
+function readyState(collection = 0) { return { ...emptyPlayState(account), friends: [{ collection: 0, tokenId: '1' }, { collection: 1, tokenId: '2' }], savedRun: { run: runFixture(collection), replay: { version: REPLAY_VERSION, frames: [] }, completedTicks: 0, status: 'ready' } }; }
 function lostState(collection) {
     const recording = createRecorder(seed, 'normal');
     while (recording.run.status === 'running') advanceRecorder(recording);
@@ -42,17 +44,34 @@ function claimedState(collection = 1) {
     state.history = [{ kind: 'claim', hash, status: 'confirmed', at: Number(now) * 1000 }];
     return state;
 }
+function directionState(difficulty, phase, collection = 0) {
+    const mode = ['easy', 'normal', 'degen'][difficulty];
+    const recording = createRecorder(seed, mode);
+    while (recording.run.status === 'running') {
+        const { axis: pace, jump, slide } = demoControls(recording.run);
+        queueControls(recording, { pace, jump, slide }); advanceRecorder(recording);
+        if (recording.run.transition?.from === 'side' && recording.run.transition.to === phase && recording.run.transition.progress > .08) break;
+    }
+    assert.equal(recording.run.status, 'running', `${mode} reaches ${phase} with legal controls`);
+    const state = readyState(collection);
+    Object.assign(state.savedRun.run, { difficulty, claimUntil: String(now + BigInt(recording.run.duration) + 900n) });
+    Object.assign(state.savedRun, { status: 'interrupted', replay: exportReplay(recording), completedTicks: recording.run._tick });
+    return { state, expectedSpin: continuousSpin(recording.run) };
+}
 function pendingState(hashKnown = true) { return { ...emptyPlayState(account), friends: [{ collection: 0, tokenId: '1' }], pending: { kind: 'start', to: PLAY_CONTRACTS.game, data: encodeFunctionData({ abi: PLAY_GAME_ABI, functionName: 'startRun', args: [0, 1n, 1] }), value: '0', nonce: 9, hash: hashKnown ? hash : null, createdAt: Number(now) * 1000, selection: { collection: 0, tokenId: '1', difficulty: 1 } } }; }
 for (const key of Object.keys(PLAY_CONTRACTS)) {
     assert.equal(runtimes.contracts[key], PLAY_CONTRACTS[key]);
     assert.equal(keccak256(runtimes.code[key]), runtimes.hashes[key]);
 }
-const browser = await chromium.launch({ headless: true });
+const browser = await chromium.launch({ headless: true, ...(process.env.PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH ? { executablePath: process.env.PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH } : {}) });
 const errors = [];
-async function setup({ state = null, mobile = false, chain = '0xb626', authorized = false, runtimeMismatch = false, serverReady = true, path = '/dashboard/' } = {}) {
+async function setup({ state = null, mobile = false, chain = '0xb626', authorized = false, runtimeMismatch = false, serverReady = true, controlledClock = false, path = '/dashboard/' } = {}) {
     const context = await browser.newContext({ viewport: mobile ? { width: 390, height: 844 } : { width: 1440, height: 1100 }, isMobile: mobile, hasTouch: mobile, deviceScaleFactor: 1 });
     context.on('page', page => page.on('pageerror', e => errors.push(e.message)));
     const page = await context.newPage();
+    if (controlledClock) {
+        await page.clock.install({ time: new Date(Number(now) * 1000) });
+    }
     await context.route('**/*', r => new URL(r.request().url()).origin === new URL(origin).origin ? r.continue() : r.abort());
     const requests = [], unexpected = [];
     const currentRun = structuredClone(state?.savedRun?.run ?? runFixture()), pending = state?.pending ?? pendingState().pending;
@@ -337,6 +356,75 @@ try {
     await noWrites(m.page);
     assert.deepEqual(m.unexpected, []);
     await m.context.close();
+    // Restore only replayed legal controls into each direction. No score, health,
+    // player position or phase overrides are injected into the browser.
+    for (const difficulty of [0, 1, 2]) for (const phase of ['up', 'down']) {
+        const collection = phase === 'down' ? 1 : 0;
+        const fixture = directionState(difficulty, phase, collection);
+        const v = await setup({ state: fixture.state, mobile: true, controlledClock: true, path: '/play/?run=5' });
+        await connect(v.page);
+        await v.page.getByRole('button', { name: 'RESUME RUN' }).click();
+        await v.page.locator(`.rush-run[data-phase="${phase}"][data-paused="true"]`).waitFor();
+        await v.page.clock.pauseAt(await v.page.evaluate(() => Date.now() + 100));
+        const scene = v.page.locator('[data-scene="connected-track"]');
+        const character = v.page.locator('[data-character="friend"]');
+        assert.equal(await scene.getAttribute('data-transition'), `side-${phase}`);
+        assert.equal(Number(await character.getAttribute('data-spin')), fixture.expectedSpin);
+        assert.equal(await v.page.getByRole('button', { name: 'Jump; tap twice to double jump' }).count(), 0);
+        assert.equal(await v.page.getByRole('button', { name: 'Hold to slide' }).count(), 0);
+        assert.equal(await v.page.getByRole('button', { name: 'Steer left' }).count(), 1);
+        assert.equal(await v.page.getByRole('button', { name: 'Steer right' }).count(), 1);
+        assert.equal(await v.page.locator('.vertical-touch').innerText(), phase === 'up' ? '↑ AUTO LIFT\n← STEER →' : '↓ FREE FALL\n← STEER →');
+        await v.page.getByRole('button', { name: 'KEEP RUNNING' }).tap();
+        await v.page.clock.runFor(100);
+        const sample = () => v.page.evaluate(() => ({ tick: Number(document.querySelector('.rush-run').dataset.tick), spin: Number(document.querySelector('[data-character="friend"]').dataset.spin), x: Number(document.querySelector('[data-character="friend"]').dataset.screenX) }));
+        const first = await sample();
+        await screenshot(v.page, `play-v2-${['easy', 'normal', 'degen'][difficulty]}-${phase}-entrance-mobile.png`);
+        assert.ok(Math.abs(first.spin) > Math.abs(fixture.expectedSpin), 'spin starts during the first entrance');
+        await v.page.clock.runFor(100);
+        const next = await sample();
+        assert.ok(Math.abs(Math.abs(next.spin - first.spin) - 180 * (next.tick - first.tick) / 120) < .000001, 'entrance spin runs continuously at 180 degrees per second');
+        await v.page.clock.runFor(1000);
+        assert.equal(await scene.getAttribute('data-transition'), 'none');
+        const inShaft = await sample();
+        assert.ok(Math.abs(inShaft.spin) > Math.abs(next.spin), 'spin does not reset when suction clears');
+        assert.ok(Math.abs(Math.abs(inShaft.spin - next.spin) - 180 * (inShaft.tick - next.tick) / 120) < .000001);
+        assert.ok(Number(await scene.getAttribute('data-camera-scale')) < 1, 'mobile camera shows the full shaft');
+        const steerLeft = await v.page.getByRole('button', { name: 'Steer left' }).boundingBox();
+        await v.page.mouse.move(steerLeft.x + steerLeft.width / 2, steerLeft.y + steerLeft.height / 2);
+        await v.page.mouse.down();
+        const beforeLeft = await sample();
+        await v.page.clock.runFor(100);
+        const afterLeft = await sample();
+        await v.page.mouse.up();
+        assert.ok(afterLeft.x < beforeLeft.x, 'mobile LEFT steers the Friend');
+        const steerRight = await v.page.getByRole('button', { name: 'Steer right' }).boundingBox();
+        await v.page.mouse.move(steerRight.x + steerRight.width / 2, steerRight.y + steerRight.height / 2);
+        await v.page.mouse.down();
+        const beforeRight = await sample();
+        await v.page.clock.runFor(100);
+        const afterRight = await sample();
+        await v.page.mouse.up();
+        assert.ok(afterRight.x > beforeRight.x, 'mobile RIGHT steers the Friend');
+        if (collection === 1) assert.equal(await v.page.locator('[data-genesis-art]').count(), 1);
+        await screenshot(v.page, `play-v2-${['easy', 'normal', 'degen'][difficulty]}-${phase}-mobile.png`);
+        await v.page.getByRole('button', { name: 'Ⅱ PAUSE' }).tap();
+        const frozen = await sample();
+        await v.page.clock.runFor(100);
+        assert.deepEqual(await sample(), frozen, 'pause freezes shaft physics and cosmetic spin');
+        await screenshot(v.page, `play-v2-${['easy', 'normal', 'degen'][difficulty]}-${phase}-paused-mobile.png`);
+        const checkpoint = (await saved(v.page)).savedRun;
+        assert.equal(checkpoint.replay.frames.length, checkpoint.completedTicks);
+        await v.page.clock.resume();
+        await v.page.reload();
+        await v.page.getByRole('button', { name: 'RESUME RUN' }).click();
+        await v.page.getByText('RUN PAUSED', { exact: true }).waitFor();
+        assert.deepEqual(await sample(), frozen, 'saved replay restores exact shaft position and spin');
+        assert.equal(await v.page.evaluate(() => document.documentElement.scrollWidth > innerWidth), false);
+        await noWrites(v.page);
+        assert.deepEqual(v.unexpected, []);
+        await v.context.close();
+    }
     for (const hashKnown of [true, false]) {
         const p = await setup({ state: pendingState(hashKnown), mobile: !hashKnown, path: '/play/?collection=generations&friend=1' });
         await connect(p.page);
@@ -519,7 +607,7 @@ try {
     assert.deepEqual(off.unexpected, []);
     await off.context.close();
     assert.deepEqual(errors, []);
-    console.log('Play browser checks passed: desktop/mobile UI, collection → NFT artwork → mode/cabinet flow, dashboard holdings and results without play controls, silent wallet restoration across test kit/dashboard/play/reload, persistent cross-tab disconnect, provider revocation and account/network changes, pinned runtime verification, saved play/reload, keyboard/touch, pause/resume, external-tab checkpoint isolation, account isolation, known/hashless recovery, NFT/mode choice, confirmed paid entry opening paused gameplay, direct saved-run reconnect and wrong-network recovery, both collections’ lost-run close/rejection/confirmation without extra entries or automatic transactions, runtime and unavailable-verifier gating. All RPC/wallet/API traffic mocked; no transactions submitted.');
+    console.log('Play browser checks passed: desktop/mobile UI, collection → NFT artwork → mode/cabinet flow, dashboard holdings and results without play controls, silent wallet restoration across test kit/dashboard/play/reload, persistent cross-tab disconnect, provider revocation and account/network changes, pinned runtime verification, saved play/reload, keyboard/touch, V2 legal-replay up/down transitions in every mode, continuous 180-degree spin, mobile shaft steering, pause/reload restoration, external-tab checkpoint isolation, account isolation, known/hashless recovery, NFT/mode choice, confirmed paid entry opening paused gameplay, direct saved-run reconnect and wrong-network recovery, both collections’ lost-run close/rejection/confirmation without extra entries or automatic transactions, runtime and unavailable-verifier gating. All RPC/wallet/API traffic mocked; no transactions submitted.');
 }
 finally {
     await browser.close();

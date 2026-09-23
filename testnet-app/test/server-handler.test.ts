@@ -14,7 +14,7 @@ const other = privateKeyToAccount(`0x${'22'.repeat(32)}`);
 const version = `0x${'33'.repeat(32)}` as Hex;
 const time = 1_800_000_000;
 const status: VerifierStatus = { ready: true, chainId: AUTH_CHAIN_ID, game: AUTH_GAME, engineVersion: version, verifier: other.address, reason: 'ready' };
-const replay = { version: 'rare-rush-input-v1' as const, frames: [] };
+const replay = { version: 'rare-rush-input-v2' as const, frames: [] };
 
 async function payload(options: { expiresAt?: number; runId?: string; signer?: typeof wallet } = {}): Promise<VerifyRunRequest> {
   const authorization = createAuthorization({ player: wallet.address, runId: options.runId ?? '1', replay, expiresAt: options.expiresAt ?? time + 180 });

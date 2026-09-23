@@ -1,21 +1,16 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { keccak256, toHex } from 'viem';
-import { createRecorder, advanceRecorder, exportReplay, queueControls, releaseControls, snapshotRun, REPLAY_VERSION, type DifficultyId, type Recording } from '../src/play/recorder.ts';
+import { createRecorder, advanceRecorder, exportReplay, queueControls, releaseControls, snapshotRun, REPLAY_VERSION, type DifficultyId, type Recording, type Replay } from '../src/play/recorder.ts';
 import { verifyReplay } from '../generated/infra/testnet/src/replay.ts';
-import { createRun, jump, setPace, setSliding, stepRun, FIXED_STEP } from '../generated/games/rare-rush/engine.ts';
+import { createRun, demoControls, jump, setPace, setSliding, stepRun, FIXED_STEP } from '../generated/games/rare-rush/twist/engine.ts';
+import { continuousSpin } from '../generated/games/rare-rush/twist/transition-motion.ts';
 
 const seed = keccak256(toHex('rare-rush-replay-test'));
 // Test fixture only. No automated input source is imported into the public renderer.
 function testControls(recording: Recording) {
-  const run = recording.run;
-  const next = run.entities.filter(entity => ['crystal', 'block', 'drone'].includes(entity.kind) && !entity.hit && entity.x + entity.w > run.player.x)
-    .sort((first, second) => first.x - second.x)[0];
-  const until = next ? (next.x - run.player.x - run.player.w) / run.speed : Infinity;
-  queueControls(recording, {
-    slide: Boolean(next?.kind === 'drone' && until < .6), pace: 0,
-    jump: Boolean(next && next.kind !== 'drone' && (until < .24 && run.player.grounded || until < .3 && run.player.jumps === 1 && run.player.vy >= -80)),
-  });
+  const { axis: pace, jump, slide } = demoControls(recording.run);
+  queueControls(recording, { pace, jump, slide });
 }
 function finish(recording: Recording) {
   while (recording.run.status === 'running') { testControls(recording); advanceRecorder(recording); }
@@ -92,13 +87,13 @@ test('finished recordings never add extra inputs; lost runs cannot pass verifica
 });
 
 test('restore rejects invalid chain seeds, ticks, frames and injected client state', () => {
-  const replay = { version: REPLAY_VERSION, frames: [{ tick: 0, jump: true, slide: false, pace: 0 as const }] };
+  const replay: Replay = { version: REPLAY_VERSION, frames: [{ tick: 0, jump: true, slide: false, pace: 0 }] };
   assert.throws(() => createRecorder('0x1234', 'normal'), /contract seed/);
   for (const ticks of [-1, .1, NaN, 10801]) assert.throws(() => createRecorder(seed, 'normal', replay, ticks));
   assert.throws(() => createRecorder(seed, 'normal', undefined, 1), /saved replay/);
   assert.throws(() => createRecorder(seed, 'normal', replay, 0), /completed ticks/);
   for (const input of [
-    { ...replay, score: 999999 }, { ...replay, seed }, { ...replay, version: 'other' },
+    { ...replay, score: 999999 }, { ...replay, seed }, { ...replay, version: 'other' }, { ...replay, version: 'rare-rush-input-v1' },
     { ...replay, frames: [{ ...replay.frames[0], hearts: 3 }] },
     { ...replay, frames: [replay.frames[0], replay.frames[0]] },
     { ...replay, frames: [{ ...replay.frames[0], pace: 2 }] },
@@ -116,4 +111,59 @@ test('exported replay and snapshots cannot mutate the live recording', () => {
   assert.equal(recording.replay.frames[0].jump, false);
   assert.equal(recording.run.player.y, 400);
   assert.ok(recording.run.entities.length > 0);
+});
+
+
+test('snapshots and saved replays preserve every connected-map phase and transition in all modes', () => {
+  for (const difficulty of ['easy', 'normal', 'degen'] as const) {
+    const recording = createRecorder(seed, difficulty);
+    const checkpoints = new Set<string>();
+    while (recording.run.status === 'running') {
+      testControls(recording); advanceRecorder(recording);
+      const run = recording.run;
+      const key = run.transition ? `${run.transition.from}-${run.transition.to}` : run.phase;
+      if (checkpoints.has(key)) continue;
+      checkpoints.add(key);
+      const snapshot = snapshotRun(recording);
+      const restored = createRecorder(seed, difficulty, exportReplay(recording), snapshot.completedTicks);
+      assert.deepEqual(restored.run, recording.run, `${difficulty}: ${key} restores exact simulation state`);
+      assert.deepEqual(snapshot.phasePlan, run.phasePlan);
+      assert.deepEqual(snapshot.transition, run.transition);
+      assert.deepEqual(snapshot.gate, run.gate);
+      assert.equal(continuousSpin(restored.run), continuousSpin(run));
+      snapshot.phasePlan[0].end = -1;
+      if (snapshot.transition) snapshot.transition.fromEntities.length = 0;
+      assert.notEqual(run.phasePlan[0].end, -1);
+      if (run.transition?.fromEntities.length) assert.notEqual(snapshot.transition?.fromEntities.length, run.transition.fromEntities.length);
+      releaseControls(recording); releaseControls(restored);
+      for (let tick = 0; tick < 12; tick++) {
+        testControls(recording); testControls(restored);
+        advanceRecorder(recording); advanceRecorder(restored);
+      }
+      assert.deepEqual(restored.run, recording.run, `${difficulty}: ${key} resumes without diverging`);
+    }
+    assert.equal(recording.run.finishReason, 'time');
+    for (const phase of ['side', 'up', 'down', 'side-up', 'up-side', 'side-down', 'down-side'])
+      assert.ok(checkpoints.has(phase), `${difficulty} covers ${phase}`);
+  }
+});
+
+test('shaft steering and automatic travel use legal per-tick input without jump or slide physics', () => {
+  const recording = createRecorder(seed, 'normal');
+  while ((recording.run.phase === 'side' || recording.run.transition) && recording.run.status === 'running') {
+    testControls(recording); advanceRecorder(recording);
+  }
+  assert.notEqual(recording.run.phase, 'side');
+  const original = snapshotRun(recording);
+  queueControls(recording, { pace: -1, jump: true, slide: true }); advanceRecorder(recording);
+  assert.ok(recording.run.player.x < original.player.x, 'left steers through the shaft');
+  assert.equal(recording.run.player.y, original.player.y, 'vertical travel is automatic with a fixed camera anchor');
+  assert.equal(recording.run.player.slide, false);
+  assert.equal(recording.run.player.jumps, original.player.jumps);
+  assert.ok(recording.run.distance > original.distance);
+  const left = recording.run.player.x;
+  releaseControls(recording); advanceRecorder(recording);
+  assert.equal(recording.run.player.x, left, 'released steering stays neutral');
+  queueControls(recording, { pace: 1 }); advanceRecorder(recording);
+  assert.ok(recording.run.player.x > left, 'right steers through the shaft');
 });

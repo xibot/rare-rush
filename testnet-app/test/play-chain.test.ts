@@ -35,7 +35,7 @@ test('confirmed start recovers after reload into the exact selected run, ready t
   const f = fixture(); const result = await recoverPending(f.ctx);
   assert.equal(result.pending, null); assert.equal(result.savedRun?.run.runId, '5');
   assert.equal(result.savedRun?.run.seed, seed); assert.equal(result.savedRun?.status, 'ready');
-  assert.deepEqual(result.savedRun?.replay, { version: 'rare-rush-input-v1', frames: [] });
+  assert.deepEqual(result.savedRun?.replay, { version: 'rare-rush-input-v2', frames: [] });
   assert.equal(loadPlayState(f.store, account).history.at(-1)?.status, 'confirmed');
   assert.deepEqual(f.requests, []);
 });
@@ -222,7 +222,7 @@ test('claim event requires exact run, player, replay and pickup count; reward co
 test('claim recovery persists the chain reward, and a finalized abandon is tracked separately', async () => {
   for (const kind of ['claim', 'abandon'] as const) {
     const f = fixture(); const run = assertRunStarted(f.receipt, account, selection);
-    const replay = { version: 'rare-rush-input-v1' as const, frames: [] };
+    const replay = { version: 'rare-rush-input-v2' as const, frames: [] };
     const replayHash = keccak256(toHex(JSON.stringify(replay)));
     const signature = `0x${'7'.repeat(130)}` as Hex;
     const claim: VerifiedClaim = { chainId: 46630, game: PLAY_CONTRACTS.game, runId: '5', player: account, engineVersion: ENGINE_VERSION, pickupKinds: '0x0001', replayHash, deadline: '1500', signature, claimArgs: ['5', '0x0001', replayHash, '1500', signature] };

@@ -44,14 +44,30 @@ export function validateVerifiedClaim(input: unknown, run: RunSnapshot, replay?:
     engineVersion: ENGINE_VERSION, pickupKinds: value.pickupKinds, replayHash: value.replayHash,
     deadline: value.deadline, signature: value.signature, claimArgs: expected as VerifiedClaim['claimArgs'] };
 }
-export function stateKey(account: Address) { return `rare-rush:play:v1:${PLAY_CHAIN_ID}:${PLAY_CONTRACTS.game}:${account.toLowerCase()}`; }
+export function stateKey(account: Address) { return `rare-rush:play:v2:${PLAY_CHAIN_ID}:${PLAY_CONTRACTS.game}:${account.toLowerCase()}`; }
+const LEGACY_GAME = '0x24bca5bf559e0353801f719ebc3885441cb49fd3';
+/** Reuse remembered NFT IDs only. V1 replays, receipts and pending writes stay untouched. */
+function rememberedV1Friends(storage: StorageLike, account: Address): FriendSelection[] {
+  try {
+    const raw = storage.getItem(`rare-rush:play:v1:${PLAY_CHAIN_ID}:${LEGACY_GAME}:${account.toLowerCase()}`);
+    if (!raw || raw.length > MAX_STATE_BYTES) return [];
+    const prior = JSON.parse(raw);
+    if (prior.version !== 1 || prior.chainId !== PLAY_CHAIN_ID || !same(prior.game, LEGACY_GAME) ||
+      typeof prior.account !== 'string' || !same(prior.account, account) || !Array.isArray(prior.friends)) return [];
+    const ids = new Map<string, FriendSelection>();
+    for (const value of prior.friends.slice(0, 100)) {
+      try { const item = friend(value); ids.set(`${item.collection}:${item.tokenId}`, item); } catch { /* Invalid IDs confer no ownership. */ }
+    }
+    return [...ids.values()];
+  } catch { return []; }
+}
 export function emptyPlayState(account: Address): PlayState {
   if (!address(account)) fail();
-  return { version: 1, chainId: PLAY_CHAIN_ID, game: PLAY_CONTRACTS.game, account: getAddress(account), pending: null, savedRun: null, friends: [], history: [] };
+  return { version: 2, chainId: PLAY_CHAIN_ID, game: PLAY_CONTRACTS.game, account: getAddress(account), pending: null, savedRun: null, friends: [], history: [] };
 }
 export function validatePlayState(input: unknown, account: Address): PlayState {
   const value = object(input);
-  if (value.version !== 1 || value.chainId !== PLAY_CHAIN_ID || value.game !== PLAY_CONTRACTS.game || !address(value.account) || !same(value.account, account) ||
+  if (value.version !== 2 || value.chainId !== PLAY_CHAIN_ID || value.game !== PLAY_CONTRACTS.game || !address(value.account) || !same(value.account, account) ||
       !Array.isArray(value.friends) || value.friends.length > 100 || !Array.isArray(value.history) || value.history.length > 20) fail();
   value.friends = value.friends.map(friend);
   for (const item of value.history) {
@@ -87,7 +103,7 @@ export function validatePlayState(input: unknown, account: Address): PlayState {
 }
 export function loadPlayState(storage: StorageLike, account: Address): PlayState {
   const raw = storage.getItem(stateKey(account));
-  if (raw === null) return emptyPlayState(account);
+  if (raw === null) return { ...emptyPlayState(account), friends: rememberedV1Friends(storage, account) };
   if (raw.length > MAX_STATE_BYTES) fail();
   let parsed: unknown;
   try { parsed = JSON.parse(raw); } catch { fail(); }

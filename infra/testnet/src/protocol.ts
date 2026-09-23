@@ -1,6 +1,9 @@
 import { keccak256, toHex, type Address, type Hex } from 'viem';
 
-export const PROTOCOL_VERSION = 'rare-rush-input-v1';
+export const PROTOCOL_VERSION = 'rare-rush-input-v2';
+/** Canonical, sorted physics dependency paths, relative to games/rare-rush. */
+export const ENGINE_SOURCE_PATHS = ['difficulty.ts', 'engine.ts', 'twist/engine.ts'] as const;
+export type EngineSourcePath = typeof ENGINE_SOURCE_PATHS[number];
 export const resultTypes = {
   RunResult: [
     { name: 'runId', type: 'uint256' },
@@ -27,6 +30,12 @@ export function resultData(chainId: number, game: Address, result: {
   };
 }
 
-export function engineVersionFromSources(engine: string, difficulty: string): Hex {
-  return keccak256(toHex(`${PROTOCOL_VERSION}\n${engine}\n${difficulty}`));
+export function engineVersionFromSources(sources: Readonly<Record<EngineSourcePath, string>>): Hex {
+  // JSON framing binds paths and exact source contents without delimiter ambiguity.
+  // Caller object insertion order cannot change the version, nor can V1 share it.
+  const entries = ENGINE_SOURCE_PATHS.map(path => {
+    if (typeof sources[path] !== 'string') throw new Error(`Missing engine source: ${path}`);
+    return [path, sources[path]];
+  });
+  return keccak256(toHex(JSON.stringify([PROTOCOL_VERSION, entries])));
 }

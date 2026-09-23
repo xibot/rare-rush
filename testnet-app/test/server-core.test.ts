@@ -44,7 +44,7 @@ function client(overrides: Overrides = {}) {
 function options(overrides: Overrides = {}) {
   return {
     client: client(overrides), chainId: AUTH_CHAIN_ID, game: AUTH_GAME, runId: 1n,
-    replay: { version: 'rare-rush-input-v1', frames: [] }, privateKey: verifierKey,
+    replay: { version: 'rare-rush-input-v2', frames: [] }, privateKey: verifierKey,
     gameAbi: gameArtifact.abi as Abi, nftAbi: nftArtifact.abi as Abi,
     engineVersion: ENGINE_VERSION, expectedPlayer: player.address, confirmations: 2,
   };

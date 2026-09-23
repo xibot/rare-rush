@@ -1,19 +1,20 @@
 <!doctype html>
 <html lang="en">
-<head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Rare Rush · Testnet deployment</title><link rel="stylesheet" href="/style.css"><script type="module" src="/app.js"></script></head>
+<head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Rare Rush · Testnet V2 deployment</title><link rel="stylesheet" href="/style.css"><script type="module" src="/app.js"></script></head>
 <body>
 <main>
   <header><a href="https://rarerush.app" target="_blank" rel="noreferrer">RARE<span>RUSH</span><small>BY XIBOT</small></a><span class="tag">LOCAL DEPLOYMENT CONSOLE</span></header>
-  <p class="kicker">NEXT STOP: TESTNET</p><h1>BRING THE<br><em>RUSH ONCHAIN.</em></h1>
-  <p class="intro">Five contracts. Six wallet approvals. Test assets only, on Robinhood Chain testnet (46630).</p>
+  <p class="kicker">NEXT STOP: TESTNET V2</p><h1>BRING THE<br><em>RUSH ONCHAIN.</em></h1>
+  <p class="intro">Two new contracts. Three wallet approvals. Reuse your existing tRF and test NFTs. Test assets only, on Robinhood Chain testnet (46630).</p>
   <p>No real Rare Friends move here. The test NFTs and tRF are free test assets; tRARERUSH has no monetary value. Only test ETH pays deployment gas. The provisional split is 10% launch reserve / 90% gameplay. The reserve stays in your owner wallet; this does not launch a Doppler liquidity pool.</p>
   <section aria-labelledby="wallet-title"><h2 id="wallet-title">01 / YOUR DEPLOYER</h2>
     <dl><dt>Required wallet</dt><dd id="owner">Loading…</dd><dt>Connected wallet</dt><dd id="account">Not connected</dd><dt>Test ETH balance</dt><dd id="balance">—</dd><dt>Treasury · 10 tRF per paid run</dt><dd id="treasury">Loading…</dd><dt>Launch reserve · 102.4M tRARERUSH</dt><dd id="reserve">Loading…</dd><dt>Verifier</dt><dd id="verifier">Loading…</dd><dt>Engine version</dt><dd id="engine">Loading…</dd></dl>
     <div class="actions"><button id="connect" disabled>CONNECT WALLET ↗</button><button id="switch" class="secondary" hidden>SWITCH TO TESTNET</button><button id="refresh" class="secondary" disabled>REFRESH</button><a class="button secondary" href="https://faucet.testnet.chain.robinhood.com" target="_blank" rel="noreferrer">GET TEST ETH ↗</a></div>
     <p id="wallet-status" role="status">Loading the public configuration…</p>
   </section>
-  <section aria-labelledby="contracts-title"><h2 id="contracts-title">02 / DEPLOY IN ORDER</h2><p>Connect the required wallet, then deploy five contracts and bind the token to the game. A pending deployment must finish before the next one. Refreshing this page will preserve progress in this browser.</p><div id="steps"></div></section>
-  <section aria-labelledby="save-title"><h2 id="save-title">03 / SAVE YOUR DEPLOYMENT</h2><p>The manifest contains public addresses, transaction hashes and constructor arguments. Keep it with the compiler input for verification. Neither download contains a private key.</p><div class="actions"><button id="download" disabled>DOWNLOAD MANIFEST ↓</button><a class="button secondary" href="/artifacts/standard-input.json" download="rare-rush-standard-input.json">COMPILER INPUT ↓</a></div><p id="summary" role="status">Complete all six operations to export the final manifest.</p></section>
+  <section aria-labelledby="assets-title"><h2 id="assets-title">02 / EXISTING TEST ASSETS</h2><p>These V1 assets are reused after read-only code and interface checks. Your balances and NFT ownership carry forward.</p><dl id="reused-assets"></dl></section>
+  <section aria-labelledby="contracts-title"><h2 id="contracts-title">03 / DEPLOY V2 IN ORDER</h2><p>Connect the required wallet, then deploy the V2 game and reward token, then bind the token to the game. A pending deployment must finish before the next one. Refreshing this page will preserve progress in this browser.</p><div id="steps"></div></section>
+  <section aria-labelledby="save-title"><h2 id="save-title">04 / SAVE YOUR V2 DEPLOYMENT</h2><p>The manifest contains public addresses, transaction hashes and constructor arguments. Keep it with the compiler input for verification. Neither download contains a private key.</p><div class="actions"><button id="download" disabled>DOWNLOAD MANIFEST ↓</button><a class="button secondary" href="/artifacts/standard-input.json" download="rare-rush-v2-standard-input.json">COMPILER INPUT ↓</a></div><p id="summary" role="status">Complete all three V2 operations to export the final manifest.</p></section>
   <footer>Local operator tool. Keep this tab open while a transaction is awaiting your wallet. Never paste a private key here or into chat.</footer>
 </main>
 </body></html>

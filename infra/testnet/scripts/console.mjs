@@ -2,7 +2,7 @@ import { createServer } from 'node:http';
 import { readFile } from 'node:fs/promises';
 import { fileURLToPath } from 'node:url';
 import { build } from 'esbuild';
-import { publicConfig } from '../src/deployment-config.mjs';
+import { publicConfig, CONFIG_FILE } from '../src/deployment-config.mjs';
 import { currentEngineVersion } from '../src/engine-version.ts';
 
 const root = new URL('../', import.meta.url);
@@ -11,7 +11,7 @@ if (!Number.isInteger(port) || port < 1024 || port > 65535) throw new Error('Inv
 
 // Explicitly select public fields. Never serve the config file itself, any
 // arbitrary path, environment variables, keystores, or signing material.
-const raw = JSON.parse(await readFile(new URL('operator-config.json', root), 'utf8'));
+const raw = JSON.parse(await readFile(new URL(CONFIG_FILE, root), 'utf8'));
 const config = publicConfig(raw);
 if (config.engineVersion !== await currentEngineVersion()) throw new Error('Engine changed. Prepare the operator config again.');
 const bundle = await build({ entryPoints: [fileURLToPath(new URL('console/app.js', root))], bundle: true,
@@ -43,7 +43,7 @@ const server = createServer((req, res) => {
   res.end(req.method === 'HEAD' ? undefined : file.body);
 });
 server.listen(port, '127.0.0.1', () => {
-  console.log(`Rare Rush local deployment console: http://127.0.0.1:${port}`);
+  console.log(`Rare Rush V2 local deployment console: http://127.0.0.1:${port}`);
   console.log('Robinhood Chain testnet only. Connect and approve each deployment in your browser wallet.');
 });
 for (const signal of ['SIGINT', 'SIGTERM']) process.on(signal, () => server.close(() => process.exit(0)));

@@ -11,13 +11,15 @@ import { currentEngineVersion } from '../src/engine-version.ts';
 import {
   ARTIFACT_NAMES, CHAIN_ID, REWARD_CAP, LAUNCH_ALLOCATION, GAMEPLAY_ALLOCATION,
   artifactFingerprint, constructorArgs, economics, publicConfig, validHash, same, json,
+  CONFIG_FILE, DEPLOYMENT_VERSION, OPERATIONS, REUSED_ASSETS, verifyReusedAssets,
 } from '../src/deployment-config.mjs';
 
 // No wallet, signing key, env loader, user-provided RPC, or transaction-send method is used.
-// This initial-deployment check intentionally fails if gameplay or reserve transfers have begun.
+// Fresh V2 game/token state is checked before gameplay or reserve transfers. Reused
+// V1 assets are verified by identity only; existing balances and mints are permitted.
 const root = new URL('../', import.meta.url);
-const evidencePath = new URL('artifacts/public-deployment-verification.json', root);
-const operations = ['rf', 'genesis', 'generations', 'game', 'rewardToken', 'bind'];
+const evidencePath = new URL('artifacts/public-deployment-v2-verification.json', root);
+const operations = OPERATIONS;
 const names = { rf: 'TestRF', genesis: 'TestFriends', generations: 'TestFriends', game: 'RareRushGame', rewardToken: 'RareRushToken', bind: 'RareRushGame' };
 const check = (condition, message) => { if (!condition) throw new Error(message); };
 const object = value => value !== null && typeof value === 'object' && !Array.isArray(value);
@@ -56,7 +58,7 @@ try {
   const args = process.argv.slice(2);
   check(args.length >= 1 && args.length <= 2 && !args.some(item => item.startsWith('--')), 'Usage: node scripts/verify-deployment.mjs MANIFEST.json [STANDARD-INPUT.json]');
   const { value: manifest, contents: manifestText } = await readJson(args[0], 128_000);
-  check(object(manifest) && manifest.formatVersion === 2 && manifest.network === 'robinhood-testnet' && manifest.chainId === CHAIN_ID, 'Manifest must identify Robinhood testnet format 2.');
+  check(object(manifest) && manifest.formatVersion === 3 && manifest.deploymentVersion === DEPLOYMENT_VERSION && manifest.network === 'robinhood-testnet' && manifest.chainId === CHAIN_ID, 'Manifest must identify Robinhood testnet V2 format 3.');
   equal(manifest.rpcUrl, robinhoodTestnet.rpcUrls.default.http[0], 'Manifest RPC');
   equal(manifest.explorerUrl, robinhoodTestnet.blockExplorers.default.url, 'Manifest explorer');
   equal(manifest.deploymentMethod, 'browser-wallet-console', 'Deployment method');
@@ -64,7 +66,7 @@ try {
   equal(Object.keys(manifest.deployments).sort(), [...operations].sort(), 'Deployment operations');
   equal(manifest.economics, economics, 'Economics');
 
-  const { value: configRaw } = await readJson(new URL('operator-config.json', root), 16_000);
+  const { value: configRaw } = await readJson(new URL(CONFIG_FILE, root), 16_000);
   const config = publicConfig(configRaw);
   equal(publicConfig(manifest), config, 'Manifest operator config');
   equal(await currentEngineVersion(), config.engineVersion, 'Current engine version');
@@ -100,14 +102,15 @@ try {
     equal(rebuilt.abi, item.abi, `${name} ABI`);
   }
 
-  const contracts = {};
+  const contracts = { ...config.reusedAssets };
+  for (const [id, asset] of Object.entries(REUSED_ASSETS)) equal(manifest[id], asset.address, `${id} reused asset address`);
   const expectedData = {};
   const transactionHashes = new Set();
   for (const id of operations) {
     const item = manifest.deployments[id];
     const contractArtifact = artifacts[names[id]];
     check(object(item) && item.status === 'confirmed' && address(item.address) && validHash(item.hash) && validHash(item.dataHash), `Invalid ${id} deployment record.`);
-    check(typeof item.blockNumber === 'string' && /^[1-9][0-9]*$/.test(item.blockNumber) && Number.isSafeInteger(item.confirmations) && item.confirmations >= 2, `Invalid ${id} receipt metadata.`);
+    check(typeof item.blockNumber === 'string' && /^[1-9][0-9]*$/.test(item.blockNumber) && Number.isSafeInteger(item.confirmations) && item.confirmations >= 2 && Number.isSafeInteger(item.nonce) && item.nonce >= 0, `Invalid ${id} receipt metadata.`);
     check(!transactionHashes.has(item.hash.toLowerCase()), 'Duplicate deployment transaction hash.');
     transactionHashes.add(item.hash.toLowerCase());
     const expectedArgs = constructorArgs(id, config, manifest.deployments);
@@ -139,6 +142,8 @@ try {
   const head = await client.getBlockNumber({ cacheTime: 0 });
   const blockNumber = head - 1n;
   const pinned = await client.getBlock({ blockNumber });
+  const reusedAssetVerification = await verifyReusedAssets(client, artifacts, blockNumber);
+  equal(manifest.reusedAssetVerification, reusedAssetVerification, 'Reused asset verification');
   const transactions = {};
   let lastNonce = -1;
   let lastBlock = -1n;
@@ -153,6 +158,7 @@ try {
     equal(tx.to, id === 'bind' ? contracts.game : null, `${id} destination`);
     equal(tx.value, 0n, `${id} transaction value`);
     equal(tx.input, expectedData[id], `${id} transaction calldata`);
+    equal(tx.nonce, item.nonce, `${id} fixed nonce`);
     check(tx.nonce > lastNonce, 'Deployment transaction nonces must increase.');
     lastNonce = tx.nonce;
     equal(receipt.status, 'success', `${id} receipt status`);
@@ -267,7 +273,7 @@ try {
   equal(await client.getChainId(), CHAIN_ID, 'Final RPC chain');
   equal((await client.getBlock({ blockNumber })).hash, pinned.hash, 'Pinned block after verification');
   const report = {
-    formatVersion: 1, verifiedAt: new Date().toISOString(), network: 'robinhood-testnet', chainId: CHAIN_ID,
+    formatVersion: 2, deploymentVersion: DEPLOYMENT_VERSION, reusedAssetVerification, verifiedAt: new Date().toISOString(), network: 'robinhood-testnet', chainId: CHAIN_ID,
     rpcUrl: robinhoodTestnet.rpcUrls.default.http[0], blockNumber, blockHash: pinned.hash, blockTimestamp: pinned.timestamp,
     manifestHash: keccak256(stringToHex(manifestText)), standardInputHash: keccak256(stringToHex(trustedInputText)),
     submittedCompilerInputMatched: Boolean(args[1]), compiler: solc.version(), artifactFingerprint: manifest.artifactFingerprint,
@@ -277,7 +283,7 @@ try {
   };
   await mkdir(new URL('artifacts/', root), { recursive: true });
   await writeFile(evidencePath, JSON.stringify(report, (_, value) => typeof value === 'bigint' ? value.toString() : value, 2) + '\n');
-  console.log(json({ verified: true, chainId: CHAIN_ID, blockNumber, blockHash: pinned.hash, contracts, transactions: operations.length, stateChecks: checks.length + 1, guardChecks: guards.length, evidence: 'artifacts/public-deployment-verification.json' }));
+  console.log(json({ verified: true, chainId: CHAIN_ID, blockNumber, blockHash: pinned.hash, contracts, transactions: operations.length, stateChecks: checks.length + 1, guardChecks: guards.length, evidence: 'artifacts/public-deployment-v2-verification.json' }));
 } catch (error) {
   // Do not dump caller-supplied documents, RPC bodies, or unrelated environment contents.
   console.error(`Deployment verification failed: ${error instanceof Error ? error.message.split('\n')[0] : 'Unknown error.'}`);

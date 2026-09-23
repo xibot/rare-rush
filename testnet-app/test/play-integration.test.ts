@@ -6,6 +6,7 @@ import { fileURLToPath } from 'node:url';
 import { setTimeout as delay } from 'node:timers/promises';
 import { createPublicClient, createWalletClient, http, parseEther, toHex, type Address, type EIP1193Provider, type Hash } from 'viem';
 import { mnemonicToAccount } from 'viem/accounts';
+import deployment from '../src/shared/deployment.json' with { type: 'json' };
 import { artifact } from '../../infra/testnet/src/artifacts.mjs';
 import { currentEngineVersion } from '../../infra/testnet/src/engine-version.ts';
 import { recordPilot } from '../../infra/testnet/test/pilot.ts';
@@ -20,7 +21,7 @@ import { loadPlayState, savePlayState, validateVerifiedClaim } from '../src/play
  * The public deployment addresses are reproduced via CREATE nonces so the actual
  * pinned browser/auth domain can be exercised without relaxing production guards.
  */
-test('local recorder → wallet-authenticated handler → confirmed claim mint for both collections', {
+test('local V2 recorder → authenticated handler → confirmed mint for both collections in every mode', {
   skip: process.env.RUSH_RUN_PLAY_INTEGRATION !== '1', timeout: 120_000,
 }, async () => {
   const root = fileURLToPath(new URL('../../infra/testnet/', import.meta.url));
@@ -62,7 +63,7 @@ test('local recorder → wallet-authenticated handler → confirmed claim mint f
     const deployer = '0x6fD155b9D52F80E8A73a8A2537268602978486e2' as Address;
     await devRpc('hardhat_impersonateAccount', [deployer]);
     await devRpc('hardhat_setBalance', [deployer, toHex(parseEther('100'))]);
-    await devRpc('hardhat_setNonce', [deployer, '0x7e']);
+    await devRpc('hardhat_setNonce', [deployer, toHex(deployment.deploymentNonces.rf)]);
     const ownerWallet = createWalletClient({ account: deployer, chain: TESTNET_CHAIN, transport: http(rpc) });
     const playerWallet = createWalletClient({ account: player, chain: TESTNET_CHAIN, transport: http(rpc) });
     const [rfArtifact, nftArtifact, gameArtifact, tokenArtifact] = await Promise.all(['TestRF', 'TestFriends', 'RareRushGame', 'RareRushToken'].map(artifact));
@@ -80,7 +81,9 @@ test('local recorder → wallet-authenticated handler → confirmed claim mint f
     const genesis = await deploy(nftArtifact, [true]);
     const generations = await deploy(nftArtifact, [false]);
     const launch = 102_400_000n * 1_000_000n;
+    await devRpc('hardhat_setNonce', [deployer, toHex(deployment.deploymentNonces.game)]);
     const game = await deploy(gameArtifact, [deployer, verifier.address, deployer, rf, genesis, generations, engineVersion, launch]);
+    await devRpc('hardhat_setNonce', [deployer, toHex(deployment.deploymentNonces.rewardToken)]);
     const rewardToken = await deploy(tokenArtifact, [deployer, deployer, game, launch]);
     for (const [key, deployed] of Object.entries({ rf, genesis, generations, game, rewardToken })) {
       assert.equal(deployed.toLowerCase(), PLAY_CONTRACTS[key as keyof typeof PLAY_CONTRACTS]);
@@ -104,7 +107,10 @@ test('local recorder → wallet-authenticated handler → confirmed claim mint f
       if (miningBusy) return; miningBusy = true;
       void devRpc('evm_mine').catch(() => undefined).finally(() => { miningBusy = false; });
     }, 150);
-    const now = () => Math.floor(Date.now() / 1000);
+    // Fast-forward service time with the local chain. Six complete runs would
+    // otherwise arrive within one real minute and correctly hit the wallet limiter.
+    let verificationClock = Math.floor(Date.now() / 1000);
+    const now = () => verificationClock;
     let verificationCalls = 0;
     const handlers = createVerifierHandlers({
       now,
@@ -127,20 +133,23 @@ test('local recorder → wallet-authenticated handler → confirmed claim mint f
     const balance = () => client.readContract({ address: rewardToken, abi: tokenArtifact.abi, functionName: 'balanceOf', args: [player.address] }) as Promise<bigint>;
     let expectedBalance = 0n;
     for (const collection of [0, 1] as const) {
+     for (const difficulty of [0, 1, 2] as const) {
+      const mode = (['easy', 'normal', 'degen'] as const)[difficulty];
+      const duration = [120, 90, 60][difficulty];
       const beforeRF = await client.readContract({ address: rf, abi: rfArtifact.abi, functionName: 'balanceOf', args: [player.address] }) as bigint;
       if (collection === 0) {
         const approved = await approveEntry(ctx);
         assert.equal(approved.pending, null); assert.equal(approved.history.at(-1)?.kind, 'approve');
       }
-      const started = await startRun(ctx, { collection, tokenId: '1', difficulty: 1 });
+      const started = await startRun(ctx, { collection, tokenId: '1', difficulty });
       assert.equal(started.savedRun?.status, 'ready'); assert.equal(started.pending, null);
       const run = started.savedRun!.run;
-      const controls = recordPilot(run.seed, 1);
-      let recorder = createRecorder(run.seed, 'normal');
+      const controls = recordPilot(run.seed, difficulty);
+      let recorder = createRecorder(run.seed, mode);
       for (const input of controls.frames) {
         queueControls(recorder, { jump: input.jump, slide: input.slide, pace: input.pace }); advanceRecorder(recorder);
         if (recorder.run._tick === 5400) {
-          recorder = createRecorder(run.seed, 'normal', exportReplay(recorder), snapshotRun(recorder).completedTicks);
+          recorder = createRecorder(run.seed, mode, exportReplay(recorder), snapshotRun(recorder).completedTicks);
         }
       }
       assert.equal(recorder.run.finishReason, 'time', 'Legal pilot must survive this fixture course');
@@ -157,16 +166,17 @@ test('local recorder → wallet-authenticated handler → confirmed claim mint f
       assert.equal(verificationCalls, callsBefore, 'Wrong wallet never reaches replay verification');
       const tampered = { ...replay, frames: replay.frames.map((frame, index) => index === 0 ? { ...frame, jump: !frame.jump } : frame) };
       assert.equal((await handlers.verify(request({ authorization, signature, replay: tampered }))).status, 400);
-      await devRpc('evm_increaseTime', [91]);
+      await devRpc('evm_increaseTime', [duration + 1]);
+      verificationClock += duration + 1;
       await devRpc('hardhat_mine', ['0x3']);
       const response = await handlers.verify(request({ authorization, signature, replay }));
       const body = await response.json();
       assert.equal(response.status, 200, JSON.stringify(body));
       const claim = validateVerifiedClaim(body, run, replay);
-      const reward = await client.readContract({ address: game, abi: gameArtifact.abi, functionName: 'quoteReward', args: [claim.pickupKinds, collection, 1] }) as bigint;
+      const reward = await client.readContract({ address: game, abi: gameArtifact.abi, functionName: 'quoteReward', args: [claim.pickupKinds, collection, difficulty] }) as bigint;
       assert.ok(reward > 0n);
       if (collection === 1) {
-        const ordinary = await client.readContract({ address: game, abi: gameArtifact.abi, functionName: 'quoteReward', args: [claim.pickupKinds, 0, 1] }) as bigint;
+        const ordinary = await client.readContract({ address: game, abi: gameArtifact.abi, functionName: 'quoteReward', args: [claim.pickupKinds, 0, difficulty] }) as bigint;
         assert.equal(reward, ordinary * 100n);
       }
       const claimed = await claimRun(ctx, claim);
@@ -177,9 +187,10 @@ test('local recorder → wallet-authenticated handler → confirmed claim mint f
       assert.equal(beforeRF - afterRF, collection === 0 ? 110n * 10n ** 18n : 0n);
       await devRpc('hardhat_mine', ['0x3']);
       assert.equal((await handlers.verify(request({ authorization, signature, replay }))).status, 422, 'Finalized runs cannot obtain another reward receipt');
+     }
     }
-    assert.equal(await client.readContract({ address: game, abi: gameArtifact.abi, functionName: 'prizePoolBalance' }), 100n * 10n ** 18n);
-    assert.equal(await client.readContract({ address: rf, abi: rfArtifact.abi, functionName: 'balanceOf', args: [deployer] }), 10n * 10n ** 18n);
+    assert.equal(await client.readContract({ address: game, abi: gameArtifact.abi, functionName: 'prizePoolBalance' }), 300n * 10n ** 18n);
+    assert.equal(await client.readContract({ address: rf, abi: rfArtifact.abi, functionName: 'balanceOf', args: [deployer] }), 30n * 10n ** 18n);
     assert.equal(await client.readContract({ address: rewardToken, abi: tokenArtifact.abi, functionName: 'totalSupply' }), launch + expectedBalance);
   } finally {
     cleanup(); process.removeListener('SIGTERM', cleanup); process.removeListener('SIGINT', cleanup);

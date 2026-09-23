@@ -18,7 +18,7 @@ const input = {
   language: 'Solidity', sources,
   settings: {
     optimizer: { enabled: true, runs: 200 }, evmVersion: 'cancun',
-    outputSelection: { '*': { '*': ['abi', 'evm.bytecode.object', 'evm.deployedBytecode.object', 'metadata'] } },
+    outputSelection: { '*': { '*': ['abi', 'evm.bytecode.object', 'evm.deployedBytecode.object', 'evm.deployedBytecode.immutableReferences', 'metadata'] } },
   },
 };
 const output = JSON.parse(solc.compile(JSON.stringify(input), {
@@ -40,7 +40,7 @@ for (const [source, contracts] of Object.entries(output.contracts)) {
     await writeFile(new URL(`artifacts/${name}.json`, root), JSON.stringify({
       contractName: name, sourceName: source, compiler: solc.version(),
       abi: artifact.abi, bytecode: `0x${artifact.evm.bytecode.object}`,
-      deployedBytecode: `0x${artifact.evm.deployedBytecode.object}`, metadata: JSON.parse(artifact.metadata),
+      deployedBytecode: `0x${artifact.evm.deployedBytecode.object}`, immutableReferences: artifact.evm.deployedBytecode.immutableReferences, metadata: JSON.parse(artifact.metadata),
     }, null, 2) + '\n');
     console.log(`${name}: ${bytes} deployed bytes`);
   }

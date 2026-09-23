@@ -7,6 +7,8 @@ import { spawnSync } from 'node:child_process';
 import test from 'node:test';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import ts from 'typescript';
+import deployment from '../src/shared/deployment.json' with { type: 'json' };
+import { ENGINE_VERSION } from '../generated/engine-version.ts';
 
 const app = fileURLToPath(new URL('../', import.meta.url));
 
@@ -27,7 +29,8 @@ function smokeEntrypoints(statusFile: string, verifyFile: string) {
     assert.equal(body.ready, false);
     assert.equal(body.reason, 'not-configured');
     assert.equal(body.chainId, 46630);
-    assert.equal(body.game.toLowerCase(), '0x24bca5bf559e0353801f719ebc3885441cb49fd3');
+    assert.equal(body.game.toLowerCase(), ${JSON.stringify(deployment.contracts.game.toLowerCase())});
+    assert.equal(body.engineVersion, ${JSON.stringify(ENGINE_VERSION)});
     assert.equal(body.verifier, null);
     const invalid = await verify.fetch(new Request('https://testnet.rarerush.app/api/verify-run', {
       method: 'POST', headers: { origin: 'https://testnet.rarerush.app', 'content-type': 'application/json' }, body: '{}',

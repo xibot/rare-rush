@@ -382,3 +382,7 @@
  .testnet-arcade[data-screen=result] .arcade-bottom{height:44px;justify-content:center}
  .testnet-arcade[data-screen=result] .playfield,.testnet-arcade[data-screen=result] .game-overlay{bottom:91px}
 }
+
+/* Shaft controls share the existing mobile footer without shifting the cabinet. */
+.testnet-arcade .vertical-touch{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:6px;font-size:12px;font-weight:700;min-width:0}
+.testnet-arcade .vertical-touch small{font-size:10px}

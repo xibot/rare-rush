@@ -15,6 +15,7 @@ import {
   zeroHash,
 } from 'viem';
 import { mnemonicToAccount } from 'viem/accounts';
+import { currentEngineVersion } from '../src/engine-version.ts';
 
 // These are Hardhat's publicly documented, disposable local accounts. Never use
 // these accounts, this mnemonic, or this test signer on a public network.
@@ -199,6 +200,40 @@ beforeEach(async () => {
 async function unboundGame(allocation = launchAllocation) {
   return deployed('RareRushGame', [f.owner, verifier.address, f.treasury, f.rf.address, f.genesis.address, f.generations.address, engineVersion, allocation], f.owner);
 }
+
+describe('V2 deployment with reused test assets', () => {
+  it('binds a fresh game/token to V2 while preserving V1 state and rejecting V1 signatures', async () => {
+    const v1Run = await start();
+    const rfBalance = await read(f.rf, 'balanceOf', [f.player]);
+    const nftCount = await read(f.generations, 'nextTokenId');
+    const v2Version = await currentEngineVersion();
+    assert.notEqual(v2Version, engineVersion);
+    const game = await deployed('RareRushGame', [f.owner, verifier.address, f.treasury,
+      f.rf.address, f.genesis.address, f.generations.address, v2Version, launchAllocation], f.owner);
+    await reverts(game, 'bindRewardToken', [f.token.address], f.owner, 'InvalidRewardToken');
+    const token = await deployed('RareRushToken', [f.owner, f.owner, game.address, launchAllocation], f.owner);
+    await send(game, 'bindRewardToken', [token.address], f.owner);
+    assert.equal(await read(game, 'engineVersion'), v2Version);
+    assert.equal(await read(game, 'MAX_PICKUPS'), 512n);
+    assert.equal(await read(f.game, 'engineVersion'), engineVersion);
+    assert.equal(await read(f.game, 'runCount'), 1n);
+    assert.equal((await read(f.game, 'token')).toLowerCase(), f.token.address.toLowerCase());
+    assert.equal((await read(token, 'rewardMinter')).toLowerCase(), game.address.toLowerCase());
+    assert.equal(await read(f.rf, 'balanceOf', [f.player]), rfBalance);
+    assert.equal(await read(f.generations, 'nextTokenId'), nftCount);
+    assert.equal((await read(f.generations, 'ownerOf', [1n])).toLowerCase(), f.player.toLowerCase());
+    await send(f.rf, 'approve', [game.address, parseEther('110')], f.player);
+    const run = await start(0, 1, 1n, f.player, game);
+    await advance(90);
+    await reverts(game, 'claim', await signed(run, '0x00', { game }), f.player, 'InvalidVerifierSignature');
+    await send(game, 'claim', await signed(run, '0x00', { game, message: { engineVersion: v2Version } }), f.player);
+    assert.equal(await read(token, 'balanceOf', [f.player]), 10_000_000n);
+    assert.equal(await read(f.token, 'balanceOf', [f.player]), 0n);
+    // The old game's pending run is still independently claimable.
+    await send(f.game, 'claim', await signed(v1Run), f.player);
+    assert.equal(await read(f.token, 'balanceOf', [f.player]), 10_000_000n);
+  });
+});
 
 describe('external capped reward token binding', () => {
   it('uses the same source implementation validated by the Doppler proof', async () => {

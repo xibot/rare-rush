@@ -1,3 +1,4 @@
+import { PROTOCOL_VERSION } from '../../generated/infra/testnet/src/protocol.ts';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { createPublicClient, createWalletClient, custom, formatUnits, http, isHash, parseAbi, type Address, type EIP1193Provider, type Hash } from 'viem';
 import { RunCanvas, TestFriendAvatar } from './RunCanvas.tsx';
@@ -245,7 +246,7 @@ export function App() {
     const saved=loadPlayState(localStorage,account);
     if(saved.pending)throw new Error('Recover the pending transaction first.');
     if(saved.savedRun && !['claimed','abandoned'].includes(saved.savedRun.status) && saved.savedRun.run.runId!==next.runId && Number(saved.savedRun.run.claimUntil)*1000>Date.now())throw new Error('Finish or abandon your saved run before recovering another.');
-    if(saved.savedRun?.run.runId!==next.runId) saved.savedRun={run:next,replay:{version:'rare-rush-input-v1',frames:[]},completedTicks:0,status:next.claimed?'claimed':next.abandoned?'abandoned':'ready'};
+    if(saved.savedRun?.run.runId!==next.runId) saved.savedRun={run:next,replay:{version:PROTOCOL_VERSION,frames:[]},completedTicks:0,status:next.claimed?'claimed':next.abandoned?'abandoned':'ready'};
     if(saved.savedRun){saved.savedRun.run=next;if(next.claimed)saved.savedRun.status='claimed';else if(next.abandoned)saved.savedRun.status='abandoned';}
     savePlayState(localStorage,saved);onState(saved);setStats(null);setRecoverId('');
   }

@@ -1,12 +1,13 @@
 import { keccak256, toHex, type Hex } from 'viem';
-import { createRun, jump, setSliding, setPace, stepRun, FIXED_STEP } from '../../../games/rare-rush/engine.ts';
+import { createRun, jump, setSliding, setPace, stepRun, FIXED_STEP } from '../../../games/rare-rush/twist/engine.ts';
 import { DIFFICULTY_ORDER, difficultySettings } from '../../../games/rare-rush/difficulty.ts';
 import { PROTOCOL_VERSION } from './protocol.ts';
 
-/** Apply before advancing tick. A frame supplies held slide/pace plus a jump press. */
+/** Apply slide, pace, then jump before a tick; pace steers left/right in shafts. */
 export type InputFrame = { tick: number; jump: boolean; slide: boolean; pace: -1 | 0 | 1 };
 export type Replay = { version: typeof PROTOCOL_VERSION; frames: InputFrame[] };
 export const MAX_REPLAY_BYTES = 1_500_000;
+export const MAX_PICKUPS = 512;
 
 export function parseReplay(input: unknown, maxTicks: number): Replay {
   if (!input || typeof input !== 'object' || Array.isArray(input)) throw new Error('Expected a replay object.');
@@ -56,7 +57,7 @@ export function verifyReplay(seed: Hex, difficultyId: number, input: unknown) {
   if (run.status !== 'finished' || run.finishReason !== 'time' || run.hearts < 1) {
     throw new Error('Run did not survive the timer. No claim can be issued.');
   }
-  if (kinds.length > 512) throw new Error('Pickup limit exceeded.');
+  if (kinds.length > MAX_PICKUPS) throw new Error('Pickup limit exceeded.');
   return {
     pickupKinds: toHex(new Uint8Array(kinds)),
     replayHash: keccak256(toHex(JSON.stringify(replay))),

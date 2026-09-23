@@ -1,8 +1,9 @@
 import { getAddress, isAddress, keccak256, toHex, type Address, type Hex } from 'viem';
+import deployment from './deployment.json' with { type: 'json' };
 import { parseReplay, type Replay } from '../../generated/infra/testnet/src/replay.ts';
 
 export const AUTH_CHAIN_ID = 46630;
-export const AUTH_GAME = '0x24BcA5Bf559e0353801F719EbC3885441CB49Fd3' as Address;
+export const AUTH_GAME = getAddress(deployment.contracts.game);
 export const AUTH_SITE = 'https://testnet.rarerush.app';
 export const AUTH_TTL_SECONDS = 300;
 export const MAX_VERIFY_REQUEST_BYTES = 1_500_000;

@@ -1,6 +1,7 @@
 import { createWalletClient, custom, defineChain, encodeAbiParameters, encodeFunctionData, getAddress, isHash, keccak256, parseAbi, parseAbiItem, parseEventLogs, recoverTypedDataAddress, type Abi, type Address, type EIP1193Provider, type Hash, type Hex, type PublicClient, type TransactionReceipt } from 'viem';
+import deployment from '../shared/deployment.json' with { type: 'json' };
 import gameArtifact from '../../generated/infra/testnet/artifacts/RareRushGame.json' with { type: 'json' };
-import { resultData } from '../../generated/infra/testnet/src/protocol.ts';
+import { resultData, PROTOCOL_VERSION } from '../../generated/infra/testnet/src/protocol.ts';
 import { tokenAbi, nftAbi } from '../abi.ts';
 import { RPC_URL, EXPLORER_URL, assertWalletContext, assertRewardEconomics } from '../safety.ts';
 import { PLAY_CHAIN_ID, PLAY_CONTRACTS, ENGINE_VERSION, DEPLOYMENT_BLOCK, type Collection, type FriendSelection, type RunSelection, type RunSnapshot, type PendingOperation, type PlayState, type StorageLike, type VerifiedClaim } from './types.ts';
@@ -14,13 +15,7 @@ const approvalAbi = parseAbi(['function allowance(address owner,address spender)
 const generationAbi = parseAbi(['function generation(uint256) view returns(uint256)']);
 const same = (a: string | null | undefined, b: string | null | undefined) => typeof a === 'string' && typeof b === 'string' && a.toLowerCase() === b.toLowerCase();
 function requireThat(value: unknown, message: string): asserts value { if (!value) throw new Error(message); }
-const runtimeHashes = {
-  rf: '0x2255d3a4fbaafdc39c6f7be4215449eb8ccb014b5c27c325be66c8080998a736',
-  genesis: '0x8461ccd4fa48cccce7fe5789dfcdce17eea1cff0ad1d1ddc67d11d20a0b28ad8',
-  generations: '0x98cd06ca67c51f51fcfa892e0dcbe8b88b453dcf37281ed035e0007cfae046aa',
-  game: '0x45b5d1e61c371b44010b2c690fd9a7808a680b544cd184a1b3ac207d1cb5df4e',
-  rewardToken: '0x970a032a864e1a2038b32b92775e98c6ca82116afd1e00233e50bbb6154fdb19',
-} as const;
+const runtimeHashes = deployment.runtimeHashes;
 export type PlayContext = {
   client: PublicClient; provider: EIP1193Provider; account: Address; store: StorageLike;
   onState?: (state: PlayState) => void;
@@ -147,7 +142,7 @@ async function settle(ctx: PlayContext, state: PlayState, receipt: TransactionRe
   }
   if (pending.kind === 'start') {
     const run = assertRunStarted(receipt, ctx.account, pending.selection!);
-    state.savedRun = { run, replay: { version: 'rare-rush-input-v1', frames: [] }, completedTicks: 0, status: 'ready' };
+    state.savedRun = { run, replay: { version: PROTOCOL_VERSION, frames: [] }, completedTicks: 0, status: 'ready' };
     if (!state.friends.some(item => item.collection === run.collection && item.tokenId === run.tokenId)) state.friends = [...state.friends, { collection: run.collection, tokenId: run.tokenId }].slice(-100);
   } else if (pending.kind === 'claim') {
     state.savedRun!.reward = assertRunClaimed(receipt, ctx.account, pending.claim!);

@@ -1,9 +1,11 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import { readFile } from 'node:fs/promises';
 import { keccak256, toHex } from 'viem';
-import { verifyReplay, parseReplay } from '../src/replay.ts';
+import { verifyReplay, parseReplay, MAX_PICKUPS } from '../src/replay.ts';
 import { verifyAndSign } from '../src/verifier.ts';
-import { PROTOCOL_VERSION } from '../src/protocol.ts';
+import { ENGINE_SOURCE_PATHS, engineVersionFromSources, PROTOCOL_VERSION, type EngineSourcePath } from '../src/protocol.ts';
+import { currentEngineVersion } from '../src/engine-version.ts';
 import { recordPilot } from './pilot.ts';
 import { localFixture } from './local-fixture.ts';
 
@@ -18,6 +20,54 @@ test('replays real controls deterministically for all three difficulty modes', (
     assert.equal((result.pickupKinds.length - 2) / 2, result.coins);
     assert.deepEqual(verifyReplay(seed, difficulty, input), result);
   }
+});
+
+test('V2 legal controls survive contract-shaped seeds in every mode within the pickup cap and preserve 10x bonuses', () => {
+  const seeds = [toHex(0n, { size: 32 }), toHex(1n, { size: 32 }), `0x${'ff'.repeat(32)}`,
+    ...Array.from({ length: 9 }, (_, index) => keccak256(toHex(`v2-contract-route-${index}`)))] as `0x${string}`[];
+  for (const difficulty of [0, 1, 2]) {
+    for (const contractSeed of seeds) {
+      const replay = recordPilot(contractSeed, difficulty);
+      const result = verifyReplay(contractSeed, difficulty, replay);
+      const kinds = result.pickupKinds.slice(2).match(/../g) ?? [];
+      assert.equal(result.ticks, [14400, 10800, 7200][difficulty]);
+      assert.ok(result.hearts > 0, `${difficulty}: ${contractSeed}`);
+      assert.ok(result.coins <= MAX_PICKUPS);
+      assert.equal(kinds.length, result.coins);
+      assert.ok(kinds.every(kind => kind === '00' || kind === '01'));
+      assert.equal(kinds.filter(kind => kind === '01').length, result.bonusCoins);
+      assert.ok(result.bonusCoins > 0);
+      assert.equal(kinds.reduce((weight, kind) => weight + (kind === '01' ? 10 : 1), 0), result.coins + 9 * result.bonusCoins);
+      assert.deepEqual(verifyReplay(contractSeed.toUpperCase().replace('0X', '0x') as `0x${string}`, difficulty, replay), result);
+    }
+  }
+});
+
+test('V2 source pin binds every physics dependency, ordered paths and the replay domain', async () => {
+  assert.equal(PROTOCOL_VERSION, 'rare-rush-input-v2');
+  assert.deepEqual(ENGINE_SOURCE_PATHS, ['difficulty.ts', 'engine.ts', 'twist/engine.ts']);
+  const root = new URL('../../../games/rare-rush/', import.meta.url);
+  const entries = await Promise.all(ENGINE_SOURCE_PATHS.map(async path => [path, await readFile(new URL(path, root), 'utf8')] as const));
+  const sources = Object.fromEntries(entries) as Record<EngineSourcePath, string>;
+  const version = engineVersionFromSources(sources);
+  assert.equal(version, '0x907ff2967abdd97cc172f53c0c69fbcd17f22fcf4ece263e5846bf2973a3accb');
+  assert.equal(await currentEngineVersion(), version);
+  assert.equal(engineVersionFromSources(Object.fromEntries([...entries].reverse()) as typeof sources), version);
+  for (const path of ENGINE_SOURCE_PATHS) {
+    assert.notEqual(engineVersionFromSources({ ...sources, [path]: sources[path] + '\n' }), version);
+    assert.throws(() => engineVersionFromSources({ ...sources, [path]: undefined } as unknown as typeof sources), /Missing engine source/);
+  }
+  assert.notEqual(keccak256(toHex(JSON.stringify(['rare-rush-input-v1', entries]))), version);
+  assert.notEqual(keccak256(toHex(`rare-rush-input-v1\n${sources['engine.ts']}\n${sources['difficulty.ts']}`)), version);
+});
+
+test('V1 recordings cannot be accepted as V2 and canonical replay hashes include V2 framing', () => {
+  const replay = recordPilot(seed, 1);
+  assert.throws(() => parseReplay({ ...replay, version: 'rare-rush-input-v1' }, 10800), /Unsupported replay schema/);
+  assert.throws(() => verifyReplay(seed, 1, { ...replay, version: 'rare-rush-input-v1' }), /Unsupported replay schema/);
+  const result = verifyReplay(seed, 1, replay);
+  assert.equal(result.replayHash, keccak256(toHex(JSON.stringify(parseReplay(replay, 10800)))));
+  assert.notEqual(result.replayHash, keccak256(toHex(JSON.stringify({ ...replay, version: 'rare-rush-input-v1' }))));
 });
 
 test('a lost run never produces a claim receipt', () => {

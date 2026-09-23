@@ -2,11 +2,11 @@
   "version": 1,
   "chainId": 46630,
   "contracts": {
-    "game": "0x24bca5bf559e0353801f719ebc3885441cb49fd3",
     "rf": "0xed668133bab94dd83e537f12b68365c4bc0ec2a3",
     "genesis": "0x7404d2b0461228c6478fdb8850d27d8e65efd2c3",
     "generations": "0x606dcbfa17b76e4194865a09d6cfb92be7ee26c3",
-    "rewardToken": "0x9fce27c074281709d0ccd9bd0439f223e8f83844"
+    "game": "0x415b897fff5a336a8c3a527beef12440eadc6422",
+    "rewardToken": "0x1c3d191561a7077f944b9967553c21dd8c26db71"
   },
   "deploymentConsoleUrl": null
 }

@@ -7,7 +7,7 @@ import { ENGINE_VERSION, PLAY_CONTRACTS, type RunSnapshot, type VerifiedClaim } 
 const account = `0x${'1'.repeat(40)}` as Address;
 const other = `0x${'2'.repeat(40)}` as Address;
 const seed = `0x${'3'.repeat(64)}` as Hash;
-const replay = { version: 'rare-rush-input-v1' as const, frames: [] };
+const replay = { version: 'rare-rush-input-v2' as const, frames: [] };
 const run: RunSnapshot = { runId: '5', player: account, tokenId: '7', seed, startedAt: '1000', claimUntil: '1990', verifierEpoch: '1', collection: 0, difficulty: 1, claimed: false, abandoned: false };
 function memory() { const items = new Map<string, string>(); return { getItem: (key: string) => items.get(key) ?? null, setItem: (key: string, value: string) => { items.set(key, value); } }; }
 function receipt(): VerifiedClaim {
@@ -25,7 +25,7 @@ test('saved progress survives reload and is isolated by account, game and chain'
   assert.throws(() => loadPlayState(store, other), /invalid/);
 });
 test('corrupt or cross-chain checkpoints never silently reset to an empty playable state', () => {
-  for (const patch of [{ version: 2 }, { chainId: 4663 }, { game: other }, { account: other }]) {
+  for (const patch of [{ version: 1 }, { chainId: 4663 }, { game: other }, { account: other }]) {
     const store = memory(); store.setItem(stateKey(account), JSON.stringify({ ...emptyPlayState(account), ...patch }));
     assert.throws(() => loadPlayState(store, account), /invalid/);
   }
@@ -66,4 +66,24 @@ test('storage failure fails closed instead of pretending a checkpoint was persis
   const store = { getItem: () => null, setItem: () => {} };
   assert.throws(() => savePlayState(store, emptyPlayState(account)), /Could not save/);
   assert.throws(() => savePlayState({ ...store, setItem: () => { throw new Error('quota'); } }, emptyPlayState(account)), /quota/);
+});
+test('V2 remembers existing test NFT IDs without moving or overwriting any V1 transaction or run', () => {
+  const store = memory();
+  const key = `rare-rush:play:v1:46630:0x24bca5bf559e0353801f719ebc3885441cb49fd3:${account}`;
+  const old = JSON.stringify({ version: 1, chainId: 46630, game: '0x24bca5bf559e0353801f719ebc3885441cb49fd3', account,
+    friends: [{ collection: 0, tokenId: '7' }, { collection: 1, tokenId: '2' }, { collection: 4, tokenId: '9' }],
+    pending: { hash: seed }, savedRun: { replay: { version: 'rare-rush-input-v1', frames: [] } } });
+  store.setItem(key, old);
+  const next = loadPlayState(store, account);
+  assert.equal(next.version, 2);
+  assert.deepEqual(next.friends, [{ collection: 0, tokenId: '7' }, { collection: 1, tokenId: '2' }]);
+  assert.equal(next.pending, null); assert.equal(next.savedRun, null);
+  savePlayState(store, next);
+  assert.equal(store.getItem(key), old);
+  assert.notEqual(stateKey(account), key);
+});
+test('V1 replay data cannot become a V2 run even when copied into the new storage key', () => {
+  const state = emptyPlayState(account);
+  state.savedRun = { run, replay: { version: 'rare-rush-input-v1', frames: [] } as any, completedTicks: 0, status: 'ready' };
+  assert.throws(() => savePlayState(memory(), state), /Unsupported replay schema/);
 });

@@ -32,6 +32,7 @@ export function ArcadeCabinet(props: ArcadeCabinetProps) {
   const mode = difficultySettings(props.difficulty);
   const art = useMemo(() => testRunArt(props.collection, props.tokenId, props.runId ?? 'chooser'), [props.collection, props.tokenId, props.runId]);
   const remaining = Math.max(0, Math.ceil(run.duration - run.elapsed));
+  const vertical = run.phase !== 'side';
   const biome = Math.min(2, Math.floor(run.elapsed / run.duration * 3));
   const friend = props.collection === 1
     ? <GenesisRunnerSprite portraitUrl={art.portraitUrl} bodyId={art.bodyId}/>
@@ -48,7 +49,7 @@ export function ArcadeCabinet(props: ArcadeCabinetProps) {
   }, []);
 
   return <div className="testnet-arcade-shell">
-    <section ref={cabinet} className="testnet-arcade" data-screen={props.snapshot ? props.snapshot.status === 'finished' ? 'result' : 'running' : 'ready'} data-difficulty={props.difficulty} aria-label="Rare Rush testnet arcade">
+    <section ref={cabinet} className="testnet-arcade" data-screen={props.snapshot ? props.snapshot.status === 'finished' ? 'result' : 'running' : 'ready'} data-difficulty={props.difficulty} data-phase={run.phase} aria-label="Rare Rush testnet arcade">
       <div className="arcade-top">
         <a className="arcade-logo" href="/" aria-label="Rare Rush home" onClick={event => { if (props.onHome) { event.preventDefault(); props.onHome(); } }}>
           <svg className="brand-icon" viewBox="0 0 30 30" aria-hidden="true"><TokenCoin size={30}/></svg>
@@ -72,17 +73,17 @@ export function ArcadeCabinet(props: ArcadeCabinetProps) {
             <g transform={`translate(${run.player.x + run.player.w / 2 - 32} ${run.player.y - 60}) scale(4)`}>{friend}</g>
           </g>
         </svg>}
-        <div className="zone-label"><span>0{biome + 1}</span>{['GARDEN COMMONS', 'CIRCUIT COURTYARD', 'CRYSTAL MESA'][biome]}<span className="zone-line"/></div>
+        <div className="zone-label"><span>{vertical ? run.phase === 'up' ? '↑' : '↓' : `0${biome + 1}`}</span>{vertical ? run.phase === 'up' ? 'SUCTION SHAFT' : 'FREE FALL' : ['GARDEN COMMONS', 'CIRCUIT COURTYARD', 'CRYSTAL MESA'][biome]}<span className="zone-line"/></div>
         {props.fieldOverlays}
       </div>
       {props.children}
       <div className="arcade-bottom">
-        <div className="keyboard-controls"><span><kbd>SPACE</kbd> JUMP <small>×2 DOUBLE</small></span><span><kbd>↓</kbd> SLIDE</span><span><kbd>←</kbd><kbd>→</kbd> HOLD FOR PACE</span></div>
+        <div className="keyboard-controls">{vertical ? <><span><kbd>{run.phase === 'up' ? '↑' : '↓'}</kbd> AUTO {run.phase === 'up' ? 'LIFT' : 'FALL'}</span><span><kbd>←</kbd><kbd>→</kbd> HOLD TO STEER</span></> : <><span><kbd>SPACE</kbd> JUMP <small>×2 DOUBLE</small></span><span><kbd>↓</kbd> SLIDE</span><span><kbd>←</kbd><kbd>→</kbd> HOLD FOR PACE</span></>}</div>
         <div className="touch-controls rush-run-touch" aria-label="Touch controls">{props.touchControls ?? <><button type="button" className="touch-pace" disabled>←<span>SLOW</span></button><button type="button" disabled>↓<span>SLIDE</span></button><button type="button" className="touch-jump" disabled>↑<span>JUMP ×2</span></button><button type="button" className="touch-pace" disabled>→<span>FAST</span></button></>}</div>
         <div className="economy-bar"><span><b>{props.collection === 1 ? '100×' : '1×'}</b> {props.collection === 1 ? 'GENESIS' : 'GENERATIONS'} · {mode.rewardLabel} MODE</span><a href="/dashboard/">DASHBOARD <span>↗</span></a></div>
       </div>
       <div className="arcade-toolbar"><span>Robinhood testnet</span><span>{props.collection === 1 ? 'Genesis' : 'Friend'} #{props.tokenId.toString()}</span>{props.runId != null && <span>Run #{props.runId.toString()}</span>}<a href="/dashboard/">Friend wallet</a></div>
-      {showHelp && <div className="game-overlay arcade-help" role="dialog" aria-label="How to rush"><div className="pause-card"><span className="eyebrow">HOW TO RUSH</span><h2>KEEP IT RARE.</h2><p>Space or ↑ jumps. Tap again to double jump. Hold ↓ to slide, ← to slow down, and → to speed up.</p><p>Coins make your Friend grow. Hits cost a heart and shrink it. Catch the giant coins for 10× coin rewards.</p><p>Survive the timer to verify your run and mint test tokens. Three starts per NFT daily.</p><button type="button" className="primary" onClick={() => setShowHelp(false)}>GOT IT <span>↗</span></button></div></div>}
+      {showHelp && <div className="game-overlay arcade-help" role="dialog" aria-label="How to rush"><div className="pause-card"><span className="eyebrow">HOW TO RUSH</span><h2>KEEP IT RARE.</h2><p>Space or ↑ jumps. Tap again to double jump. Hold ↓ to slide, ← to slow down, and → to speed up.</p><p>Ceiling intakes lift you automatically; floor gaps drop you into free fall. Hold ← / → (LEFT / RIGHT on phone) to steer through shafts while your Friend spins. Jump and slide return on the sideways track.</p><p>Coins make your Friend grow. Hits cost a heart and shrink it. Catch the giant coins for 10× coin rewards.</p><p>Survive the timer to verify your run and mint test tokens. Three starts per NFT daily.</p><button type="button" className="primary" onClick={() => setShowHelp(false)}>GOT IT <span>↗</span></button></div></div>}
     </section>
   </div>;
 }

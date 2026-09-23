@@ -4,3 +4,4 @@ coverage/
 deployments/local.json
 replays/
 operator-config.json
+operator-config-v2.json

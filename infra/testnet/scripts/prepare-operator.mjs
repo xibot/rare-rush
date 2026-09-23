@@ -1,27 +1,20 @@
-import { readFile, writeFile, chmod } from 'node:fs/promises';
+import { readFile, writeFile } from 'node:fs/promises';
 import { getAddress } from 'viem';
-import { generatePrivateKey, privateKeyToAccount } from 'viem/accounts';
 import { currentEngineVersion } from '../src/engine-version.ts';
-import { AUTHORIZED_OWNER, LAUNCH_ALLOCATION, publicConfig } from '../src/deployment-config.mjs';
+import { AUTHORIZED_OWNER, LAUNCH_ALLOCATION, DEPLOYMENT_VERSION, CONFIG_FILE, REUSED_ASSETS, publicConfig } from '../src/deployment-config.mjs';
 
+// V2 keeps the existing verifier identity. This script reads only the public V1
+// config; it never opens, generates, rotates, or writes signing material.
+const prior = JSON.parse(await readFile(new URL('../operator-config.json', import.meta.url), 'utf8'));
 const owner = getAddress(process.argv[2] ?? AUTHORIZED_OWNER);
-if (owner !== getAddress(AUTHORIZED_OWNER)) throw new Error('This test deployment is authorized only for the configured XIBOT wallet.');
-if (/^0x0{40}$/i.test(owner)) throw new Error('A nonzero owner address is required.');
-const treasury = getAddress(process.argv[3] ?? owner);
-if (/^0x0{40}$/i.test(treasury)) throw new Error('A nonzero treasury address is required.');
-const envFile = new URL('../.env.testnet', import.meta.url);
-let key;
-try {
-  const existing = await readFile(envFile, 'utf8');
-  key = /^RUSH_VERIFIER_PRIVATE_KEY=(0x[a-fA-F0-9]{64})$/m.exec(existing)?.[1];
-  if (!key) throw new Error('Existing operator environment has no valid verifier key; refusing to overwrite.');
-} catch (error) {
-  if (error.code !== 'ENOENT') throw error;
-  key = generatePrivateKey();
-  await writeFile(envFile, `# Local testnet verifier secret. Never share or commit this file.\nRUSH_CHAIN_ID=46630\nRUSH_RPC_URL=https://rpc.testnet.chain.robinhood.com\nRUSH_VERIFIER_PRIVATE_KEY=${key}\n`, { flag: 'wx', mode: 0o600 });
-}
-await chmod(envFile, 0o600);
-const config = publicConfig({ chainId: 46630, owner, treasury, verifier: privateKeyToAccount(key).address, engineVersion: await currentEngineVersion(), launchRecipient: owner, launchAllocation: LAUNCH_ALLOCATION.toString() });
-await writeFile(new URL('../operator-config.json', import.meta.url), JSON.stringify(config, null, 2) + '\n');
+const treasury = getAddress(process.argv[3] ?? prior.treasury);
+if (owner !== getAddress(AUTHORIZED_OWNER) || getAddress(prior.owner) !== owner) throw new Error('This deployment is authorized only for the configured XIBOT wallet.');
+if (treasury !== getAddress(AUTHORIZED_OWNER)) throw new Error('V2 preserves the approved owner treasury.');
+const engineVersion = await currentEngineVersion();
+if (engineVersion === prior.engineVersion) throw new Error('V2 must bind the new approved gameplay engine hash.');
+const config = publicConfig({ deploymentVersion: DEPLOYMENT_VERSION, chainId: 46630, owner, treasury,
+  verifier: prior.verifier, engineVersion, launchRecipient: owner, launchAllocation: LAUNCH_ALLOCATION.toString(),
+  reusedAssets: Object.fromEntries(Object.entries(REUSED_ASSETS).map(([id, asset]) => [id, asset.address])) });
+await writeFile(new URL(`../${CONFIG_FILE}`, import.meta.url), JSON.stringify(config, null, 2) + '\n');
 console.log(JSON.stringify(config, null, 2));
-console.log('Verifier secret saved in the ignored, permission-restricted .env.testnet file. The wallet console receives only the public config above.');
+console.log('V2 public config prepared. Existing public V1 config and verifier signing material were preserved.');

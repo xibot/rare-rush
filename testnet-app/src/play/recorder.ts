@@ -1,9 +1,10 @@
 import type { Hex } from 'viem';
-import { createRun, FIXED_STEP, jump, setPace, setSliding, stepRun, type Pace, type RunEvent, type RunState } from '../../generated/games/rare-rush/engine.ts';
+import { createRun, FIXED_STEP, jump, setPace, setSliding, stepRun, type Pace, type RunEvent, type RunState } from '../../generated/games/rare-rush/twist/engine.ts';
+import { PROTOCOL_VERSION } from '../../generated/infra/testnet/src/protocol.ts';
 import { difficultySettings, type Difficulty } from '../../generated/games/rare-rush/difficulty.ts';
 
 export type DifficultyId = Difficulty;
-export const REPLAY_VERSION = 'rare-rush-input-v1' as const;
+export const REPLAY_VERSION = PROTOCOL_VERSION;
 export type InputFrame = { tick: number; jump: boolean; slide: boolean; pace: Pace };
 export type Replay = { version: typeof REPLAY_VERSION; frames: InputFrame[] };
 export type RunSnapshot = Readonly<RunState> & { readonly completedTicks: number };
@@ -37,7 +38,7 @@ function validateReplay(input: unknown, completedTicks: number, maxTicks: number
 }
 
 function applyFrame(run: RunState, frame: InputFrame) {
-  // This ordering is part of rare-rush-input-v1 and must match the verifier.
+  // This ordering is part of rare-rush-input-v2 and must match the verifier.
   setSliding(run, frame.slide);
   setPace(run, frame.pace);
   if (frame.jump) jump(run);

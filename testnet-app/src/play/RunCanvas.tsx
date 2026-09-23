@@ -4,7 +4,8 @@ import { WorldArt } from '../../generated/games/rare-rush/WorldArt.tsx';
 import { EntityArt, FriendSprite } from '../../generated/games/rare-rush/RunnerArt.tsx';
 import { GenesisRunnerSprite } from '../../generated/games/rare-rush/genesis/GenesisRunnerSprite.tsx';
 import { difficultySettings } from '../../generated/games/rare-rush/difficulty.ts';
-import { FIXED_STEP, type Pace } from '../../generated/games/rare-rush/engine.ts';
+import { FIXED_STEP, type Pace } from '../../generated/games/rare-rush/twist/engine.ts';
+import { DirectionScene } from '../../generated/games/rare-rush/twist/DirectionScene.tsx';
 import { advanceRecorder, createRecorder, exportReplay, queueControls, releaseControls, snapshotRun,
   type DifficultyId, type Replay, type RunSnapshot } from './recorder.ts';
 import { testRunArt } from './art.ts';
@@ -100,7 +101,7 @@ function RunSession(props: RunCanvasProps) {
     stage.current?.focus({ preventScroll: true });
   }
   function pressJump() {
-    if (pausedRef.current || recording.run.status !== 'running') return;
+    if (pausedRef.current || recording.run.status !== 'running' || recording.run.phase !== 'side' || recording.run.transition) return;
     queueControls(recording, { jump: true });
   }
   function heldInput(key: string, down: boolean) {
@@ -135,7 +136,7 @@ function RunSession(props: RunCanvasProps) {
     const onKeyDown = (event: KeyboardEvent) => {
       const target = event.target as HTMLElement | null;
       if (target?.closest('input, textarea, select, [contenteditable="true"]')) return;
-      if (event.code === 'Escape' && !pausedRef.current) { event.preventDefault(); pause(); return; }
+      if (['Escape', 'KeyP'].includes(event.code) && !pausedRef.current) { event.preventDefault(); pause(); return; }
       if (pausedRef.current || recording.run.status !== 'running') return;
       if (['Space', 'ArrowUp', 'KeyW'].includes(event.code)) {
         event.preventDefault();
@@ -208,38 +209,41 @@ function RunSession(props: RunCanvasProps) {
 
   const biome = Math.min(2, Math.floor(run.elapsed / run.duration * 3));
   const growth = run.growth;
-  const spriteFrame = reduced || paused ? 0 : Math.floor(run.elapsed * 12) % 8;
-  const center = run.player.x + run.player.w / 2;
-  const height = run.player.slide ? 30 : 60 * growth;
+  const vertical = run.phase !== 'side';
   const live = !paused && !isFinished;
   const label = isFinished ? (run.finishReason === 'time' ? 'TIMER SURVIVED' : 'OUT OF HEARTS') : hasStarted ? 'RUN PAUSED' : 'YOUR RUN IS READY';
   const returnHome = () => { pause(); if (props.onHome) props.onHome(); else window.location.assign('/'); };
   const touchControls = <>
-    <button type="button" className="touch-pace" disabled={!live} onPointerDown={event => touchDown(event, 'touch-left')} onPointerUp={() => heldInput('touch-left', false)} onPointerCancel={() => heldInput('touch-left', false)} onLostPointerCapture={() => heldInput('touch-left', false)} aria-label="Hold to slow down">←<span>SLOW</span></button>
-    <button type="button" disabled={!live} onPointerDown={event => touchDown(event, 'touch-slide')} onPointerUp={() => heldInput('touch-slide', false)} onPointerCancel={() => heldInput('touch-slide', false)} onLostPointerCapture={() => heldInput('touch-slide', false)} aria-label="Hold to slide">↓<span>SLIDE</span></button>
-    <button type="button" className="touch-jump" disabled={!live} onPointerDown={event => { event.preventDefault(); pressJump(); }} aria-label="Jump; tap twice to double jump">↑<span>JUMP ×2</span></button>
-    <button type="button" className="touch-pace" disabled={!live} onPointerDown={event => touchDown(event, 'touch-right')} onPointerUp={() => heldInput('touch-right', false)} onPointerCancel={() => heldInput('touch-right', false)} onLostPointerCapture={() => heldInput('touch-right', false)} aria-label="Hold to speed up">→<span>FAST</span></button>
+    <button type="button" className="touch-pace" disabled={!live} onPointerDown={event => touchDown(event, 'touch-left')} onPointerUp={() => heldInput('touch-left', false)} onPointerCancel={() => heldInput('touch-left', false)} onLostPointerCapture={() => heldInput('touch-left', false)} aria-label={vertical ? 'Steer left' : 'Hold to slow down'}>←<span>{vertical ? 'LEFT' : 'SLOW'}</span></button>
+    {vertical ? <span className="vertical-touch">{run.phase === 'up' ? '↑ AUTO LIFT' : '↓ FREE FALL'}<small>← STEER →</small></span> : <>
+      <button type="button" disabled={!live} onPointerDown={event => touchDown(event, 'touch-slide')} onPointerUp={() => heldInput('touch-slide', false)} onPointerCancel={() => heldInput('touch-slide', false)} onLostPointerCapture={() => heldInput('touch-slide', false)} aria-label="Hold to slide">↓<span>SLIDE</span></button>
+      <button type="button" className="touch-jump" disabled={!live} onPointerDown={event => { event.preventDefault(); pressJump(); }} aria-label="Jump; tap twice to double jump">↑<span>JUMP ×2</span></button>
+    </>}
+    <button type="button" className="touch-pace" disabled={!live} onPointerDown={event => touchDown(event, 'touch-right')} onPointerUp={() => heldInput('touch-right', false)} onPointerCancel={() => heldInput('touch-right', false)} onLostPointerCapture={() => heldInput('touch-right', false)} aria-label={vertical ? 'Steer right' : 'Hold to speed up'}>→<span>{vertical ? 'RIGHT' : 'FAST'}</span></button>
   </>;
-  const world = <svg ref={stage} className="world-svg rush-run-world" viewBox={`0 0 ${viewWidth} 500`} preserveAspectRatio="none" tabIndex={0} role="img" aria-label="Runner world. Space or up to jump. Down to slide. Left slows down, right speeds up." onPointerDown={event => { if (live) { event.preventDefault(); stage.current?.focus({ preventScroll: true }); pressJump(); } }}>
-    <WorldArt distance={run.distance} elapsed={run.elapsed * 1000} reducedMotion={reduced || !hasStarted} biome={biome}/>
-    {run.entities.map(entity => <EntityArt key={entity.id} entity={entity} elapsed={run.elapsed} reduced={reduced}/>)}
-    <g transform={!hasStarted ? `translate(${viewWidth === 960 ? 265 : 200} 0)` : undefined} opacity={run.invulnerable > 0 ? reduced ? .6 : Math.floor(run.elapsed * 12) % 2 ? .35 : 1 : 1}>
-      <ellipse cx={center} cy="403" rx={32 * growth} ry="3" fill="#000"/>
-      {run.magnet > 0 && <circle cx={center} cy={run.player.y - height / 2} r={58 * growth} fill="none" stroke="#ccff00" strokeDasharray="3 10"/>}
-      {run.shield > 0 && <rect x={center - 38 * growth} y={run.player.y - height - 10} width={76 * growth} height={height + 16} fill="none" stroke="#ccff00" strokeWidth="2"/>}
-      <g data-character="friend" data-slide={run.player.slide} data-growth={growth.toFixed(3)} transform={`translate(${center - 32 * growth} ${run.player.y - height}) scale(${4 * growth} ${run.player.slide ? 2 : 4 * growth})`}>
-        {props.collection === 1 ? <GenesisRunnerSprite portraitUrl={art.portraitUrl} bodyId={art.bodyId} frame={spriteFrame} walking={live && !reduced}/> : <FriendSprite sprites={art.sprites} frame={spriteFrame} walking={live && !reduced}/>}
+  const world = <svg ref={stage} className="world-svg rush-run-world" viewBox={`0 0 ${viewWidth} 500`} preserveAspectRatio="none" tabIndex={0} role="img" aria-label={vertical ? `Runner world. ${run.phase === 'up' ? 'Pulled upward' : 'Free falling'} automatically. Hold left or right to steer around obstacles.` : 'Runner world. Space or up to jump. Down to slide. Left slows down, right speeds up.'} onPointerDown={event => { if (live) { event.preventDefault(); stage.current?.focus({ preventScroll: true }); pressJump(); } }}>
+    {hasStarted ? <DirectionScene run={run} reducedMotion={reduced || !hasStarted} running={live} biome={biome} growth={growth} viewportWidth={viewWidth}
+        renderCharacter={(frame, walking) => props.collection === 1
+          ? <GenesisRunnerSprite portraitUrl={art.portraitUrl} bodyId={art.bodyId} frame={frame} walking={walking && !reduced}/>
+          : <FriendSprite sprites={art.sprites} frame={frame} walking={walking && !reduced}/>}/> : <>
+      <WorldArt distance={run.distance} elapsed={0} reducedMotion biome={biome}/>
+      {run.entities.map(entity => <EntityArt key={entity.id} entity={entity} elapsed={0} reduced/>)}
+      <g transform={`translate(${viewWidth === 960 ? 265 : 200} 0)`}>
+        <ellipse cx={run.player.x + run.player.w / 2} cy="403" rx={32} ry="3" fill="#000"/>
+        <g transform={`translate(${run.player.x + run.player.w / 2 - 32} ${run.player.y - 60}) scale(4)`}>
+          {props.collection === 1 ? <GenesisRunnerSprite portraitUrl={art.portraitUrl} bodyId={art.bodyId}/> : <FriendSprite sprites={art.sprites} frame={0}/>}
+        </g>
       </g>
-    </g>
+    </>}
   </svg>;
   const overlays = hasStarted ? <>
     <div className="run-score"><span>SCORE</span><strong>{run.score.toLocaleString()}</strong><small>{run.coins} COINS <b>×{run.combo} CHAIN</b></small></div>
-    <div className="run-modifiers"><span>PACE <b>{run.speedMultiplier.toFixed(2)}×</b></span><span>SIZE <b>{growth.toFixed(2)}×</b></span><div className="growth-meter" role="meter" aria-label="Friend size" aria-valuemin={1} aria-valuemax={1.75} aria-valuenow={growth}><i style={{width:`${(growth - 1) / .75 * 100}%`}}/></div></div>
+    <div className="run-modifiers"><span>{vertical ? 'STEER' : 'PACE'} <b data-pace={run.pace}>{vertical ? run.pace < 0 ? '←' : run.pace > 0 ? '→' : '← →' : `${run.speedMultiplier.toFixed(2)}×`}</b></span><span>SIZE <b>{growth.toFixed(2)}×</b></span><div className="growth-meter" role="meter" aria-label="Friend size" aria-valuemin={1} aria-valuemax={1.75} aria-valuenow={growth}><i style={{width:`${(growth - 1) / .75 * 100}%`}}/></div></div>
     {notice && live && <div className="pickup-notice" role="status">{notice}</div>}
     <div className="run-progress"><i style={{ width: `${run.elapsed / run.duration * 100}%` }}/></div>
   </> : undefined;
 
-  return <section ref={shell} className="rush-run" aria-label="Rare Rush testnet run" data-run-id={props.runId.toString()} data-status={run.status} data-paused={paused}>
+  return <section ref={shell} className="rush-run" aria-label="Rare Rush testnet run" data-run-id={props.runId.toString()} data-status={run.status} data-paused={paused} data-phase={run.phase} data-tick={run.completedTicks} data-difficulty={props.difficulty}>
     <ArcadeCabinet difficulty={props.difficulty} collection={props.collection} tokenId={props.tokenId} runId={props.runId} snapshot={run} world={world} fieldOverlays={overlays} onHome={returnHome} touchControls={touchControls}
       topActions={<><button type="button" onClick={() => setReduced(value => !value)} aria-pressed={reduced} title="Reduce background motion">FX {reduced ? 'OFF' : 'ON'}</button><button type="button" onClick={paused ? resume : pause} disabled={isFinished} aria-label={paused ? '▶ RESUME' : 'Ⅱ PAUSE'}>{paused ? '▶' : 'Ⅱ'}</button></>}>
       {paused && !hasStarted && !isFinished && <div className="start-screen">

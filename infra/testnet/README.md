@@ -1,6 +1,6 @@
 # Rare Rush · Robinhood testnet infrastructure
 
-An isolated contract and verifier prototype for **test assets only**. The public vibeathon game still simulates its economy. This directory is excluded from the Vercel upload and is not a new public game route.
+Contract and verifier infrastructure for **test assets only**. The owner deployed and bound the Testnet V2 game/token on September 22, 2026. Independent verification passed 66 state checks and two guards, and the app addresses are activated. Hosting checks are in progress. The public vibeathon arcade retains its simulated economy.
 
 ## What works
 
@@ -8,16 +8,26 @@ An isolated contract and verifier prototype for **test assets only**. The public
 - `RareRushGame`: owner-only, one-time binding to the external reward token; starts remain disabled until binding is complete. NFT-gated starts, three starts per NFT per UTC day, one active run per NFT, signed single-use claims, emergency pause, two-step ownership, verifier rotation, and owner-administered prize awards.
 - `TestRF`: a valueless `tRF` faucet, 1,100 per wallet per UTC day (ten paid test entries).
 - `TestFriends`: separate, freely mintable test Genesis and test Generations collections. These do **not** represent real Rare Friends ownership.
-- A verifier that replays the existing 120 Hz game engine, reconstructs pickups, and signs only runs that survive the timer with at least one heart. Client scores, coins, seeds, and state overrides are never accepted.
+- A verifier that replays the approved V2 120 Hz directional game engine, reconstructs pickups, and signs only runs that survive the timer with at least one heart. Client scores, coins, seeds, and state overrides are never accepted.
 - A local browser-wallet deployment console, CLI deployment/preflight, compiler verification input, and an end-to-end local mint demo.
 
-No public verifier endpoint, production wallet-game integration, real-holder bridge, DEX pair, liquidity, or automated leaderboard payout is included in this first infrastructure milestone.
+The separate `testnet-app/` contains the wallet game and hosted verifier adapter. V2 uses a fresh game and reward token, with the existing tRF and test NFT collections. No real-holder bridge, DEX pair, liquidity, or automated leaderboard payout is part of this deployment.
 
-## Public testnet deployment
+## V1 and V2 deployment evidence
 
-The owner completed the six browser-wallet operations on September 21, 2026. The [public manifest](deployments/robinhood-testnet.json) records all five addresses, transaction hashes, constructor arguments and the reward-token binding. The [independent verification snapshot](deployments/robinhood-testnet-verification.json) checks them against the reviewed compiler input and deployed state. This is our read-only verification evidence, not a claim of explorer source verification or a security audit.
+The [V1 public manifest](deployments/robinhood-testnet.json) and [V1 independent verification snapshot](deployments/robinhood-testnet-verification.json) are historical records and remain unchanged. They identify the existing test assets and the earlier game/token. The [V2 manifest](deployments/robinhood-testnet-v2.json) and [V2 verification snapshot](deployments/robinhood-testnet-v2-verification.json) document the new game/token and reused assets. Our verification reports are read-only evidence, not explorer source verification or a security audit.
 
-The separate [testnet lab](https://testnet.rarerush.app) exposes the 1,100 tRF daily faucet and free test Genesis/Generations minting. Browser gameplay and the hosted run verifier are next; the public arcade at `rarerush.app` retains its simulated economy. The 102.4M launch reserve is in the configured owner wallet; it is not a deployed liquidity pool.
+V2 reuses these contracts after checking their pinned deployed code and ABI:
+
+| Asset | Existing testnet address |
+| --- | --- |
+| tRF | `0xED668133bab94DD83e537F12B68365c4bC0eC2a3` |
+| Test Genesis | `0x7404d2b0461228C6478fdB8850d27d8e65EFD2c3` |
+| Test Generations | `0x606dCbFA17b76E4194865a09D6cfb92BE7EE26c3` |
+
+Existing tRF balances, NFT ownership and faucet usage persist. The game’s engine version and the reward token’s authorized minter are immutable, so V2 needs a **new game and a new reward token**, followed by one binding transaction. V1 tRARERUSH remains a separate token; balances and rewards do not migrate into the V2 token. V1 pending runs remain on the V1 game, with their original deadlines. V2 does not resume or verify those recordings; preserve their browser data and use the matching V1 workflow to handle them.
+
+The approved V2 engine hash is `0x907ff2967abdd97cc172f53c0c69fbcd17f22fcf4ece263e5846bf2973a3accb`, with replay protocol `rare-rush-input-v2`. See the [V2 deployment and activation runbook](../../docs/TESTNET-V2.md).
 
 ## Run locally
 
@@ -48,31 +58,46 @@ Every contract constructor rejects chains other than `46630` and local `31337`. 
 
 The [official asset/faucet check](docs/ASSET_DISCOVERY.md) found no documented Rare Friends NFT/RF faucet deployment for chain 46630 in the vibeathon, FriendSDK, or Rare Friends web repositories. SDK mock contracts are automated-test fixtures. Our faucets are explicitly Rare Rush test assets, not official Rare Friends NFTs or a mainnet ownership bridge.
 
-## Deploy with your browser wallet
+## Prepare and deploy V2 with the owner’s browser wallet
 
 From `infra/testnet/`:
 
 ```sh
 npm run compile
 npm run prepare:operator -- 0x6fD155b9D52F80E8A73a8A2537268602978486e2
+npm run deploy
 npm run console
 ```
 
-Open `http://127.0.0.1:4174` in your wallet-enabled desktop browser. The console is pinned to XIBOT's chosen owner wallet above and asks you to approve six transactions: deploy test RF, test Genesis, test Generations, the game, and the external reward token; then bind that token to the game. The token reserves 102.4 million tokens in the configured owner wallet, with 921.6 million left unminted for gameplay. This reserve is not yet a liquidity pool. Fund that owner with **test ETH** from the official faucet first. Save the downloaded deployment manifest after all receipts succeed. Pending transaction hashes are saved in the browser so a refresh can resume confirmation rather than duplicate deployment.
+`prepare:operator` reads the existing **public** V1 `operator-config.json`, preserves the verifier identity, and writes ignored `operator-config-v2.json`. It never reads or changes `.env.testnet`, generates a key, or overwrites the V1 config. Owner, treasury and launch-reserve recipient remain `0x6fD155b9D52F80E8A73a8A2537268602978486e2`. The existing public verifier is `0xd3166A769cF352F103A60a385892b599ecCc2B36`.
 
-`prepare:operator` creates a dedicated verifier key in ignored `.env.testnet` with owner-only filesystem permissions and emits an ignored `operator-config.json` containing public addresses only. It reuses an existing local key and never prints it. Back up the secret securely before operating the verifier; never commit it, put it in a browser bundle, or use this test signer for assets with value. The console cannot serve the secret file. This is a local operator setup, not a hosted secrets-management system.
+`npm run deploy` is a **read-only preflight**. It checks chain 46630, reused asset code/ABI, the engine hash and artifact shape, and reports the owner’s test ETH balance, artifact fingerprint, next nonces and predicted CREATE addresses. Predictions are valid only if these are the next owner transactions. They are not deployment evidence. CLI broadcasting is disabled.
 
-The optional second address argument to `prepare:operator` selects the treasury; it defaults to the owner wallet for this testnet setup. The deployment page displays it before signing. The constructor fixes that address permanently, and every paid start forwards 10 tRF to it atomically. Changing game ownership does not redirect the treasury or the reward token's immutable game minter. The one-time token binding checks the cap, decimals, launch allocation and untouched initial supply before enabling runs. A different treasury or revised immutable economics requires a new game deployment. Refresh the console after recompiling; if any earlier package has a pending or confirmed deployment, it preserves and blocks that progress for reconciliation instead of silently deploying again.
+Open `http://127.0.0.1:4174` in a wallet-enabled desktop browser. To choose another local port, use `RUSH_CONSOLE_PORT=4184 npm run console`, then open `http://127.0.0.1:4184`. Fund the owner with **test ETH** from the linked official faucet if needed. Connect the owner wallet on Robinhood testnet and approve these actions in order:
 
-The optional CLI `npm run deploy` performs read-only preflight and reports the artifact fingerprint, configured allocation and test ETH balance. CLI broadcasting is disabled; use the six-operation browser console, which checkpoints each pending transaction and verifies it before enabling the next step. No deployer key is exported or loaded. Never clear existing pending progress to retry an ambiguous transaction. Explorer verification uses `artifacts/standard-input.json`, Solidity `v0.8.30+commit.73712a01`, optimization 200, Cancun, and constructor arguments from the manifest.
+1. **Deploy Rare Rush V2 Game** with the V2 engine hash and existing test assets.
+2. **Deploy V2 Reward Token** with the new game as its immutable minter and a 102.4M launch reserve to the owner.
+3. **Bind Reward Token** to enable the new game, leaving 921.6M tokens reserved for verified gameplay.
 
-After deployment, independently check the downloaded files against the local public `operator-config.json`, current source, pinned compiler and RPC:
+Each action records its nonce before opening the wallet. A pending or ambiguous action must be verified before the next one; the console never automatically resends it. Refresh restores V2 progress under a separate storage key and leaves V1 progress untouched. An interrupted wallet response can be recovered by entering the transaction hash. Do not clear checkpoints to bypass recovery. A changed package with V2 transactions already saved remains blocked for reconciliation.
+
+After all three receipts verify, download **`rare-rush-robinhood-testnet-v2.json`** and **`rare-rush-v2-standard-input.json`**. Keep both, without replacing the V1 files. No download contains signing material. Compiler settings remain Solidity `v0.8.30+commit.73712a01`, optimizer 200, Cancun.
+
+Before gameplay or transfers from the V2 launch reserve, verify the downloads from `infra/testnet/`:
 
 ```sh
-npm run verify:deployment -- deployments/robinhood-testnet.json /path/to/rare-rush-standard-input.json
+npm run verify:deployment -- /path/to/rare-rush-robinhood-testnet-v2.json /path/to/rare-rush-v2-standard-input.json
 ```
 
-The second path is optional. The check signs and sends no transactions, writes public evidence to ignored `artifacts/public-deployment-verification.json`, and verifies exact transaction inputs, canonical receipts, compiled runtime outside compiler-declared immutable slots, contract bindings, economics and access guards at one pinned block. It is an **initial deployment** check: it deliberately expects zero gameplay starts/mints and an untouched launch reserve, so it will fail once gameplay starts or the owner’s reserve balance differs. The committed snapshot records the initial deployment rather than making an ongoing health claim.
+The compiler-input path is optional. This read-only check writes `artifacts/public-deployment-v2-verification.json` and requires the exact V2 configuration, transaction inputs and nonces, canonical receipts, deployed runtime, binding, economics and access guards at one pinned block. Reused asset balances and mint counters may already be populated. The **new game/token** must still have zero gameplay starts/mints and an untouched launch reserve. V1 manifests are rejected; V1 verification evidence is never overwritten.
+
+Then, from the repository root, prepare the app’s verified V2 address/runtime pins and public config together:
+
+```sh
+node testnet-app/scripts/activate-v2.mjs /path/to/rare-rush-robinhood-testnet-v2.json /path/to/rare-rush-v2-standard-input.json
+```
+
+Activation is a local configuration step, not a website deployment. Complete the app checks and the separately authorized testnet-site deployment before describing V2 as available. See the [full runbook](../../docs/TESTNET-V2.md) for local rehearsal and pending-production guards.
 
 ## Entry and reward rules
 
@@ -106,11 +131,11 @@ Halving is computed atomically in **successful onchain claim order**, using each
 
 ## Verify a run
 
-The future testnet game adapter must read the confirmed `RunStarted`/`runs(id)` seed and difficulty and record this input format before each engine tick:
+The V2 testnet game adapter reads the confirmed `RunStarted`/`runs(id)` seed and difficulty and records this input format before each engine tick:
 
 ```json
 {
-  "version": "rare-rush-input-v1",
+  "version": "rare-rush-input-v2",
   "frames": [
     { "tick": 0, "jump": false, "slide": false, "pace": 0 },
     { "tick": 70, "jump": true, "slide": false, "pace": 0 }
@@ -126,7 +151,7 @@ Set `RUSH_GAME_ADDRESS` in the operator environment after deployment. The CLI is
 node --env-file=.env.testnet src/sign-run.ts RUN_ID replay.json > receipt.json
 ```
 
-It checks the fixed chain, confirmed contract state, current NFT owner, verifier epoch, and the deployed engine source hash. It replays the full run and returns signed `claimArgs`. The player wallet then calls `claim(runId, pickupKinds, replayHash, deadline, signature)`. The chain enforces timing, identity, signature, supply cap, and single use. Original pickup order is important at a halving boundary. Any changes to the engine or difficulty source require a new compatible deployment/version.
+It checks the fixed chain, confirmed contract state, current NFT owner, verifier epoch, and the deployed engine source hash. It replays the full run and returns signed `claimArgs`. The player wallet then calls `claim(runId, pickupKinds, replayHash, deadline, signature)`. The chain enforces timing, identity, signature, supply cap, and single use. Original pickup order is important at a halving boundary. V2 hashes the exact approved `difficulty.ts`, classic `engine.ts`, and `twist/engine.ts` sources in canonical path order. Changes to those physics dependencies require a new compatible deployment/version. V1 recordings are rejected by V2.
 
 ## Trust and next integration
 
@@ -134,4 +159,4 @@ The verifier and owner are trusted operators. EIP-712 binds a receipt to chain, 
 
 The owner can pause starts/claims/payouts and rotate the verifier; rotation invalidates all pending runs from old epochs. `abandonRun` remains available while paused. Prize awards are explicit owner transactions bounded by the **100 tRF prize share** and unique award IDs. Treasury funds have already left the game and cannot be spent by `awardPrize`. Incoming payments and the outgoing treasury transfer are checked exactly; any failure rolls back both transfers, the run and its daily attempt. Genesis starts pay neither share. Direct token donations are outside pool accounting. There is no discretionary token-mint function on the game, but verifier authority remains a minting trust assumption.
 
-Before inviting public gameplay: connect a separate testnet host to these contracts, implement wallet-authenticated/rate-limited verifier requests with durable run/replay storage, maintain a server-owned RPC and signer, and rehearse outage/rotation recovery. Real Genesis/Generations holder access requires freshly checked mainnet ownership and a carefully scoped cross-chain attestation system (or another explicit eligibility design). Do not treat the freely minted test NFTs as real-holder verification. A future token pair requires separately chosen exchange contracts and funded liquidity; deploying the reward token creates neither.
+Before enabling public V2 gameplay: finish the three owner transactions, verify and activate their exact contract/runtime pins, run the app checks, and deploy the separate testnet host with its existing server-only signer and authentication/rate limits. Rehearse outage/rotation recovery. Local rehearsal is not proof of a public deployment. Real Genesis/Generations holder access requires freshly checked mainnet ownership and a carefully scoped cross-chain attestation system (or another explicit eligibility design). Do not treat the freely minted test NFTs as real-holder verification. A future token pair requires separately chosen exchange contracts and funded liquidity; deploying the reward token creates neither.

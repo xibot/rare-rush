@@ -1,4 +1,5 @@
 import { createPublicClient, defineChain, getAddress, http, type Abi, type Hex } from 'viem';
+import deployment from '../src/shared/deployment.json' with { type: 'json' };
 import { privateKeyToAccount } from 'viem/accounts';
 import gameArtifact from '../generated/infra/testnet/artifacts/RareRushGame.json' with { type: 'json' };
 import nftArtifact from '../generated/infra/testnet/artifacts/TestFriends.json' with { type: 'json' };
@@ -7,8 +8,8 @@ import { verifyAndSignCore } from '../generated/infra/testnet/src/verifier-core.
 import { AUTH_CHAIN_ID, AUTH_GAME } from '../src/shared/authorization.ts';
 import { createVerifierHandlers, RunVerificationRejected, type VerifierStatus } from './handler.ts';
 
-const EXPECTED_VERIFIER = '0xd3166A769cF352F103A60a385892b599ecCc2B36';
-const EXPECTED_REWARD_TOKEN = '0x9fCe27c074281709d0Ccd9bd0439f223E8F83844';
+const EXPECTED_VERIFIER = deployment.verifier;
+const EXPECTED_REWARD_TOKEN = deployment.contracts.rewardToken;
 const chain = defineChain({
   id: AUTH_CHAIN_ID, name: 'Robinhood Testnet', testnet: true,
   nativeCurrency: { name: 'Test Ether', symbol: 'ETH', decimals: 18 },
