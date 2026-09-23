@@ -6,6 +6,18 @@ The owner deployed and bound V2 on Robinhood testnet on September 22, 2026. Inde
 - Reward token: `0x1c3D191561a7077f944b9967553C21Dd8c26dB71`
 - [Public manifest](../infra/testnet/deployments/robinhood-testnet-v2.json) · [Independent verification snapshot](../infra/testnet/deployments/robinhood-testnet-v2-verification.json)
 
+## Blockscout source verification
+
+On September 23, 2026, Blockscout returned **Pass - Verified** and full source verification for all five active contracts. Their source code and ABIs are public. Before submission, each contract's creation input (including constructor arguments) and deployed runtime hash matched the local artifacts and active app profile. The compiler was `v0.8.30+commit.73712a01`, with optimization enabled at 200 runs and the Cancun EVM target. The [verification record](../infra/testnet/deployments/robinhood-testnet-v2-blockscout.json) preserves the results and compiler-input hash.
+
+| Contract | Verified source |
+| --- | --- |
+| Game V2 | [RareRushGame](https://explorer.testnet.chain.robinhood.com/address/0x415b897fff5a336a8c3a527beef12440eadc6422?tab=contract) |
+| tRARERUSH V2 | [RareRushToken](https://explorer.testnet.chain.robinhood.com/address/0x1c3d191561a7077f944b9967553c21dd8c26db71?tab=contract) |
+| tRF | [TestRF](https://explorer.testnet.chain.robinhood.com/address/0xed668133bab94dd83e537f12b68365c4bc0ec2a3?tab=contract) |
+| Test Genesis | [TestFriends (Genesis)](https://explorer.testnet.chain.robinhood.com/address/0x7404d2b0461228c6478fdb8850d27d8e65efd2c3?tab=contract) |
+| Test Generations | [TestFriends (Generations)](https://explorer.testnet.chain.robinhood.com/address/0x606dcbfa17b76e4194865a09d6cfb92be7ee26c3?tab=contract) |
+
 ## What changes and what persists
 
 V2 uses the approved directional gameplay, with replay protocol `rare-rush-input-v2` and engine hash:
