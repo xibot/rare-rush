@@ -13,7 +13,7 @@ try {
   server = createRushSiteServer(outdir);
   await new Promise(resolve => server.listen(0, '127.0.0.1', resolve));
   const origin = `http://127.0.0.1:${server.address().port}`;
-  browser = await chromium.launch({ headless: true });
+  browser = await chromium.launch({ headless: true, ...(process.env.RUSH_BROWSER_CHANNEL ? { channel: process.env.RUSH_BROWSER_CHANNEL } : {}) });
   for (const [width, height] of [[1440, 1000], [390, 844], [360, 640]]) {
     const page = await browser.newPage({ viewport: { width, height }, reducedMotion: 'reduce' });
     const errors = [], external = [], failed = [];
@@ -40,6 +40,16 @@ try {
     assert.equal(await page.locator('.docs-logo small').innerText(), 'BY XIBOT');
     assert.equal(await page.locator('.docs-nav a').count(), 6);
     await page.screenshot({ path: `artifacts/docs-${width}-hero.png` });
+    assert.equal(await page.locator('.experience-card').count(), 2, 'Guide offers both live experiences');
+    assert.equal(await page.locator('.experience-card a[href="/arcade/"]').count(), 1);
+    assert.equal(await page.locator('.experience-card a[href="https://testnet.rarerush.app/"]').count(), 1);
+    assert.match(await page.locator('.experience-grid').innerText(), /SIMULATED REWARDS/);
+    assert.match(await page.locator('.experience-grid').innerText(), /PLAY → VERIFY → MINT/);
+    assert.equal(await page.locator('.direction-grid article').count(), 4);
+    assert.match(await page.locator('.direction-route').innerText(), /occasional surprise, not a fixed sequence/);
+    assert.match(await page.locator('.control-card').last().innerText(), /onchain claim deadline keeps counting down/);
+    await page.locator('.experience-grid').screenshot({ path: `artifacts/docs-${width}-experiences.png` });
+    await page.locator('.direction-route').screenshot({ path: `artifacts/docs-${width}-directions.png` });
 
     const collect = page.getByRole('button', { name: 'COLLECT 5 COINS +' });
     const hit = page.getByRole('button', { name: 'TAKE A HIT −' });
@@ -82,9 +92,28 @@ try {
     assert.equal(await page.locator('[data-reward="bonus"]').innerText(), '10,000');
     await page.locator('#reward-holder').selectOption('generations');
     assert.equal(await page.locator('[data-reward="ordinary"]').innerText(), '10');
+    assert.match(await page.locator('.reward-lab').innerText(), /ARCADE ONLY/);
+    assert.match(await page.locator('.lab-caption').innerText(), /does not calculate Testnet mint amounts/);
     await page.locator('.reward-lab').screenshot({ path: `artifacts/docs-${width}-rewards.png` });
-    await page.getByRole('link', { name: /05.*The next level/ }).click();
-    await page.locator('#next').screenshot({ path: `artifacts/docs-${width}-planned.png` });
+    await page.getByRole('link', { name: /05.*Play to mint/ }).click();
+    await page.locator('#next').screenshot({ path: `artifacts/docs-${width}-testnet.png` });
+    const testnetCopy = await page.locator('#next').innerText();
+    assert.match(testnetCopy, /LIVE ON TESTNET/);
+    assert.match(testnetCopy, /110 tRF/);
+    assert.match(testnetCopy, /100 stays in the prize pool and 10 goes to the treasury/);
+    assert.match(testnetCopy, /Three starts per NFT per UTC day/);
+    assert.match(testnetCopy, /one run duration plus 15 minutes after the onchain start/);
+    assert.match(testnetCopy, /Fees and attempts are not refunded/);
+    assert.match(testnetCopy, /Each NFT can have one active onchain run/);
+    assert.match(testnetCopy, /one saved run per browser and account/);
+    assert(!testnetCopy.includes('One active run per wallet'), 'Onchain active-run restriction is per NFT');
+    assert.match(testnetCopy, /within five minutes of verification/);
+    assert.match(testnetCopy, /global activity, and available supply at claim time/);
+    await page.locator('.testnet-rules').screenshot({ path: `artifacts/docs-${width}-testnet-rules.png` });
+    assert.match(testnetCopy, /Automatic prize distribution is not/);
+    assert.match(testnetCopy, /no live game liquidity pool/);
+    assert(!/NOT LIVE|planned flow|Real token claims aren’t live/i.test(await page.locator('.claim-concept').innerText()), 'Live Testnet claims must not be described as future work');
+    assert.equal(await page.locator('#next a[href="https://testnet.rarerush.app/dashboard/"]').count(), 1);
     await page.getByText('Am I earning real tokens right now?', { exact: true }).click();
     assert(await page.locator('details[open]').innerText().then(text => text.includes('simulated')));
     assert.equal(await page.locator('body').evaluate(body => body.scrollWidth > window.innerWidth), false);

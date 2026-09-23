@@ -2,7 +2,7 @@ import { context } from 'esbuild';
 import { buildGame } from '@rarefriends/friendsdk/build';
 import { createGameServer } from '@rarefriends/friendsdk/serve';
 import { createServer } from 'node:http';
-import { mkdir, readFile, writeFile, realpath, stat, unlink, rm } from 'node:fs/promises';
+import { copyFile, mkdir, readFile, writeFile, realpath, stat, unlink, rm } from 'node:fs/promises';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -43,6 +43,10 @@ export async function buildRushSite({ outdir = path.join(project, 'dist'), watch
           await writeFile(path.join(outdir, 'docs/index.html'), await readFile(path.join(landing, '../docs/index.html')));
           await mkdir(path.join(outdir, 'pitch'), { recursive: true });
           await writeFile(path.join(outdir, 'pitch/index.html'), await readFile(path.join(landing, '../pitch/index.html')));
+          await mkdir(path.join(outdir, 'media'), { recursive: true });
+          for (const filename of ['rare-rush-directions.mp4', 'rare-rush-directions.jpg']) {
+            await copyFile(path.join(landing, '../pitch/media', filename), path.join(outdir, 'media', filename));
+          }
           await mkdir(path.join(outdir, 'genesis'), { recursive: true });
           await mkdir(path.join(outdir, 'arcade'), { recursive: true });
           const genesisHTML = await readFile(path.join(landing, '../genesis/index.html'));
@@ -86,6 +90,8 @@ export function createRushSiteServer(outdir) {
     ['/pitch/index.html', ['pitch/index.html', 'text/html; charset=utf-8']],
     ['/pitch/index.js', ['pitch/index.js', 'text/javascript; charset=utf-8']],
     ['/pitch/index.css', ['pitch/index.css', 'text/css; charset=utf-8']],
+    ['/media/rare-rush-directions.mp4', ['media/rare-rush-directions.mp4', 'video/mp4']],
+    ['/media/rare-rush-directions.jpg', ['media/rare-rush-directions.jpg', 'image/jpeg']],
     ['/arcade/', ['arcade/index.html', 'text/html; charset=utf-8']],
     ['/genesis/', ['genesis/index.html', 'text/html; charset=utf-8']],
     ['/genesis/index.js', ['genesis/index.js', 'text/javascript; charset=utf-8']],
@@ -118,7 +124,33 @@ export function createRushSiteServer(outdir) {
       if (file !== path.join(base, output[0]) || !(await stat(file)).isFile()) { response.writeHead(404).end(); return; }
       const cors = url.pathname === '/genesis/child.js' || output[1] === 'font/woff2' ? { 'Access-Control-Allow-Origin': '*' } : {};
       const framing = url.pathname === '/genesis/game.html' ? { 'Content-Security-Policy': "frame-ancestors 'self'" } : {};
-      response.writeHead(200, { 'Content-Type': output[1], 'Cache-Control': 'no-store', 'X-Content-Type-Options': 'nosniff', ...cors, ...framing });
+      const headers = { 'Content-Type': output[1], 'Cache-Control': 'no-store', 'X-Content-Type-Options': 'nosniff', ...cors, ...framing };
+      if (output[1] === 'video/mp4') {
+        const content = await readFile(file);
+        headers['Accept-Ranges'] = 'bytes';
+        headers['Content-Length'] = content.length;
+        // Let the local preview seek like the deployed static video.
+        if (request.method === 'GET' && request.headers.range) {
+          const range = /^bytes=(\d*)-(\d*)$/.exec(request.headers.range);
+          let start = 0, end = content.length - 1;
+          if (range?.[1]) {
+            start = Number(range[1]);
+            if (range[2]) end = Math.min(Number(range[2]), end);
+          } else if (range?.[2]) {
+            start = Math.max(0, content.length - Number(range[2]));
+          }
+          if (!range || (!range[1] && !range[2]) || !Number.isSafeInteger(start) || !Number.isSafeInteger(end) || start > end || start >= content.length) {
+            response.writeHead(416, { ...headers, 'Content-Range': `bytes */${content.length}`, 'Content-Length': 0 }).end();
+            return;
+          }
+          response.writeHead(206, { ...headers, 'Content-Range': `bytes ${start}-${end}/${content.length}`, 'Content-Length': end - start + 1 });
+          response.end(content.subarray(start, end + 1));
+          return;
+        }
+        response.writeHead(200, headers).end(request.method === 'HEAD' ? undefined : content);
+        return;
+      }
+      response.writeHead(200, headers);
       response.end(request.method === 'HEAD' ? undefined : await readFile(file));
     } catch { response.writeHead(404).end('Not found'); }
   });

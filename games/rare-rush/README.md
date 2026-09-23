@@ -46,7 +46,7 @@ The separate demo ledger starts with 100 demo RF. For Generations, every difficu
 
 The SDK requires `game.json` to describe a positive-priced consumable and weighted reward table even when those actions are unused. This file's 1 RF item and 100%-probability 1 RF reward are **unused compatibility terms**, not runner mechanics. Rare Rush initializes `client.read()` but never calls buy/play/settle/redeem. Skill-based rewards use the clearly labeled game-local simulation.
 
-A real RARERUSH token, $RUSH/RAREFRIENDS liquidity, secure score verification, global counters, persistent balances and prize distribution require future integration. See [the full economy design](../../docs/ECONOMY.md).
+The separately deployed [Testnet build](https://github.com/xibot/rare-rush/tree/codex/testnet-infrastructure) now supports replay verification, onchain entries, and persistent test-token balances. This Arcade ledger remains simulated. Mainnet RARERUSH, funded RARERUSH/RAREFRIENDS liquidity, and automatic prize distribution remain future work. See [the Arcade economy design](../../docs/ECONOMY.md) and the [live player guide](https://rarerush.app/docs/).
 
 ## Build and verify
 
