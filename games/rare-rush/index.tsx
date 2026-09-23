@@ -4,8 +4,9 @@ import type { GameClient } from '@rarefriends/friendsdk/game';
 import { createFriendReader, type GenerationSprites } from '@rarefriends/friendsdk/sprites';
 import { createFriendSoundKit, type FriendSoundKit } from '@rarefriends/friendsdk/sounds';
 import { GameMenu } from '@rarefriends/friendsdk/frame';
-import { createRun, jump, setSliding, setPace, stepRun, type RunState } from './twist/engine';
+import { createRun, jump, setSliding, setPace, stepRun, FIXED_STEP, type RunState } from './twist/engine';
 import { DirectionScene } from './twist/DirectionScene';
+import { canonicalAxis, headingFor } from './twist/presentation';
 import { createEconomy, enterRun, collectCoin, nextCoinReward, formatToken, formatRF } from './economy';
 import { DIFFICULTIES, DIFFICULTY_ORDER, type Difficulty } from './difficulty';
 import { WorldArt } from './WorldArt';
@@ -92,25 +93,33 @@ function Runner({ friendId, client, paused, genesis, onNavigate = requestArcadeN
   useEffect(() => {
     let id = 0, previous = 0;
     const tick = (time: number) => {
-      const dt = previous ? Math.min((time - previous) / 1000, .25) : 0; previous = time;
+      const frameDt = previous ? Math.min((time - previous) / 1000, .25) : 0; previous = time;
       if (active.current) {
-        const events = stepRun(engine.current, dt);
-        for (const event of events) {
-          if (event.type === 'coin') {
-            const gained = collectCoin(economy.current, engine.current.difficulty, event.rewardMultiplier ?? 1, collection);
-            reward.current += gained;
-            const bonus = event.rewardMultiplier === 10;
-            sounds.current?.play(bonus ? 'reveal-rare' : 'select');
-            if (bonus) { setNotice(`10× COIN! +${formatToken(gained)}`); noticeUntil.current = engine.current.elapsed + 1.8; }
-          }
-          if (event.type === 'hit') { sounds.current?.play('impact'); setNotice('OUCH! SIZE DOWN'); noticeUntil.current = engine.current.elapsed + 1.3; }
-          if (event.type === 'magnet' || event.type === 'shield') { sounds.current?.play('reveal-rare'); setNotice(event.type === 'magnet' ? 'COIN MAGNET!' : event.amount === 0 ? 'SHIELD SAVED YOU!' : 'SHIELD UP!'); noticeUntil.current = engine.current.elapsed + 1.5; }
-          if (event.type === 'finish') {
-            const finished = engine.current;
-            active.current = false; setScreen('result'); setBest(old => ({ ...old, [finished.difficulty]: Math.max(old[finished.difficulty], finished.score) })); sounds.current?.play('reward');
+        // A slow render frame may span a shaft exit. Re-map held arrows at
+        // every physics step, preserving the engine's existing accumulator.
+        let remaining = frameDt;
+        while (remaining > 1e-10 && engine.current.status === 'running') {
+          const dt = Math.min(remaining, FIXED_STEP);
+          remaining -= dt;
+          applyPace();
+          const events = stepRun(engine.current, dt);
+          for (const event of events) {
+            if (event.type === 'coin') {
+              const gained = collectCoin(economy.current, engine.current.difficulty, event.rewardMultiplier ?? 1, collection);
+              reward.current += gained;
+              const bonus = event.rewardMultiplier === 10;
+              sounds.current?.play(bonus ? 'reveal-rare' : 'select');
+              if (bonus) { setNotice(`10× COIN! +${formatToken(gained)}`); noticeUntil.current = engine.current.elapsed + 1.8; }
+            }
+            if (event.type === 'hit') { sounds.current?.play('impact'); setNotice('OUCH! SIZE DOWN'); noticeUntil.current = engine.current.elapsed + 1.3; }
+            if (event.type === 'magnet' || event.type === 'shield') { sounds.current?.play('reveal-rare'); setNotice(event.type === 'magnet' ? 'COIN MAGNET!' : event.amount === 0 ? 'SHIELD SAVED YOU!' : 'SHIELD UP!'); noticeUntil.current = engine.current.elapsed + 1.5; }
+            if (event.type === 'finish') {
+              const finished = engine.current;
+              active.current = false; setScreen('result'); setBest(old => ({ ...old, [finished.difficulty]: Math.max(old[finished.difficulty], finished.score) })); sounds.current?.play('reward');
+            }
           }
         }
-        displayedGrowth.current += (engine.current.growth - displayedGrowth.current) * (1 - Math.exp(-14 * dt));
+        displayedGrowth.current += (engine.current.growth - displayedGrowth.current) * (1 - Math.exp(-14 * frameDt));
         if (engine.current.elapsed > noticeUntil.current) setNotice('');
         draw(time);
       }
@@ -126,9 +135,13 @@ function Runner({ friendId, client, paused, genesis, onNavigate = requestArcadeN
   function paceInput(source: string, held: boolean) {
     if (held && !active.current) return;
     if (held) paceInputs.current.add(source); else paceInputs.current.delete(source);
-    const slow = [...paceInputs.current].some(key => key.endsWith('left'));
-    const fast = [...paceInputs.current].some(key => key.endsWith('right'));
-    setPace(engine.current, slow === fast ? 0 : fast ? 1 : -1);
+    applyPace();
+  }
+  function applyPace() {
+    const left = [...paceInputs.current].some(key => key.endsWith('left'));
+    const right = [...paceInputs.current].some(key => key.endsWith('right'));
+    const run = engine.current;
+    setPace(run, canonicalAxis(left === right ? 0 : right ? 1 : -1, run.phase, headingFor(run)));
   }
   function releaseControls() { paceInputs.current.clear(); setPace(engine.current, 0); setSliding(engine.current, false); }
   useEffect(() => {
@@ -183,7 +196,7 @@ function Runner({ friendId, client, paused, genesis, onNavigate = requestArcadeN
   const run = engine.current, e = economy.current, biome = Math.min(2, Math.floor(run.elapsed / run.duration * 3));
   const mode = DIFFICULTIES[run.difficulty], modeBest = best[run.difficulty];
   const running = screen === 'running', freeze = paused || userPaused || Boolean(panel);
-  const vertical = run.phase !== 'side';
+  const vertical = run.phase !== 'side', heading = headingFor(run);
   const timer = Math.max(0, Math.ceil(run.duration-run.elapsed));
   const playerFrame = reduced || freeze ? 0 : Math.floor(run.elapsed * 12) % 8;
   const growth = reduced ? run.growth : displayedGrowth.current;
@@ -194,7 +207,7 @@ function Runner({ friendId, client, paused, genesis, onNavigate = requestArcadeN
     ? <GenesisRunnerSprite portraitUrl={genesis.portraitUrl} bodyId={genesisBodyId} frame={frame} walking={walking && !reduced && !freeze}/>
     : sprites ? <Sprite sprites={sprites} frame={frame} walking={walking}/> : null;
 
-  return <section ref={root} className={`rare-rush ${reduced ? 'reduce-motion' : ''}`} data-collection={collection} data-screen={screen} data-phase={run.phase} data-difficulty={run.difficulty} data-run-duration={run.duration} data-bonus-coins={run.bonusCoins} aria-label="Rare Rush arcade game">
+  return <section ref={root} className={`rare-rush ${reduced ? 'reduce-motion' : ''}`} data-collection={collection} data-screen={screen} data-phase={run.phase} data-heading={vertical ? 0 : heading} data-difficulty={run.difficulty} data-run-duration={run.duration} data-bonus-coins={run.bonusCoins} aria-label="Rare Rush arcade game">
     <div className="arcade-top"><button type="button" className="arcade-logo" aria-label="Rare Rush home" onClick={() => onNavigate('home')}><BrandMark/></button>
       <div className="top-actions"><span className="preview-tag">SIMULATED</span><button onClick={() => { const next = !muted; setMuted(next); sounds.current?.setMuted(next); if (!next) void sounds.current?.unlock(); focusWorld(); }} aria-label={muted ? 'Turn sound on' : 'Mute sound'} title={muted ? 'Sound off' : 'Sound on'}>{muted ? '♪ OFF' : '♪ ON'}</button>
         <button onClick={() => { setReduced(value => !value); focusWorld(); }} aria-pressed={reduced} title="Reduce background motion">FX {reduced ? 'OFF' : 'ON'}</button>
@@ -207,7 +220,7 @@ function Runner({ friendId, client, paused, genesis, onNavigate = requestArcadeN
       <div className="life-hud"><span>KEEP IT RARE</span><strong aria-label={`${run.hearts} hearts remaining`}>{[0,1,2].map(i => <b key={i} className={i>=run.hearts?'lost':''}>♥</b>)}</strong></div>
     </div>
     <div className={`playfield ${running && !freeze ? 'playing' : ''}`}>
-      <svg ref={stage} className="world-svg" viewBox={`0 0 ${viewWidth} 500`} preserveAspectRatio="none" tabIndex={running ? 0 : -1} role="img" aria-label={vertical ? `Runner world. ${run.phase === 'up' ? 'Pulled upward' : 'Free falling'} automatically. Hold left or right to steer around obstacles.` : 'Runner world. Space or up to jump, down to slide. Hold right to speed up, left to slow down.'} onPointerDown={event => { if (running) { event.preventDefault(); stage.current?.focus(); doJump(); } }}>
+      <svg ref={stage} className="world-svg" viewBox={`0 0 ${viewWidth} 500`} preserveAspectRatio="none" tabIndex={running ? 0 : -1} role="img" aria-label={vertical ? `Runner world. ${run.phase === 'up' ? 'Pulled upward' : 'Free falling'} automatically. Hold left or right to steer around obstacles.` : `Runner world. Space or up to jump, down to slide. Hold ${heading === -1 ? 'left' : 'right'} to speed up, ${heading === -1 ? 'right' : 'left'} to slow down.`} onPointerDown={event => { if (running) { event.preventDefault(); stage.current?.focus(); doJump(); } }}>
         {screen !== 'ready' ? <DirectionScene run={run} reducedMotion={reduced} running={running && !freeze} biome={biome} growth={growth} renderCharacter={renderCharacter} viewportWidth={viewWidth}/> : <>
         <WorldArt distance={run.distance} elapsed={run.elapsed * 1000} reducedMotion={reduced || !running} biome={biome}/>
         {!running && screen === 'ready' && <g>{[0,1,2,3,4].map(i => <TokenCoin key={i} x={370+i*52} y={295 - Math.sin(i/4*Math.PI)*65} size={30}/>)}<EntityArt entity={{id:999,kind:'crystal',x:730,y:339,w:44,h:61} as RunState['entities'][number]} elapsed={0} reduced={reduced}/></g>}
@@ -243,15 +256,15 @@ function Runner({ friendId, client, paused, genesis, onNavigate = requestArcadeN
     {running && userPaused && !paused && !panel && <div className="game-overlay"><div className="pause-card"><span className="eyebrow">TAKE A BREATHER</span><h2>PAUSED</h2><p>Your timer is paused too.</p><button className="primary" onClick={() => { setUserPaused(false); stage.current?.focus(); }}>KEEP RUNNING <span>▶</span></button><button className="text-button" onClick={() => setPanel('rules')}>Controls & rules</button></div></div>}
 
     <div className="arcade-bottom"><div className="keyboard-controls">{vertical ? <><span><kbd>{run.phase === 'up' ? '↑' : '↓'}</kbd> AUTO {run.phase === 'up' ? 'LIFT' : 'FALL'}</span><span><kbd>←</kbd><kbd>→</kbd> HOLD TO STEER</span></> : <><span><kbd>SPACE</kbd> JUMP <small>×2 DOUBLE</small></span><span><kbd>↓</kbd> SLIDE</span><span><kbd>←</kbd><kbd>→</kbd> HOLD FOR PACE</span></>}</div>
-      <div className="touch-controls"><button className="touch-pace" disabled={!running || freeze} onPointerDown={event => { event.preventDefault(); event.currentTarget.setPointerCapture(event.pointerId); paceInput('touch-left', true); }} onPointerUp={() => paceInput('touch-left', false)} onPointerCancel={() => paceInput('touch-left', false)} onLostPointerCapture={() => paceInput('touch-left', false)} aria-label={vertical ? 'Steer left' : 'Hold to slow down'}>← <span>{vertical ? 'LEFT' : 'SLOW'}</span></button>
+      <div className="touch-controls"><button className="touch-pace" disabled={!running || freeze} onPointerDown={event => { event.preventDefault(); event.currentTarget.setPointerCapture(event.pointerId); paceInput('touch-left', true); }} onPointerUp={() => paceInput('touch-left', false)} onPointerCancel={() => paceInput('touch-left', false)} onLostPointerCapture={() => paceInput('touch-left', false)} aria-label={vertical ? 'Steer left' : heading === -1 ? 'Hold to speed up' : 'Hold to slow down'}>← <span>{vertical ? 'LEFT' : heading === -1 ? 'FAST' : 'SLOW'}</span></button>
         {vertical ? <span className="vertical-touch">{run.phase === 'up' ? '↑ AUTO LIFT' : '↓ FREE FALL'}<small>← STEER →</small></span> : <><button disabled={!running || freeze} onPointerDown={event => { event.preventDefault(); event.currentTarget.setPointerCapture(event.pointerId); slide(true); }} onPointerUp={() => slide(false)} onPointerCancel={() => slide(false)} onLostPointerCapture={() => slide(false)} aria-label="Hold to slide">↓ <span>SLIDE</span></button>
         <button className="touch-jump" disabled={!running || freeze} onPointerDown={event => { event.preventDefault(); doJump(); }} aria-label="Jump, tap twice to double jump">↑ <span>JUMP <small>×2</small></span></button></>}
-        <button className="touch-pace" disabled={!running || freeze} onPointerDown={event => { event.preventDefault(); event.currentTarget.setPointerCapture(event.pointerId); paceInput('touch-right', true); }} onPointerUp={() => paceInput('touch-right', false)} onPointerCancel={() => paceInput('touch-right', false)} onLostPointerCapture={() => paceInput('touch-right', false)} aria-label={vertical ? 'Steer right' : 'Hold to speed up'}>→ <span>{vertical ? 'RIGHT' : 'FAST'}</span></button></div>
+        <button className="touch-pace" disabled={!running || freeze} onPointerDown={event => { event.preventDefault(); event.currentTarget.setPointerCapture(event.pointerId); paceInput('touch-right', true); }} onPointerUp={() => paceInput('touch-right', false)} onPointerCancel={() => paceInput('touch-right', false)} onLostPointerCapture={() => paceInput('touch-right', false)} aria-label={vertical ? 'Steer right' : heading === -1 ? 'Hold to slow down' : 'Hold to speed up'}>→ <span>{vertical ? 'RIGHT' : heading === -1 ? 'SLOW' : 'FAST'}</span></button></div>
       <div className="economy-bar"><span><b>{formatToken(nextCoinReward(e, run.difficulty, 1, collection))}</b> DEMO $RUSH / COIN</span><button onClick={() => setPanel('economy')}>TOKEN LAB <span>↗</span></button></div>
     </div>
     {error && loaded && <div className="error-toast" role="alert">{error}</div>}
     {panel && <GameMenu title={panel === 'rules' ? 'HOW TO RUSH' : 'TOKEN LAB · SIMULATION'} onClose={() => { setPanel(null); if (running && !userPaused) requestAnimationFrame(() => stage.current?.focus()); }}>
-      {panel === 'rules' ? <div className="rules-panel"><p>Choose your difficulty before a run. Three hearts, an endless world, and a best score for each mode.</p><dl><dt>PICK YOUR CHALLENGE</dt><dd>Easy: 120 seconds, roomy obstacles and 0.75× rewards. Normal: 90 seconds, mixed obstacles and 1× rewards. Degen: 60 seconds, tougher combinations, wider coin scatter and 2× rewards. Difficulty stays locked until the run ends.</dd>{genesis && <><dt>A NEW BODY EACH RUN</dt><dd>Your original Genesis face gets one of 36 Generations bodies at the start of each run. It stays with you until the run ends. Bodies are cosmetic: movement, collision rules and rewards stay the same.</dd></>}<dt>JUMP / DOUBLE JUMP</dt><dd>Space, ↑ or W. On phone, tap JUMP or the world. Tap again in the air for a double jump.</dd><dt>SLIDE</dt><dd>Hold ↓, S or SLIDE to duck under the floating bridges. Release to stand up.</dd><dt>SET YOUR PACE</dt><dd>Hold → to speed up or ← to slow down. On phone, hold FAST or SLOW. Release to return to cruising speed.</dd><dt>FOLLOW THE TWIST</dt><dd>Every run starts sideways. A ceiling intake can pull you up, or a break in the floor can drop you into free fall. Hold ← / → (LEFT / RIGHT on phone) to steer through the shaft. Your Friend spins continuously; jump and slide return when the track turns sideways again.</dd><dt>COLLECT & GROW</dt><dd>Every bear coin grows your Friend, up to 1.75× size. An obstacle hit shrinks it by 0.35×, down to its starting size. A shield protects your size too. You can still squeeze under bridges.</dd><dt>CHASE THE 10× COIN</dt><dd>Giant bear coins fly in from the right at surprise intervals, sometimes in a pair. They are twice the size and earn 10× your difficulty’s current coin reward, up to the remaining emission cap. Jump, double jump, or use a magnet to catch them. Each still counts as one coin for growth and chains.</dd><dt>CHAIN YOUR COINS</dt><dd>Collect coins in a row to grow your score multiplier to ×5. Getting hit breaks your chain.</dd><dt>POWER UP</dt><dd>S shields you from a hit. M attracts nearby coins. Crystals and crates cost a heart.</dd><dt>TAKE A BREAK</dt><dd>Press P or Escape to pause. Switching tabs pauses your run. Sound and FX controls are at the top.</dd></dl><p className="fine-print">{genesis ? 'Genesis runs are free and earn 100× demo token rewards. ' : 'Each run costs 1 simulated RF. All fees enter the simulated prize pool. '} Coins earn demo $RUSH at the selected difficulty rate; combo boosts score only. Rewards are banked on timeout or your third hit. Reloading or switching Friends resets this session.</p></div> : <div className="economy-panel">
+      {panel === 'rules' ? <div className="rules-panel"><p>Choose your difficulty before a run. Three hearts, an endless world, and a best score for each mode.</p><dl><dt>PICK YOUR CHALLENGE</dt><dd>Easy: 120 seconds, roomy obstacles and 0.75× rewards. Normal: 90 seconds, mixed obstacles and 1× rewards. Degen: 60 seconds, tougher combinations, wider coin scatter and 2× rewards. Difficulty stays locked until the run ends.</dd>{genesis && <><dt>A NEW BODY EACH RUN</dt><dd>Your original Genesis face gets one of 36 Generations bodies at the start of each run. It stays with you until the run ends. Bodies are cosmetic: movement, collision rules and rewards stay the same.</dd></>}<dt>JUMP / DOUBLE JUMP</dt><dd>Space, ↑ or W. On phone, tap JUMP or the world. Tap again in the air for a double jump.</dd><dt>SLIDE</dt><dd>Hold ↓, S or SLIDE to duck under the floating bridges. Release to stand up.</dd><dt>SET YOUR PACE</dt><dd>Hold the direction you are running to speed up, or the opposite direction to slow down. On phone, hold FAST or SLOW. Release to return to cruising speed.</dd><dt>FOLLOW THE TWIST</dt><dd>Every run starts sideways. A ceiling intake can pull you up, or a break in the floor can drop you into free fall. Hold ← / → (LEFT / RIGHT on phone) to steer through the shaft. Your Friend spins continuously. A shaft can sometimes send you out running left; jump and slide return on the horizontal track.</dd><dt>COLLECT & GROW</dt><dd>Every bear coin grows your Friend, up to 1.75× size. An obstacle hit shrinks it by 0.35×, down to its starting size. A shield protects your size too. You can still squeeze under bridges.</dd><dt>CHASE THE 10× COIN</dt><dd>Giant bear coins fly in from ahead at surprise intervals, sometimes in a pair. They are twice the size and earn 10× your difficulty’s current coin reward, up to the remaining emission cap. Jump, double jump, or use a magnet to catch them. Each still counts as one coin for growth and chains.</dd><dt>CHAIN YOUR COINS</dt><dd>Collect coins in a row to grow your score multiplier to ×5. Getting hit breaks your chain.</dd><dt>POWER UP</dt><dd>S shields you from a hit. M attracts nearby coins. Crystals and crates cost a heart.</dd><dt>TAKE A BREAK</dt><dd>Press P or Escape to pause. Switching tabs pauses your run. Sound and FX controls are at the top.</dd></dl><p className="fine-print">{genesis ? 'Genesis runs are free and earn 100× demo token rewards. ' : 'Each run costs 1 simulated RF. All fees enter the simulated prize pool. '} Coins earn demo $RUSH at the selected difficulty rate; combo boosts score only. Rewards are banked on timeout or your third hit. Reloading or switching Friends resets this session.</p></div> : <div className="economy-panel">
         <p>Early coins earn more. Every 10,000 simulated pickups halves the reward. Try a later chapter of the economy.</p>
         <div className="lab-stat"><span>NEXT COIN · {mode.label.toUpperCase()} · {mode.rewardLabel}{genesis ? ' · GENESIS 100×' : ''}</span><strong>{formatToken(nextCoinReward(e, run.difficulty, 1, collection))}<small> demo $RUSH</small></strong></div>
         <div className="scenario-buttons">{[[0,'LAUNCH'],[10000,'10K COINS'],[30000,'30K COINS'],[100000,'100K COINS']].map(([n,label]) => <button key={n} disabled={running} onClick={() => { economy.current = createEconomy(Number(n)); reward.current = 0n; setError(''); draw(performance.now()); }}>{label}</button>)}</div>
