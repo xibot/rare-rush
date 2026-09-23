@@ -53,6 +53,22 @@ test('two confirmations and canonical block are required even if receipt waiter 
     assert.ok(loadPlayState(f.store, account).pending);
   }
 });
+test('confirmation checks run concurrently but do not settle until every canonical check finishes', async () => {
+  const f = fixture();
+  const entered = new Set<string>();
+  let releaseTransaction!: () => void;
+  const transactionReady = new Promise<void>(resolve => { releaseTransaction = resolve; });
+  f.ctx.client.getTransaction = (async () => { entered.add('transaction'); await transactionReady; return f.tx; }) as unknown as PublicClient['getTransaction'];
+  f.ctx.client.getBlockNumber = (async () => { entered.add('head'); return 101n; }) as PublicClient['getBlockNumber'];
+  f.ctx.client.getBlock = (async () => { entered.add('canonical'); return { hash: blockHash }; }) as PublicClient['getBlock'];
+  const recovery = recoverPending(f.ctx);
+  await new Promise(resolve => setImmediate(resolve));
+  assert.deepEqual([...entered].sort(), ['canonical', 'head', 'transaction']);
+  assert.equal(loadPlayState(f.store, account).pending?.hash, hash);
+  assert.equal(loadPlayState(f.store, account).savedRun, null);
+  releaseTransaction();
+  assert.equal((await recovery).savedRun?.run.runId, '5');
+});
 test('wrong sender, nonce, chain or contract logs cannot finalize a pending operation', async () => {
   for (const patch of [{ from: other }, { nonce: 10 }, { chainId: 4663 }]) {
     const f = fixture(); Object.assign(f.tx, patch);

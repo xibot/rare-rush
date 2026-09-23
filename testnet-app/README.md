@@ -80,7 +80,7 @@ The optional compiler-input argument checks the exact downloaded input. Verifica
 
 ## Server and deployment
 
-`api/status.ts` and `api/verify-run.ts` run as Vercel Node 22 functions. Configure `RUSH_VERIFIER_PRIVATE_KEY` only as an encrypted, server-only environment variable in the **testnet project**, for its deployment target. The dedicated signer must match the deployed game's verifier. Never use a `VITE_` prefix or a user wallet key.
+`api/status.ts` and `api/verify-run.ts` run as Vercel Node 22 functions. Configure `RUSH_VERIFIER_PRIVATE_KEY` only as a server-only **Secret** in the **testnet project**, for its deployment target. The dedicated signer must match the deployed game's verifier. Never use a `VITE_` prefix or a user wallet key.
 
 The browser signs an EIP-712 authorization binding the wallet, run ID, canonical replay hash, fixed game/chain, canonical site and short expiry. The server checks that authorization, confirmed run ownership/eligibility, NFT ownership and engine version, then replays legal inputs and signs only the resulting ordered pickups. Client scores and reward totals are never trusted. The claim contract independently enforces signatures, deadlines, NFT limits, economics and supply cap. This verifies deterministic simulation; it does **not** prove a human played or prevent automated pilots. Production anti-bot/economic controls remain separate work.
 
@@ -89,6 +89,10 @@ Requests are capped at 1.5 MB with strict schemas, expiry checks and bounded loc
 The dedicated verifier key is not in the source or browser bundle. The app pins five runtime hashes, contract addresses and the engine version through its central deployment profile. The committed `../infra/testnet/deployments/robinhood-testnet-verification.json` is **V1 evidence**. It does not establish that V2 is deployed; use the new verified V2 report after the owner transactions.
 
 ## Recovery and test limitations
+
+Verifier status probes coalesce concurrent requests and cache stable results for ten seconds; transient RPC failures are not cached, so a retry can recover immediately. Server reads use JSON-RPC batches with bounded transport retries. Public RPC latency and availability can still vary; a successful status check does not guarantee that a later request will succeed.
+
+The browser bounds status/body waits, retries a transient status failure once, and ignores superseded responses. An unavailable verifier is checked again on a visible idle page after fifteen seconds or when connectivity/focus returns; this never signs or submits a transaction. Verification uploads also time out with the replay preserved. Confirmed approvals refresh only the allowance, while a new run still performs the full deployment, wallet, ownership and allowance checks. Approval settlement still requires two canonical confirmations.
 
 V2 records use a separate versioned storage key scoped to chain, game and wallet. V1 browser data is preserved and is not loaded as a V2 run. V1 pending runs remain on the old game and retain their original deadlines; use a matching V1 client/verifier to handle them. V2 does not resume, convert or sign V1 recordings.
 

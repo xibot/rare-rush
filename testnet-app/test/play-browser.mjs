@@ -21,7 +21,7 @@ const account = `0x${'1'.repeat(40)}`, other = `0x${'2'.repeat(40)}`;
 const seed = keccak256(toHex('browser-recording-fixture'));
 const hash = `0x${'3'.repeat(64)}`, blockHash = `0x${'4'.repeat(64)}`;
 const head = DEPLOYMENT_BLOCK + 10n, now = BigInt(Math.floor(Date.now() / 1000));
-const fullTokenAbi = [...tokenAbi, ...parseAbi(['function allowance(address,address) view returns(uint256)', 'function approve(address,uint256) returns(bool)'])];
+const fullTokenAbi = [...tokenAbi, ...parseAbi(['function allowance(address,address) view returns(uint256)', 'function approve(address,uint256) returns(bool)', 'event Approval(address indexed owner,address indexed spender,uint256 value)'])];
 const fullNftAbi = [...nftAbi, ...parseAbi(['function generation(uint256) view returns(uint256)'])];
 const runFixture = (collection = 0) => ({ runId: '5', player: account, tokenId: '1', seed, startedAt: String(now), claimUntil: String(now + 990n), collection, difficulty: 1, claimed: false, verifierEpoch: '1', abandoned: false });
 function readyState(collection = 0) { return { ...emptyPlayState(account), friends: [{ collection: 0, tokenId: '1' }, { collection: 1, tokenId: '2' }], savedRun: { run: runFixture(collection), replay: { version: REPLAY_VERSION, frames: [] }, completedTicks: 0, status: 'ready' } }; }
@@ -89,7 +89,7 @@ for (const key of Object.keys(PLAY_CONTRACTS)) {
 }
 const browser = await chromium.launch({ headless: true, ...(process.env.PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH ? { executablePath: process.env.PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH } : {}) });
 const errors = [];
-async function setup({ state = null, mobile = false, chain = '0xb626', authorized = false, runtimeMismatch = false, serverReady = true, controlledClock = false, path = '/dashboard/' } = {}) {
+async function setup({ state = null, mobile = false, chain = '0xb626', authorized = false, runtimeMismatch = false, serverReady = true, controlledClock = false, path = '/dashboard/', initialAllowance = 110n * 10n ** 18n, holdReceipts = false } = {}) {
     const context = await browser.newContext({ viewport: mobile ? { width: 390, height: 844 } : { width: 1440, height: 1100 }, isMobile: mobile, hasTouch: mobile, deviceScaleFactor: 1 });
     context.on('page', page => page.on('pageerror', e => errors.push(e.message)));
     const page = await context.newPage();
@@ -99,7 +99,8 @@ async function setup({ state = null, mobile = false, chain = '0xb626', authorize
     await context.route('**/*', r => new URL(r.request().url()).origin === new URL(origin).origin ? r.continue() : r.abort());
     const requests = [], unexpected = [];
     const currentRun = structuredClone(state?.savedRun?.run ?? runFixture()), pending = state?.pending ?? pendingState().pending;
-    let verifierReady = serverReady, startBroadcast = false;
+    let verifierReady = serverReady, startBroadcast = false, allowance = initialAllowance, receiptReady = !holdReceipts, rpcHead = head;
+    const statusRequests = [];
     await context.addInitScript(({ state, key, account, chain, authorized }) => {
         // New tabs initially run this script on about:blank, which has no origin storage.
         if (!/^https?:$/.test(location.protocol)) return;
@@ -136,16 +137,26 @@ async function setup({ state = null, mobile = false, chain = '0xb626', authorize
                 throw Object.assign(new Error('User rejected fixture wallet operation'), { code: 4001 });
             } };
     }, { state, key: stateKey(account), account, chain, authorized });
-    await context.route('**/api/status', r => r.fulfill({ json: { ready: verifierReady, chainId: 46630, game: PLAY_CONTRACTS.game } }));
+    await context.route('**/api/status', r => { statusRequests.push(r.request().url()); return r.fulfill({ json: { ready: verifierReady, chainId: 46630, game: PLAY_CONTRACTS.game, engineVersion: ENGINE_VERSION } }); });
     await context.route('**/api/verify-run', r => { unexpected.push('Unexpected verification request'); return r.fulfill({ status: 503, json: { error: 'Verification fixture unavailable' } }); });
     const nft = keccak256(encodeAbiParameters([{ type: 'uint8' }, { type: 'uint256' }], [currentRun.collection, BigInt(currentRun.tokenId)]));
     const startedLog = { address: PLAY_CONTRACTS.game, topics: encodeEventTopics({ abi: PLAY_GAME_ABI, eventName: 'RunStarted', args: { runId: 5n, player: account, nft } }), data: encodeAbiParameters([{ type: 'uint8' }, { type: 'uint256' }, { type: 'uint8' }, { type: 'bytes32' }, { type: 'uint64' }, { type: 'uint64' }, { type: 'uint256' }], [currentRun.collection, BigInt(currentRun.tokenId), 1, seed, BigInt(currentRun.startedAt), BigInt(currentRun.claimUntil), 1n]), blockNumber: toHex(head - 1n), blockHash, transactionHash: hash, transactionIndex: '0x0', logIndex: '0x0', removed: false };
     const tx = { hash, from: account, to: PLAY_CONTRACTS.game, nonce: '0x9', chainId: '0xb626', value: '0x0', input: pending.data, blockHash, blockNumber: toHex(head - 1n), transactionIndex: '0x0', type: '0x2', gas: '0x50000', gasPrice: '0x1', maxFeePerGas: '0x1', maxPriorityFeePerGas: '0x1', v: '0x1', r: `0x${'5'.repeat(64)}`, s: `0x${'6'.repeat(64)}`, accessList: [] };
     const receipt = { transactionHash: hash, transactionIndex: '0x0', blockHash, blockNumber: toHex(head - 1n), from: account, to: PLAY_CONTRACTS.game, cumulativeGasUsed: '0x21000', gasUsed: '0x21000', effectiveGasPrice: '0x1', contractAddress: null, logs: [startedLog], status: '0x1', type: '0x2', logsBloom: `0x${'00'.repeat(256)}` };
     await context.exposeBinding('mockBroadcastTransaction', (_source, transaction) => {
-        assert.equal(transaction.to.toLowerCase(), PLAY_CONTRACTS.game);
         assert.equal(transaction.from.toLowerCase(), account);
         assert.equal(BigInt(transaction.value), 0n);
+        if (transaction.to.toLowerCase() === PLAY_CONTRACTS.rf) {
+            const approval = decodeFunctionData({ abi: fullTokenAbi, data: transaction.data });
+            assert.equal(approval.functionName, 'approve');
+            assert.equal(approval.args[0].toLowerCase(), PLAY_CONTRACTS.game);
+            assert.equal(approval.args[1], 110n * 10n ** 18n);
+            allowance = 110n * 10n ** 18n;
+            Object.assign(tx, { to: PLAY_CONTRACTS.rf, input: transaction.data, nonce: transaction.nonce });
+            Object.assign(receipt, { to: PLAY_CONTRACTS.rf, logs: [{ ...startedLog, address: PLAY_CONTRACTS.rf, topics: encodeEventTopics({ abi: fullTokenAbi, eventName: 'Approval', args: { owner: account, spender: PLAY_CONTRACTS.game } }), data: encodeAbiParameters([{ type: 'uint256' }], [allowance]) }] });
+            return hash;
+        }
+        assert.equal(transaction.to.toLowerCase(), PLAY_CONTRACTS.game);
         const operation = decodeFunctionData({ abi: PLAY_GAME_ABI, data: transaction.data });
         Object.assign(tx, { input: transaction.data, nonce: transaction.nonce });
         if (operation.functionName === 'startRun') {
@@ -164,8 +175,9 @@ async function setup({ state = null, mobile = false, chain = '0xb626', authorize
         assert.ok(key, `Unknown contract ${item.params[0].to}`);
         const abi = key === 'game' ? PLAY_GAME_ABI : ['genesis', 'generations'].includes(key) ? fullNftAbi : fullTokenAbi;
         const { functionName } = decodeFunctionData({ abi, data: item.params[0].data });
-        const values = { game: { rf: PLAY_CONTRACTS.rf, genesis: PLAY_CONTRACTS.genesis, generations: PLAY_CONTRACTS.generations, token: PLAY_CONTRACTS.rewardToken, ENTRY_FEE: 110n * 10n ** 18n, PRIZE_POOL_SHARE: 100n * 10n ** 18n, TREASURY_SHARE: 10n * 10n ** 18n, MAX_DAILY_RUNS: 3n, engineVersion: ENGINE_VERSION, paused: false, expectedLaunchAllocation: LAUNCH_ALLOCATION, INITIAL_COIN_REWARD: 10000000n, MIN_COIN_REWARD: 1000000n, HALVING_INTERVAL: 10000n, runs: [currentRun.player, BigInt(currentRun.tokenId), currentRun.seed, BigInt(currentRun.startedAt), BigInt(currentRun.claimUntil), currentRun.collection, currentRun.difficulty, currentRun.claimed, 1n, currentRun.abandoned], nftKey: nft, dailyStarts: startBroadcast ? 2n : 1n, activeRunByNft: (state?.savedRun || startBroadcast) && !currentRun.abandoned && !currentRun.claimed ? 5n : 0n, abandonRun: undefined, startRun: 5n }, rewardToken: { CAP: REWARD_CAP, rewardMinter: PLAY_CONTRACTS.game, decimals: 6, launchAllocation: LAUNCH_ALLOCATION, rewardAllocation: GAMEPLAY_ALLOCATION, rewardsMinted: 0n, totalSupply: LAUNCH_ALLOCATION, balanceOf: BigInt(state?.savedRun?.reward ?? '0') }, rf: { FAUCET_AMOUNT: 1100n * 10n ** 18n, lastFaucetDayPlusOne: 0n, balanceOf: 1100n * 10n ** 18n, allowance: 110n * 10n ** 18n }, genesis: { isGenesis: true, ownerOf: account, balanceOf: 1n }, generations: { isGenesis: false, ownerOf: account, generation: 1n, balanceOf: 1n } };
+        const values = { game: { rf: PLAY_CONTRACTS.rf, genesis: PLAY_CONTRACTS.genesis, generations: PLAY_CONTRACTS.generations, token: PLAY_CONTRACTS.rewardToken, ENTRY_FEE: 110n * 10n ** 18n, PRIZE_POOL_SHARE: 100n * 10n ** 18n, TREASURY_SHARE: 10n * 10n ** 18n, MAX_DAILY_RUNS: 3n, engineVersion: ENGINE_VERSION, paused: false, expectedLaunchAllocation: LAUNCH_ALLOCATION, INITIAL_COIN_REWARD: 10000000n, MIN_COIN_REWARD: 1000000n, HALVING_INTERVAL: 10000n, runs: [currentRun.player, BigInt(currentRun.tokenId), currentRun.seed, BigInt(currentRun.startedAt), BigInt(currentRun.claimUntil), currentRun.collection, currentRun.difficulty, currentRun.claimed, 1n, currentRun.abandoned], nftKey: nft, dailyStarts: startBroadcast ? 2n : 1n, activeRunByNft: (state?.savedRun || startBroadcast) && !currentRun.abandoned && !currentRun.claimed ? 5n : 0n, abandonRun: undefined, startRun: 5n }, rewardToken: { CAP: REWARD_CAP, rewardMinter: PLAY_CONTRACTS.game, decimals: 6, launchAllocation: LAUNCH_ALLOCATION, rewardAllocation: GAMEPLAY_ALLOCATION, rewardsMinted: 0n, totalSupply: LAUNCH_ALLOCATION, balanceOf: BigInt(state?.savedRun?.reward ?? '0') }, rf: { FAUCET_AMOUNT: 1100n * 10n ** 18n, lastFaucetDayPlusOne: 0n, balanceOf: 1100n * 10n ** 18n, allowance: 110n * 10n ** 18n, approve: true }, genesis: { isGenesis: true, ownerOf: account, balanceOf: 1n }, generations: { isGenesis: false, ownerOf: account, generation: 1n, balanceOf: 1n } };
         assert.ok(functionName in values[key], `Unexpected ${key}.${functionName}`);
+        if (key === 'rf' && functionName === 'allowance') return encodeFunctionResult({ abi, functionName, result: allowance });
         return encodeFunctionResult({ abi, functionName, result: values[key][functionName] });
     }
     function respond(item) {
@@ -175,7 +187,7 @@ async function setup({ state = null, mobile = false, chain = '0xb626', authorize
             if (item.method === 'eth_chainId')
                 result = '0xb626';
             else if (item.method === 'eth_blockNumber')
-                result = toHex(head);
+                result = toHex(holdReceipts && receiptReady ? ++rpcHead : rpcHead);
             else if (item.method === 'eth_getBalance')
                 result = toHex(10n ** 18n);
             else if (item.method === 'eth_getTransactionCount')
@@ -192,7 +204,7 @@ async function setup({ state = null, mobile = false, chain = '0xb626', authorize
             else if (item.method === 'eth_getTransactionByHash')
                 result = tx;
             else if (item.method === 'eth_getTransactionReceipt')
-                result = receipt;
+                result = receiptReady ? receipt : null;
             else if (item.method === 'eth_getBlockByNumber')
                 result = { number: item.params[0] === 'latest' ? toHex(head) : item.params[0], hash: blockHash, timestamp: toHex(now + 5n), transactions: [], parentHash: `0x${'0'.repeat(64)}`, gasLimit: '0x1000000', gasUsed: '0x21000', baseFeePerGas: '0x1' };
             else
@@ -208,7 +220,7 @@ async function setup({ state = null, mobile = false, chain = '0xb626', authorize
     await context.route('**/testnet-config.json', r => r.fulfill({ json: { version: 1, chainId: 46630, contracts: PLAY_CONTRACTS, deploymentConsoleUrl: null } }));
     await page.goto(`${origin}${path}`);
     await page.locator('.play-shell').waitFor();
-    return { page, context, requests, unexpected, setServerReady(value) { verifierReady = value; } };
+    return { page, context, requests, statusRequests, unexpected, setServerReady(value) { verifierReady = value; }, confirmReceipt() { receiptReady = true; rpcHead++; } };
 }
 async function connect(page) {
     const target = page.url();
@@ -224,6 +236,37 @@ async function screenshot(page, name) { await page.evaluate(() => document.fonts
 async function saved(page, who = account) { return page.evaluate(key => JSON.parse(localStorage.getItem(key)), stateKey(who)); }
 async function noWrites(page) { assert.deepEqual(await page.evaluate(() => window.mockWallet.writes), []); }
 try {
+    const approval = await setup({ state: { ...emptyPlayState(account), friends: readyState().friends }, authorized: true, initialAllowance: 0n, holdReceipts: true, path: '/play/?collection=generations&friend=1' });
+    const approve = approval.page.getByRole('button', { name: 'APPROVE 110 tRF' });
+    await approve.waitFor();
+    await approval.page.evaluate(() => { window.mockWallet.confirmTransactions = true; });
+    await approve.click();
+    await approval.page.waitForFunction(key => JSON.parse(localStorage.getItem(key))?.pending?.hash, stateKey(account));
+    assert.equal((await saved(approval.page)).pending.kind, 'approve', 'a broadcast approval stays pending until its confirmed receipt is checked');
+    assert.equal(await approve.isDisabled(), true, 'a wallet hash alone must not unlock another approval or a start');
+    await approval.page.getByText('Approval submitted. Waiting for confirmation…', { exact: true }).waitFor();
+    const afterBroadcast = approval.requests.length, statusBeforeConfirmation = approval.statusRequests.length;
+    approval.confirmReceipt();
+    try {
+        await approval.page.waitForFunction(() => [...document.querySelectorAll('button')].some(button => button.getAttribute('aria-label') === 'START RUN · 110 tRF' && !button.disabled), undefined, { timeout: 10000 });
+    } catch (error) {
+        console.error('Approval fixture diagnosis', JSON.stringify({ state: await saved(approval.page), feedback: await approval.page.locator('.feedback').allTextContents(), unexpected: approval.unexpected, requests: approval.requests.slice(afterBroadcast) }));
+        throw error;
+    }
+    assert.equal((await saved(approval.page)).pending, null);
+    assert.equal((await saved(approval.page)).savedRun, null, 'approval never starts a run automatically');
+    assert.equal((await saved(approval.page)).history.at(-1).kind, 'approve');
+    const postConfirmationReads = approval.requests.slice(afterBroadcast);
+    assert.equal(postConfirmationReads.filter(request => ['eth_getLogs', 'eth_getCode'].includes(request.method)).length, 0, 'confirmation must not rescan holdings or all deployed runtimes');
+    const allowanceReads = postConfirmationReads.filter(request => request.method === 'eth_call');
+    assert.equal(allowanceReads.length, 1, 'only the current allowance needs refreshing after a confirmed approval');
+    assert.equal(decodeFunctionData({ abi: fullTokenAbi, data: allowanceReads[0].params[0].data }).functionName, 'allowance');
+    assert.equal(approval.statusRequests.length, statusBeforeConfirmation, 'an approval must not wait on another verifier health check');
+    assert.equal((await approval.page.evaluate(() => window.mockWallet.writes)).length, 1, 'approval makes only the explicitly requested wallet transaction');
+    assert.deepEqual(approval.unexpected, []);
+    await approval.context.close();
+    console.log('Confirmed approval regression passed: pending until canonical confirmation, then one allowance read; no holdings/runtime/status rescan or automatic start.');
+
     // An already authorized injected wallet restores without opening a permission prompt.
     const authorized = await setup({ authorized: true });
     await authorized.page.getByRole('button', { name: 'DISCONNECT', exact: true }).waitFor();
@@ -673,6 +716,12 @@ try {
     await connect(off.page);
     await off.page.getByText(/Run verification is temporarily unavailable/).waitFor();
     assert.equal(await off.page.getByRole('button', { name: 'START RUN · 110 tRF' }).isDisabled(), true);
+    const beforeRecovery = await saved(off.page);
+    off.setServerReady(true);
+    await off.page.getByRole('button', { name: 'CHECK AGAIN', exact: true }).click();
+    await off.page.waitForFunction(() => [...document.querySelectorAll('button')].some(button => button.getAttribute('aria-label') === 'START RUN · 110 tRF' && !button.disabled));
+    assert.equal(await off.page.getByText(/Run verification is temporarily unavailable/).count(), 0, 'CHECK AGAIN recovers the same page without a reload');
+    assert.deepEqual(await saved(off.page), beforeRecovery, 'status retries never change a saved run or request a wallet transaction');
     await noWrites(off.page);
     assert.deepEqual(off.unexpected, []);
     await off.context.close();

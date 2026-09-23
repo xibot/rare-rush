@@ -5,14 +5,15 @@ import { RunCanvas, TestFriendAvatar } from './RunCanvas.tsx';
 import { ArcadeCabinet } from './ArcadeCabinet.tsx';
 import { CollectionChoice, CollectionFriends } from './CollectionEntry.tsx';
 import { createRecorder, type Replay, type RunSnapshot as EngineSnapshot } from './recorder.ts';
-import { TESTNET_CHAIN, PLAY_GAME_ABI, verifyPlayContracts, readRun, readOwnedFriend, discoverFriends, approveEntry, startRun, claimRun, abandonRun, recoverPending, retryHashlessPending, cancelHashlessPending } from './chain.ts';
-import { PLAY_CONTRACTS, type Collection, type Difficulty, type PlayState, type FriendSelection } from './types.ts';
+import { TESTNET_CHAIN, PLAY_GAME_ABI, verifyPlayContracts, readRun, readOwnedFriend, discoverFriends, entryAllowance, approveEntry, startRun, claimRun, abandonRun, recoverPending, retryHashlessPending, cancelHashlessPending } from './chain.ts';
+import { PLAY_CONTRACTS, ENGINE_VERSION, type Collection, type Difficulty, type PlayState, type FriendSelection } from './types.ts';
 import { loadPlayState, savePlayState, validateVerifiedClaim } from './storage.ts';
 import { createAuthorization, authorizationTypedData } from '../shared/authorization.ts';
 import { EXPLORER_URL, RPC_URL, assertWalletContext } from '../safety.ts';
 import { createWalletSession } from '../wallet-session.ts';
+import { createVerifierStatusMonitor, fetchVerifierJson } from './verifier-status.ts';
 
-const client = createPublicClient({ chain: TESTNET_CHAIN, transport: http(RPC_URL, { timeout: 12000, retryCount: 1 }), cacheTime: 0 });
+const client = createPublicClient({ chain: TESTNET_CHAIN, transport: http(RPC_URL, { timeout: 12000, retryCount: 1, batch: { wait: 10, batchSize: 20 } }), cacheTime: 0 });
 const tokenAbi = parseAbi(['function balanceOf(address) view returns(uint256)', 'function allowance(address,address) view returns(uint256)']);
 const MODES = ['easy', 'normal', 'degen'] as const;
 const durations = [120, 90, 60];
@@ -64,6 +65,7 @@ export function App() {
   const [playbackSession,setPlaybackSession]=useState(0);
   const playbackPermit=useRef(0);
   const walletSession=useRef<ReturnType<typeof createWalletSession>|null>(null);
+  const serverMonitor=useRef<ReturnType<typeof createVerifierStatusMonitor>|null>(null);
   const [quote, setQuote] = useState<bigint|null>(null);
   const [nftInfo, setNftInfo] = useState<{left:number;activeRun:string}|null>(null);
   const currentAccount = useRef<Address|null>(null);
@@ -75,6 +77,9 @@ export function App() {
   const liveSaved = run && !['claimed','abandoned'].includes(run.status) && !expired;
   const needsRunClose = !!liveSaved && run?.status === 'lost';
   const canWrite = !!account && chainId === 46630 && verified && !busy && !pending;
+  useEffect(()=>{
+    if(pending?.kind==='approve'&&pending.hash&&actionBusy.current)setBusy('Approval submitted. Waiting for confirmation…');
+  },[pending?.kind,pending?.hash]);
 
   function navigatePlay(next: Partial<PlayRoute> = {}) {
     const params = new URLSearchParams();
@@ -111,10 +116,7 @@ export function App() {
     try { await work(); } catch (e) { setError(message(e)); }
     finally { actionBusy.current = false; setBusy(''); }
   };
-  async function checkServer() {
-    try { const r = await fetch('/api/status', {cache:'no-store'}); const data = await r.json(); setServer(r.ok && data.ready === true && data.chainId === 46630 && data.game?.toLowerCase() === PLAY_CONTRACTS.game ? 'ready' : 'unavailable'); }
-    catch { setServer('unavailable'); }
-  }
+  function checkServer(force = false) { return serverMonitor.current?.check(force); }
   async function refresh(who: Address) {
     const requestEpoch = epoch.current;
     await verifyPlayContracts(client);
@@ -145,13 +147,27 @@ export function App() {
       const recording = createRecorder(s.run.seed, MODES[s.run.difficulty], s.replay, s.completedTicks);
       setStats({...recording.run,completedTicks:recording.run._tick});
     }
-    await checkServer();
+    void checkServer();
   }
   async function syncWallet(prompt = false) {
     if (prompt) await walletSession.current?.connect();
     else await walletSession.current?.sync(true);
   }
-  useEffect(() => { void checkServer(); const timer=setInterval(()=>setNow(Date.now()),1000); return()=>clearInterval(timer); }, []);
+  useEffect(() => {
+    const monitor=createVerifierStatusMonitor({chainId:46630,game:PLAY_CONTRACTS.game,engineVersion:ENGINE_VERSION,onChange:setServer});
+    serverMonitor.current=monitor; void monitor.check();
+    const timer=setInterval(()=>setNow(Date.now()),1000);
+    return()=>{monitor.dispose();serverMonitor.current=null;clearInterval(timer);};
+  }, []);
+  useEffect(() => {
+    if (server!=='unavailable'||active) return;
+    const recover=()=>{if(!document.hidden)void checkServer();};
+    // Only retry unavailable status on a visible, idle page. Never poll during a run.
+    const timer=setTimeout(recover,15_000);
+    window.addEventListener('online',recover); window.addEventListener('focus',recover);
+    document.addEventListener('visibilitychange',recover);
+    return()=>{clearTimeout(timer);window.removeEventListener('online',recover);window.removeEventListener('focus',recover);document.removeEventListener('visibilitychange',recover);};
+  },[server,active]);
   useEffect(() => {
     const session=createWalletSession({
       invalidated() {
@@ -199,7 +215,7 @@ export function App() {
       })().catch(e=>{if(!cancelled)setError(message(e));});
     }
     return()=>{cancelled=true;};
-  }, [selected,account,verified,state?.history.at(-1)?.hash,refreshCount,Math.floor(now/86400000)]);
+  }, [selected,account,verified,state?.history.findLast(tx=>tx.kind!=='approve')?.hash,refreshCount,Math.floor(now/86400000)]);
   const progress = useCallback((replay: Replay, snapshot: EngineSnapshot) => {
     const who=account;
     const expectedRunId=run?.run.runId;
@@ -231,9 +247,11 @@ export function App() {
     const auth=createAuthorization({player:account,runId:original.run.runId,replay:original.replay,expiresAt:Math.floor(Date.now()/1000)+240});
     const signature=await createWalletClient({chain:TESTNET_CHAIN,transport:custom(p),account}).signTypedData(authorizationTypedData(auth));
     assertWalletContext(account,await p.request({method:'eth_accounts'}),Number(await p.request({method:'eth_chainId'})));
-    const response=await fetch('/api/verify-run',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({authorization:auth,signature,replay:original.replay})});
-    const body=await response.json();
-    if (!response.ok) throw new Error(body.error ?? 'Verification unavailable. Your replay is saved; try again.');
+    const {response,body}=await fetchVerifierJson('/api/verify-run',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({authorization:auth,signature,replay:original.replay})},35_000);
+    if (!response.ok) {
+      if(response.status>=500)void checkServer(true);
+      throw new Error(body&&typeof body==='object'&&'error' in body&&typeof body.error==='string' ? body.error : 'Verification unavailable. Your replay is saved; try again.');
+    }
     const claim=validateVerifiedClaim(body,original.run,original.replay);
     const fresh=loadPlayState(localStorage,account);
     if(fresh.savedRun?.run.runId!==original.run.runId || fresh.savedRun.status!=='survived') throw new Error('Your saved run changed. Refresh before claiming.');
@@ -292,7 +310,7 @@ export function App() {
   </>}</>;
   const feedback = <>
     {(busy||error||info)&&<div className={`feedback ${error?'error':''}`} role="status">{error||busy||info}</div>}
-    {server==='unavailable'&&<div className="feedback">Run verification is temporarily unavailable. Starts are paused on this page; your existing replay stays saved. <button className="text-button" onClick={()=>void checkServer()}>CHECK AGAIN</button></div>}
+    {server!=='ready'&&<div className="feedback" role="status">{server==='checking'?'Checking run verification… Your existing replay stays saved.':'Run verification is temporarily unavailable. Starts are paused on this page; your existing replay stays saved.'} <button className="text-button" disabled={server==='checking'} onClick={()=>void checkServer(true)}>{server==='checking'?'CHECKING…':'CHECK AGAIN'}</button></div>}
   </>;
   const pendingPanel = pending && <section className="play-panel pending-panel">
     <span className="eyebrow">TRANSACTION RECOVERY</span><h2>{pending.kind.toUpperCase()} PENDING</h2><p>Your transaction is saved. Check confirmation before starting another action.</p>
@@ -360,7 +378,7 @@ export function App() {
       {account&&<details className="play-panel recovery"><summary>Recover a run from its onchain ID</summary><p>Recover a confirmed start from another session. A saved replay on this device is kept when the ID matches.</p><label>Run ID<input value={recoverId} onChange={e=>setRecoverId(e.target.value)} inputMode="numeric"/></label><button className="outline-button" disabled={!canWrite} onClick={()=>void action('Recovering run…',recoverRunById)}>RECOVER RUN</button></details>}
       {!!state?.history.length&&<div className="recent-txs"><span className="tiny">RECENT TRANSACTIONS</span>{state.history.slice(-4).reverse().map(tx=><a key={tx.hash} href={`${EXPLORER_URL}/tx/${tx.hash}`} target="_blank" rel="noreferrer">{tx.kind.toUpperCase()} · {tx.status.toUpperCase()} ↗</a>)}</div>}
     </main> : arcade ? <main className="arcade-route">
-      {(busy||error||info||server==='unavailable')&&<div className="arcade-feedback">{feedback}</div>}
+      {(busy||error||info||server!=='ready')&&<div className="arcade-feedback">{feedback}</div>}
       {pendingPanel}
       {showStoredRun&&run ? <>
         {active ? <RunCanvas key={run.run.runId} seed={run.run.seed} difficulty={MODES[run.run.difficulty]} collection={run.run.collection} tokenId={run.run.tokenId} runId={run.run.runId} initialReplay={run.replay} completedTicks={run.completedTicks} onProgress={progress} onFinish={finish}/> :
@@ -371,7 +389,16 @@ export function App() {
           <div className="start-card"><div className="start-card-heading"><span className="card-kicker">YOUR NEXT HIGH SCORE STARTS HERE</span><button className="start-back" onClick={()=>navigatePlay({collection:selected.collection})}>BACK</button></div><h2>Run. Collect.<br/>{' '}Stay rare.</h2>
             <div className="difficulty-picker" aria-label="Difficulty">{MODES.map((mode,i)=><button key={mode} aria-pressed={difficulty===i} disabled={!!busy||!!pending} onClick={()=>setDifficulty(i as Difficulty)}><strong>{mode.toUpperCase()}</strong><span>{durations[i]}s · {multipliers[i]}</span></button>)}</div>
             <p className="mode-description">{['Room to learn · coin trails','Mixed obstacles · scattered coins','Faster obstacles · wild coin routes'][difficulty]}<br/>{multipliers[difficulty]} rewards · 3 hearts</p>
-            {selected.collection===0&&balances.allowance<ENTRY ? <button className="primary" disabled={!canWrite||server!=='ready'||!!liveSaved||!nftInfo?.left||balances.rf<ENTRY} onClick={()=>void action('Approve exactly 110 tRF in your wallet…',async()=>{await approveEntry(context());if(account)await refresh(account);})}>APPROVE 110 tRF <span>↗</span></button> : <button className="primary" aria-label={`START ${selected.collection===1?'FREE RUN':'RUN · 110 tRF'}`} disabled={!canWrite||server!=='ready'||!!liveSaved||!nftInfo?.left||(selected.collection===0&&balances.rf<ENTRY)} onClick={()=>void action('Confirm your testnet run…',async()=>{
+            {selected.collection===0&&balances.allowance<ENTRY ? <button className="primary" disabled={!canWrite||server!=='ready'||!!liveSaved||!nftInfo?.left||balances.rf<ENTRY} onClick={()=>void action('Approve exactly 110 tRF in your wallet…',async()=>{
+              const who=account, requestEpoch=epoch.current;
+              await approveEntry(context());
+              if(!who||requestEpoch!==epoch.current||who!==currentAccount.current)return;
+              setBusy('Approval confirmed. Updating allowance…');
+              const allowance=await entryAllowance(client,who);
+              if(requestEpoch!==epoch.current||who!==currentAccount.current)return;
+              setBalances(previous=>({...previous,allowance}));
+              setInfo(allowance>=ENTRY?'110 tRF approved. Your Friend is ready to run.':'Approval confirmed. The latest allowance is below 110 tRF; refresh before trying again.');
+            })}>APPROVE 110 tRF <span>↗</span></button> : <button className="primary" aria-label={`START ${selected.collection===1?'FREE RUN':'RUN · 110 tRF'}`} disabled={!canWrite||server!=='ready'||!!liveSaved||!nftInfo?.left||(selected.collection===0&&balances.rf<ENTRY)} onClick={()=>void action('Confirm your testnet run…',async()=>{
               const who=account;
               const next=await startRun(context(),{...selected,difficulty});
               if(who!==currentAccount.current)return;

@@ -192,6 +192,40 @@ test('status is cached, read-only, and readiness gates verification', async () =
   assert.equal(server.calls(), 0);
 });
 
+test('a transient RPC outage recovers on the next status check without waiting for cache expiry', async () => {
+  let checks = 0;
+  const server = fixture({ status: async () => ++checks === 1
+    ? { ...status, ready: false, verifier: null, reason: 'rpc-unavailable' }
+    : status });
+  const probe = () => server.status(new Request(`${AUTH_SITE}/api/status`));
+  assert.equal((await (await probe()).json()).ready, false);
+  // The fixture clock has not advanced: CHECK AGAIN must reach the recovered RPC.
+  assert.equal((await (await probe()).json()).ready, true);
+  assert.equal((await (await probe()).json()).ready, true);
+  assert.equal(checks, 2, 'successful readiness is still cached');
+  assert.equal((await server.verify(request(await payload()))).status, 200);
+});
+
+test('concurrent outage probes share one request and release it for recovery', async () => {
+  let checks = 0;
+  let release!: () => void;
+  const wait = new Promise<void>(resolve => { release = resolve; });
+  const server = fixture({ status: async () => {
+    checks++;
+    if (checks === 1) { await wait; return { ...status, ready: false, reason: 'rpc-unavailable' }; }
+    return status;
+  } });
+  const probe = () => server.status(new Request(`${AUTH_SITE}/api/status`));
+  const first = probe();
+  const second = probe();
+  release();
+  assert.equal((await (await first).json()).ready, false);
+  assert.equal((await (await second).json()).ready, false);
+  assert.equal(checks, 1);
+  assert.equal((await (await probe()).json()).ready, true);
+  assert.equal(checks, 2);
+});
+
 test('a mismatched backend receipt is never returned to the browser', async () => {
   const server = fixture({ verify: async input => ({ ...receiptFor(input), player: other.address }) });
   assert.equal((await server.verify(request(await payload()))).status, 503);

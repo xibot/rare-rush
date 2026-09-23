@@ -126,7 +126,9 @@ export function createVerifierHandlers(dependencies: Dependencies) {
   async function currentStatus() {
     if (statusCache && statusCache.until > now()) return statusCache.value;
     if (!statusPending) statusPending = dependencies.status().then(value => {
-      statusCache = { until: now() + 10, value };
+      // A transient RPC error must not make CHECK AGAIN repeat a cached failure.
+      // Keep coalescing concurrent probes, and cache stable readiness/configuration.
+      statusCache = value.reason === 'rpc-unavailable' ? null : { until: now() + 10, value };
       return value;
     }).finally(() => { statusPending = null; });
     return statusPending;

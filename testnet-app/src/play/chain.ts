@@ -22,9 +22,11 @@ export type PlayContext = {
 };
 function persist(ctx: PlayContext, state: PlayState) { savePlayState(ctx.store, state); ctx.onState?.(state); return state; }
 async function walletContext(ctx: PlayContext) {
-  const [accounts, chain] = await Promise.all([ctx.provider.request({ method: 'eth_accounts' }), ctx.provider.request({ method: 'eth_chainId' })]);
+  const [accounts, chain, rpcChain] = await Promise.all([
+    ctx.provider.request({ method: 'eth_accounts' }), ctx.provider.request({ method: 'eth_chainId' }), ctx.client.getChainId(),
+  ]);
   assertWalletContext(ctx.account, accounts, Number(chain));
-  requireThat(await ctx.client.getChainId() === PLAY_CHAIN_ID, 'Testnet RPC network mismatch.');
+  requireThat(rpcChain === PLAY_CHAIN_ID, 'Testnet RPC network mismatch.');
 }
 const localLocks = new Set<string>();
 async function locked<T>(ctx: PlayContext, action: () => Promise<T>): Promise<T> {
@@ -39,8 +41,8 @@ async function locked<T>(ctx: PlayContext, action: () => Promise<T>): Promise<T>
 }
 /** Read one pinned state snapshot and compare the verified deployment's exact runtimes. */
 export async function verifyPlayContracts(client: PublicClient) {
-  requireThat(await client.getChainId() === PLAY_CHAIN_ID, 'Testnet RPC network mismatch.');
-  const blockNumber = await client.getBlockNumber({ cacheTime: 0 });
+  const [chainId, blockNumber] = await Promise.all([client.getChainId(), client.getBlockNumber({ cacheTime: 0 })]);
+  requireThat(chainId === PLAY_CHAIN_ID, 'Testnet RPC network mismatch.');
   await Promise.all((Object.keys(PLAY_CONTRACTS) as (keyof typeof PLAY_CONTRACTS)[]).map(async key => {
     const code = await client.getBytecode({ address: PLAY_CONTRACTS[key], blockNumber });
     requireThat(code && keccak256(code) === runtimeHashes[key], `Unexpected ${key} runtime. Transactions are disabled.`);
@@ -128,8 +130,11 @@ function finish(ctx: PlayContext, state: PlayState, hash: Hash, status: 'confirm
 /** Every recovery verifies the mined transaction, canonical block and event—not just its hash. */
 async function settle(ctx: PlayContext, state: PlayState, receipt: TransactionReceipt): Promise<PlayState> {
   const pending = state.pending!;
-  const tx = await ctx.client.getTransaction({ hash: receipt.transactionHash });
-  const [head, canonical] = await Promise.all([ctx.client.getBlockNumber({ cacheTime: 0 }), ctx.client.getBlock({ blockNumber: receipt.blockNumber })]);
+  const [tx, head, canonical] = await Promise.all([
+    ctx.client.getTransaction({ hash: receipt.transactionHash }),
+    ctx.client.getBlockNumber({ cacheTime: 0 }),
+    ctx.client.getBlock({ blockNumber: receipt.blockNumber }),
+  ]);
   requireThat(same(tx.from, ctx.account) && tx.nonce === pending.nonce && (tx.chainId === undefined || tx.chainId === PLAY_CHAIN_ID), 'Recovery transaction belongs to another sender, nonce or chain.');
   requireThat(receipt.transactionHash === tx.hash && same(receipt.from, tx.from) && same(receipt.to, tx.to) && receipt.blockNumber === tx.blockNumber && receipt.blockHash === tx.blockHash && canonical.hash === receipt.blockHash && head >= receipt.blockNumber + 1n, 'Transaction needs two canonical confirmations.');
   if (!same(tx.to, pending.to) || tx.input.toLowerCase() !== pending.data.toLowerCase() || tx.value !== 0n) {

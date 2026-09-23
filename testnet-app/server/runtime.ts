@@ -15,7 +15,11 @@ const chain = defineChain({
   nativeCurrency: { name: 'Test Ether', symbol: 'ETH', decimals: 18 },
   rpcUrls: { default: { http: ['https://rpc.testnet.chain.robinhood.com'] } },
 });
-const client = createPublicClient({ chain, transport: http(chain.rpcUrls.default.http[0], { timeout: 12_000, retryCount: 1 }), cacheTime: 0 });
+const client = createPublicClient({ chain, transport: http(chain.rpcUrls.default.http[0], {
+  // Group independent pinned reads; do not replay a slow 12-second request twice
+  // before the status page gets a chance to recover.
+  batch: { wait: 10, batchSize: 20 }, timeout: 4_000, retryCount: 1, retryDelay: 250,
+}), cacheTime: 0 });
 const gameAbi = gameArtifact.abi as Abi;
 const nftAbi = nftArtifact.abi as Abi;
 
@@ -34,8 +38,8 @@ async function status(): Promise<VerifierStatus> {
   const signer = privateKeyToAccount(key).address;
   if (signer !== getAddress(EXPECTED_VERIFIER)) return { ...base, reason: 'configuration-mismatch' };
   try {
-    if (await client.getChainId() !== AUTH_CHAIN_ID) return { ...base, reason: 'configuration-mismatch' };
-    const latest = await client.getBlockNumber({ cacheTime: 0 });
+    const [chainId, latest] = await Promise.all([client.getChainId(), client.getBlockNumber({ cacheTime: 0 })]);
+    if (chainId !== AUTH_CHAIN_ID) return { ...base, reason: 'configuration-mismatch' };
     if (latest < 2n) return { ...base, reason: 'rpc-unavailable' };
     const blockNumber = latest - 2n;
     const read = (functionName: string) => client.readContract({ address: AUTH_GAME, abi: gameAbi, functionName, blockNumber });
