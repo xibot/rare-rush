@@ -7,6 +7,7 @@ import { GameMenu } from '@rarefriends/friendsdk/frame';
 import { createRun, jump, setSliding, setPace, stepRun, FIXED_STEP, type RunState } from './twist/engine';
 import { DirectionScene } from './twist/DirectionScene';
 import { canonicalAxis, headingFor } from './twist/presentation';
+import { startArcadeAnalytics, type ArcadeAnalyticsRun, type ArcadeSignal } from './analytics';
 import { createEconomy, enterRun, collectCoin, nextCoinReward, formatToken, formatRF } from './economy';
 import { DIFFICULTIES, DIFFICULTY_ORDER, type Difficulty } from './difficulty';
 import { WorldArt } from './WorldArt';
@@ -28,11 +29,11 @@ export default function RareRush(props: GameComponentProps & { onNavigate?: Arca
 }
 
 /** Only the separately verified Genesis sandbox host supplies this adapter. */
-export function GenesisRush({ portraitUrl, beforeRun, ...props }: { friendId: bigint; paused: boolean; portraitUrl: string; beforeRun: () => Promise<void>; onNavigate?: ArcadeNavigation }) {
+export function GenesisRush({ portraitUrl, beforeRun, ...props }: { friendId: bigint; paused: boolean; portraitUrl: string; beforeRun: () => Promise<void>; onNavigate?: ArcadeNavigation; onAnalytics?: (event: ArcadeSignal) => void }) {
   return <Runner {...props} genesis={{ portraitUrl, beforeRun }}/>;
 }
 
-function Runner({ friendId, client, paused, genesis, onNavigate = requestArcadeNavigation }: { friendId: bigint; client?: GameClient; paused: boolean; genesis?: { portraitUrl: string; beforeRun: () => Promise<void> }; onNavigate?: ArcadeNavigation }) {
+function Runner({ friendId, client, paused, genesis, onNavigate = requestArcadeNavigation, onAnalytics }: { friendId: bigint; client?: GameClient; paused: boolean; genesis?: { portraitUrl: string; beforeRun: () => Promise<void> }; onNavigate?: ArcadeNavigation; onAnalytics?: (event: ArcadeSignal) => void }) {
   const collection = genesis ? 'genesis' : 'generations';
   const [sprites, setSprites] = useState<GenerationSprites | null>(null);
   const [genesisBodyId, setGenesisBodyId] = useState(DEFAULT_BODY_ID);
@@ -49,6 +50,7 @@ function Runner({ friendId, client, paused, genesis, onNavigate = requestArcadeN
   const root = useRef<HTMLElement>(null), stage = useRef<SVGSVGElement>(null);
   const engine = useRef(createRun(1)), economy = useRef(createEconomy());
   const reward = useRef(0n), sounds = useRef<FriendSoundKit | null>(null), seed = useRef(0);
+  const analyticsRun = useRef<ArcadeAnalyticsRun | null>(null);
   const active = useRef(false), screenRef = useRef<Screen>('ready'), noticeUntil = useRef(0);
   const paceInputs = useRef(new Set<string>()), displayedGrowth = useRef(1);
   screenRef.current = screen;
@@ -58,7 +60,7 @@ function Runner({ friendId, client, paused, genesis, onNavigate = requestArcadeN
     let cancelled = false;
     mounted.current = true; startingRef.current = false; setStarting(false);
     setLoaded(false); setError(''); setSprites(null); setScreen('ready'); setUserPaused(false); setPanel(null); setDifficulty('normal'); setBest({ easy: 0, normal: 0, degen: 0 });
-    economy.current = createEconomy(); engine.current = createRun(1); reward.current = 0n; displayedGrowth.current = 1; paceInputs.current.clear();
+    economy.current = createEconomy(); engine.current = createRun(1); reward.current = 0n; displayedGrowth.current = 1; paceInputs.current.clear(); analyticsRun.current = null;
     previousGenesisBody.current = undefined; setGenesisBodyId(DEFAULT_BODY_ID);
     const load = async () => {
       if (genesis) return null;
@@ -115,6 +117,8 @@ function Runner({ friendId, client, paused, genesis, onNavigate = requestArcadeN
             if (event.type === 'magnet' || event.type === 'shield') { sounds.current?.play('reveal-rare'); setNotice(event.type === 'magnet' ? 'COIN MAGNET!' : event.amount === 0 ? 'SHIELD SAVED YOU!' : 'SHIELD UP!'); noticeUntil.current = engine.current.elapsed + 1.5; }
             if (event.type === 'finish') {
               const finished = engine.current;
+              if (event.reason === 'time' || event.reason === 'hearts') analyticsRun.current?.finish(event.reason, finished.elapsed);
+              analyticsRun.current = null;
               active.current = false; setScreen('result'); setBest(old => ({ ...old, [finished.difficulty]: Math.max(old[finished.difficulty], finished.score) })); sounds.current?.play('reward');
             }
           }
@@ -187,6 +191,7 @@ function Runner({ friendId, client, paused, genesis, onNavigate = requestArcadeN
         previousGenesisBody.current = body; setGenesisBodyId(body);
       }
     engine.current = createRun(++seed.current * 8191 + Number(friendId % 100000n), difficulty); reward.current = 0n; displayedGrowth.current = 1; paceInputs.current.clear();
+    analyticsRun.current = startArcadeAnalytics(collection, difficulty, onAnalytics);
     setNotice(''); setError(''); setUserPaused(false); setScreen('running');
     void sounds.current?.unlock(); sounds.current?.play('action-ready');
     requestAnimationFrame(() => stage.current?.focus());

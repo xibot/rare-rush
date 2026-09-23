@@ -5,3 +5,5 @@ artifacts
 .env*
 games/*/.friendsdk
 drafts
+
+tools/

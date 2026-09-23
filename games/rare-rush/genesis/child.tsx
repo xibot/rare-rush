@@ -3,6 +3,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { createRoot } from 'react-dom/client';
 import { GenesisRush } from '../index';
 import { parseGenesisIdentity, type GenesisIdentity } from './protocol';
+import type { ArcadeSignal } from '../analytics';
 import '@rarefriends/friendsdk/frame.css';
 import './game.css';
 
@@ -99,9 +100,10 @@ function GenesisGameSession() {
   const navigate = (destination: ArcadeDestination) => {
     port.current?.postMessage({ type: 'rarerush:navigate', destination });
   };
+  const analytics = (event: ArcadeSignal) => { port.current?.postMessage(event); };
 
   if (identity && status === 'ready') return <GenesisRush
-    friendId={BigInt(identity.tokenId)} portraitUrl={identity.image} paused={paused} beforeRun={beforeRun} onNavigate={navigate} />;
+    friendId={BigInt(identity.tokenId)} portraitUrl={identity.image} paused={paused} beforeRun={beforeRun} onNavigate={navigate} onAnalytics={analytics} />;
   return <section className="genesis-child-status" role={status === 'error' ? 'alert' : 'status'}>
     <span>RARE RUSH · GENESIS</span>
     <h1>{status === 'connecting' ? 'LOADING YOUR FRIEND…' : status === 'closed' ? 'SESSION ENDED'

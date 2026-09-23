@@ -3,7 +3,7 @@
   "version": "0.1.0",
   "private": true,
   "type": "module",
-  "description": "Rare Rush \u2014 a Rare Friends endless arcade sprint for the 2026 vibeathon",
+  "description": "Rare Rush — a Rare Friends endless arcade sprint for the 2026 vibeathon",
   "scripts": {
     "dev": "node scripts/rush-site.mjs dev",
     "build": "node scripts/rush-site.mjs build",
@@ -19,19 +19,23 @@
     "test:genesis": "node scripts/test-rush-genesis.mjs",
     "test:bonus": "node scripts/test-rush-bonus.mjs",
     "test:entry": "node scripts/test-rush-entry.mjs",
-    "test:twist": "node scripts/test-rush-twist.mjs"
+    "test:twist": "node scripts/test-rush-twist.mjs",
+    "analytics:local": "node tools/arcade-stats/server.mjs",
+    "test:analytics": "node --test tests/arcade-analytics.test.ts tests/arcade-analytics.test.mjs tools/arcade-stats/server.test.mjs",
+    "test:analytics:browser": "node scripts/test-arcade-analytics.mjs && node scripts/test-arcade-analytics-hosts.mjs"
   },
   "dependencies": {
     "@rarefriends/friendsdk": "file:rarefriends-friendsdk-0.1.2.tgz",
+    "@vercel/blob": "2.8.0",
     "react": "19.2.8",
     "react-dom": "19.2.8"
   },
   "devDependencies": {
-    "esbuild": "0.28.2",
     "@types/react": "19.1.12",
     "@types/react-dom": "19.1.9",
-    "typescript": "6.0.3",
-    "playwright": "1.63.0"
+    "esbuild": "0.28.2",
+    "playwright": "1.63.0",
+    "typescript": "6.0.3"
   },
   "engines": {
     "node": "22.x"

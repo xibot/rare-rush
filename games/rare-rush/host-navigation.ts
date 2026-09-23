@@ -1,12 +1,15 @@
 import { parseArcadeNavigation } from './navigation';
 import { syncFriendPortraits, cleanupFriendPortraits } from './host-portraits';
+import { bindGenerationsAnalytics } from './host-analytics';
 
 /** Site chrome for the outer SDK host. Wallet, ownership and gameplay stay in FriendSDK. */
 function enhanceGenerationsEntry(): void {
   const root = document.getElementById('root');
   if (!root) return;
+  const analytics = bindGenerationsAnalytics(root);
 
   const update = () => {
+    analytics.update();
     let pickerOpen = false;
     for (const frame of root.querySelectorAll<HTMLElement>('.rf-game-frame')) {
       let framePickerOpen = false;
@@ -54,8 +57,8 @@ function enhanceGenerationsEntry(): void {
   const observer = new MutationObserver(update);
   const observe = () => { observer.observe(root, { childList: true, characterData: true, subtree: true }); update(); };
   observe();
-  window.addEventListener('pagehide', () => { observer.disconnect(); cleanupFriendPortraits(); window.removeEventListener('message', navigate); });
-  window.addEventListener('pageshow', event => { if (event.persisted) { window.addEventListener('message', navigate); observe(); } });
+  window.addEventListener('pagehide', () => { observer.disconnect(); cleanupFriendPortraits(); analytics.close(); window.removeEventListener('message', navigate); });
+  window.addEventListener('pageshow', event => { if (event.persisted) { analytics.restore(); window.addEventListener('message', navigate); observe(); } });
 }
 
 if (window.self === window.top && /^\/play(?:\/|$)/.test(window.location.pathname)) {

@@ -7,6 +7,7 @@ import { TokenCoin } from '../CanonicalArt';
 import { readGenesisEligibility, readGenesisIdentity, readOwnedGenesis } from './identity';
 import { parseGenesisIdentity, type GenesisIdentity } from './protocol';
 import { GenesisPortrait, useGenesisPortraits } from './GenesisPortrait';
+import { createArcadeEventReporter, parseArcadeSignal } from '../analytics';
 import './host.css';
 
 async function withDeadline<T>(read: (signal: AbortSignal) => Promise<T>, outer?: AbortSignal): Promise<T> {
@@ -167,9 +168,17 @@ function GenesisHost() {
       closeBridge();
       const channel = new MessageChannel();
       bridge.current = { port: channel.port1, nonce, key: active.key };
+      const analytics = createArcadeEventReporter(window.location.origin);
       let lastStart = 0, startPending = false;
       channel.port1.onmessage = async ({ data: request }) => {
         if (activeRef.current?.key !== active.key || bridge.current?.port !== channel.port1) return;
+        const signal = parseArcadeSignal(request);
+        if (signal) {
+          if (!sameWallet({ account: active.identity.owner, revision: active.revision })) return;
+          if (signal.type === 'rarerush:arcade-start' && signal.collection === 'genesis') analytics.start(signal, active.identity.owner);
+          else if (signal.type === 'rarerush:arcade-finish') analytics.finish(signal);
+          return;
+        }
         const destination = parseArcadeNavigation(request);
         if (destination) {
           leave();
