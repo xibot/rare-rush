@@ -18,7 +18,7 @@ export async function inspectDashboard(request = fetch) {
 
 export async function openDashboard() {
   let state = await inspectDashboard();
-  if (state === 'occupied' || state === 'unavailable') throw new Error('Port 4217 is occupied by an unrecognized or unresponsive service. Close it before opening Arcade Stats.');
+  if (state === 'occupied' || state === 'unavailable') throw new Error('Port 4217 is occupied by an unrecognized or unresponsive service. Close it before opening Rare Rush Stats.');
   if (state === 'closed') {
     // Remains local and running after this launcher exits. No credentials are
     // placed in arguments or copied into this process by the launcher.
@@ -30,15 +30,15 @@ export async function openDashboard() {
       if (state === 'ready') break;
       if (state === 'occupied') throw new Error('Another service opened port 4217. The dashboard was not opened.');
     }
-    if (state !== 'ready') throw new Error('Arcade Stats could not start. Run node tools/arcade-stats/server.mjs from the repository to inspect startup.');
+    if (state !== 'ready') throw new Error('Rare Rush Stats could not start. Run node tools/arcade-stats/server.mjs from the repository to inspect startup.');
   }
   await promisify(execFile)('open', [address]);
-  console.log(`Private Arcade Stats opened at ${address}`);
+  console.log(`Private Rare Rush Stats opened at ${address}`);
 }
 
 if (process.argv[1] && import.meta.url === pathToFileURL(resolve(process.argv[1])).href) {
   openDashboard().catch(() => {
-    console.error('Arcade Stats could not open. Check that port 4217 is free and Node.js is installed, or run node tools/arcade-stats/server.mjs.');
+    console.error('Rare Rush Stats could not open. Check that port 4217 is free and Node.js is installed, or run node tools/arcade-stats/server.mjs.');
     process.exitCode = 1;
   });
 }

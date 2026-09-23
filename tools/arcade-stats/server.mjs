@@ -2,9 +2,11 @@ import http from 'node:http';
 import { readFile } from 'node:fs/promises';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { dirname, resolve } from 'node:path';
+import { createTestnetReader } from './testnet.mjs';
 
 export const PORT = 4217;
 export const UPSTREAM = 'https://rarerush.app/api/arcade-stats';
+export const TESTNET_RPC = 'https://rpc.testnet.chain.robinhood.com';
 const here = dirname(fileURLToPath(import.meta.url));
 const root = resolve(here, '../..');
 const hosts = new Set([`127.0.0.1:${PORT}`, `localhost:${PORT}`]);
@@ -47,6 +49,27 @@ export async function loadConfig() {
   return parseConfig(text, process.env);
 }
 
+/** The optional private RPC is read by Node only, independently of Arcade's key. */
+export function parseTestnetConfig(text, environment = {}) {
+  const match = text.match(/^[ \t]*RUSH_TESTNET_RPC_URL[ \t]*=[ \t]*(.*?)[ \t]*$/m);
+  let rpcUrl = environment.RUSH_TESTNET_RPC_URL ?? match?.[1] ?? TESTNET_RPC;
+  if ((rpcUrl.startsWith('"') && rpcUrl.endsWith('"')) || (rpcUrl.startsWith("'") && rpcUrl.endsWith("'"))) rpcUrl = rpcUrl.slice(1, -1);
+  if (!rpcUrl) rpcUrl = TESTNET_RPC;
+  try {
+    const url = new URL(rpcUrl);
+    if (url.protocol !== 'https:' || url.username || url.password || url.port || url.hash || /\s/.test(rpcUrl)
+      || !['rpc.testnet.chain.robinhood.com', 'robinhood-testnet.g.alchemy.com'].includes(url.hostname)) throw new Error();
+  } catch { throw safeError('testnet-invalid-config'); }
+  return { rpcUrl };
+}
+
+export async function loadTestnetConfig() {
+  let text = '';
+  try { text = await readFile(resolve(root, '.env.analytics.local'), 'utf8'); }
+  catch (error) { if (error.code !== 'ENOENT') throw safeError('testnet-invalid-config'); }
+  return parseTestnetConfig(text, process.env);
+}
+
 function iso(value, nullable = false) {
   if (nullable && value === null) return null;
   if (typeof value !== 'string' || value.length > 40 || !/^\d{4}-\d\d-\d\dT/.test(value) || !Number.isFinite(Date.parse(value))) throw safeError('invalid-response');
@@ -81,6 +104,45 @@ export function sanitizeStats(value, days) {
     daily,
     earliestObservedStart: iso(value.earliestObservedStart, true),
     scope: { source: 'client-reported-arcade-events', historicalBackfill: false, ownerExcluded: true, complete: true },
+  };
+}
+
+function testnetCounts(value) {
+  const names = ['uniquePlayers', 'startedRuns', 'claimedRuns', 'abandonedRuns', 'openRuns', 'expiredRuns', 'unresolvedRuns'];
+  if (!value || typeof value !== 'object') throw safeError('testnet-invalid-response');
+  const result = Object.fromEntries(names.map(name => {
+    if (!Number.isSafeInteger(value[name]) || value[name] < 0) throw safeError('testnet-invalid-response');
+    return [name, value[name]];
+  }));
+  if (result.uniquePlayers > result.startedRuns || result.openRuns + result.expiredRuns !== result.unresolvedRuns
+    || result.claimedRuns + result.abandonedRuns + result.unresolvedRuns !== result.startedRuns) throw safeError('testnet-invalid-response');
+  return result;
+}
+
+/** Keep chain report metadata and aggregates; never forward wallet IDs or RPC details. */
+export function sanitizeTestnetStats(value, days, version) {
+  const versions = version === 'all' ? ['v1', 'v2'] : [version];
+  if (!value || value.version !== 1 || value.selection?.version !== version || value.window?.days !== days || value.window?.timezone !== 'UTC'
+    || value.scope?.source !== 'onchain-testnet-runs' || value.scope?.historicalBackfill !== true || value.scope?.ownerExcluded !== true
+    || value.scope?.complete !== true || JSON.stringify(value.scope.versions) !== JSON.stringify(versions)
+    || value.snapshot?.chainId !== 46630 || !Number.isSafeInteger(value.snapshot?.blockNumber) || value.snapshot.blockNumber < 1
+    || !Array.isArray(value.daily) || value.daily.length > 5000) throw safeError('testnet-invalid-response');
+  const daily = value.daily.map(day => {
+    if (!day || typeof day.date !== 'string' || !/^\d{4}-\d\d-\d\d$/.test(day.date) || !Number.isFinite(Date.parse(day.date))
+      || new Date(day.date).toISOString().slice(0, 10) !== day.date) throw safeError('testnet-invalid-response');
+    return { date: day.date, ...testnetCounts(day) };
+  });
+  for (let index = 1; index < daily.length; index++) if (daily[index].date <= daily[index - 1].date) throw safeError('testnet-invalid-response');
+  return {
+    version: 1, mode: 'testnet', generatedAt: iso(value.generatedAt),
+    window: { days, from: iso(value.window.from, true), to: iso(value.window.to), timezone: 'UTC' }, selection: { version },
+    totals: testnetCounts(value.totals),
+    byCollection: Object.fromEntries(['genesis', 'generations'].map(name => [name, testnetCounts(value.byCollection?.[name])])),
+    byDifficulty: Object.fromEntries(['easy', 'normal', 'degen'].map(name => [name, testnetCounts(value.byDifficulty?.[name])])),
+    byVersion: Object.fromEntries(versions.map(name => [name, testnetCounts(value.byVersion?.[name])])),
+    daily, earliestObservedStart: iso(value.earliestObservedStart, true),
+    snapshot: { chainId: 46630, blockNumber: value.snapshot.blockNumber, blockTimestamp: iso(value.snapshot.blockTimestamp) },
+    scope: { source: 'onchain-testnet-runs', historicalBackfill: true, ownerExcluded: true, complete: true, versions },
   };
 }
 
@@ -144,9 +206,17 @@ const messages = {
   'upstream-unavailable': 'The analytics service is unavailable. Try refreshing shortly.',
   'invalid-response': 'The analytics service returned an incomplete or unexpected response. No counts were replaced.',
   timeout: 'The analytics request timed out. Try refreshing shortly.',
+  'testnet-invalid-config': 'Check RUSH_TESTNET_RPC_URL in the local settings, then refresh.',
+  'testnet-unavailable': 'Testnet activity could not be read. Try refreshing shortly.',
+  'testnet-wrong-chain': 'The configured RPC is not Robinhood Testnet. Check the local settings.',
+  'testnet-scan-limit': 'Testnet history exceeds this reader’s limit. The reader needs an update before showing complete totals.',
+  'testnet-timeout': 'Reading Testnet activity timed out. Try refreshing shortly.',
+  'testnet-invalid-response': 'Testnet returned an incomplete or unexpected report. No counts were replaced.',
 };
 
-export function createRequestHandler({ configLoader = loadConfig, request = fetch, timeoutMs = 10_000 } = {}) {
+export function createRequestHandler({ configLoader = loadConfig, request = fetch, timeoutMs = 10_000,
+  testnetConfigLoader = loadTestnetConfig, testnetReaderFactory = createTestnetReader } = {}) {
+  let testnetReader, testnetRpc;
   return async (req, res) => {
     res.setHeader('Cache-Control', 'no-store');
     res.setHeader('X-Rare-Rush-Dashboard', 'arcade-stats-local-v1');
@@ -173,11 +243,27 @@ export function createRequestHandler({ configLoader = loadConfig, request = fetc
     if (url.pathname === '/stats') {
       // A browser on another origin cannot add this header without a rejected CORS preflight.
       if (req.headers['x-rare-rush-local'] !== '1') return send(403, { error: 'Open the local dashboard to read stats.' });
+      const mode = url.searchParams.get('mode') ?? 'arcade';
       const days = url.searchParams.get('days') ?? '7';
-      if (!['7', '30', 'all'].includes(days) || [...url.searchParams.keys()].some(key => key !== 'days') || url.searchParams.getAll('days').length > 1) return send(400, { error: 'Choose 7 days, 30 days, or all tracked time.' });
-      try { return send(200, await fetchStats(await configLoader(), days, request, timeoutMs)); }
+      const version = url.searchParams.get('version') ?? 'all';
+      if (!['arcade', 'testnet'].includes(mode) || !['7', '30', 'all'].includes(days)
+        || [...url.searchParams.keys()].some(key => !['mode', 'days', 'version'].includes(key))
+        || ['mode', 'days', 'version'].some(key => url.searchParams.getAll(key).length > 1)
+        || (mode === 'arcade' && url.searchParams.has('version')) || (mode === 'testnet' && !['all', 'v1', 'v2'].includes(version))) return send(400, { error: 'Choose a supported game, date window, and contract version.' });
+      try {
+        if (mode === 'testnet') {
+          const { rpcUrl } = await testnetConfigLoader();
+          if (!testnetReader || testnetRpc !== rpcUrl) { testnetReader = testnetReaderFactory({ rpcUrl, request }); testnetRpc = rpcUrl; }
+          return send(200, sanitizeTestnetStats(await testnetReader.read({ days, version }), days, version));
+        }
+        return send(200, { mode: 'arcade', ...await fetchStats(await configLoader(), days, request, timeoutMs) });
+      }
       catch (error) {
-        const code = Object.hasOwn(messages, error.code) ? error.code : 'upstream-unavailable';
+        const testnetCodes = { 'testnet-config': 'testnet-invalid-config', 'testnet-chain': 'testnet-wrong-chain',
+          'testnet-rpc': 'testnet-unavailable', 'testnet-response': 'testnet-invalid-response', 'testnet-snapshot': 'testnet-unavailable',
+          'testnet-limit': 'testnet-scan-limit', 'invalid-response': 'testnet-invalid-response' };
+        const mapped = mode === 'testnet' ? testnetCodes[error.code] ?? error.code : error.code;
+        const code = Object.hasOwn(messages, mapped) ? mapped : mode === 'testnet' ? 'testnet-unavailable' : 'upstream-unavailable';
         return send(503, { code, error: messages[code] });
       }
     }
@@ -191,14 +277,14 @@ export function createRequestHandler({ configLoader = loadConfig, request = fetc
 
 export function startDashboard() {
   const server = http.createServer({ maxHeaderSize: 8192 }, createRequestHandler());
-  server.requestTimeout = 15_000;
+  server.requestTimeout = 25_000;
   server.headersTimeout = 5000;
   server.keepAliveTimeout = 5000;
   server.on('error', error => {
     console.error(error.code === 'EADDRINUSE' ? 'Port 4217 is already in use. Close the existing local dashboard and retry.' : 'The local dashboard could not start.');
     process.exitCode = 1;
   });
-  server.listen(PORT, '127.0.0.1', () => console.log(`Rare Rush private Arcade stats: http://127.0.0.1:${PORT}`));
+  server.listen(PORT, '127.0.0.1', () => console.log(`Rare Rush private Arcade + Testnet stats: http://127.0.0.1:${PORT}`));
   return server;
 }
 

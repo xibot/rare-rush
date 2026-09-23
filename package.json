@@ -21,7 +21,7 @@
     "test:entry": "node scripts/test-rush-entry.mjs",
     "test:twist": "node scripts/test-rush-twist.mjs",
     "analytics:local": "node tools/arcade-stats/server.mjs",
-    "test:analytics": "node --test tests/arcade-analytics.test.ts tests/arcade-analytics.test.mjs tools/arcade-stats/server.test.mjs",
+    "test:analytics": "node --test tests/arcade-analytics.test.ts tests/arcade-analytics.test.mjs tools/arcade-stats/server.test.mjs tools/arcade-stats/testnet.test.mjs",
     "test:analytics:browser": "node scripts/test-arcade-analytics.mjs && node scripts/test-arcade-analytics-hosts.mjs"
   },
   "dependencies": {

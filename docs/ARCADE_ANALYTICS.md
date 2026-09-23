@@ -61,3 +61,7 @@ These are not distributed quotas: multiple instances and invented wallets can by
 ## Validation
 
 Run `node --test tests/arcade-analytics.test.mjs`. Tests cover secret/configuration failures, authorization and origins, owner exclusion, schema/body limits, pseudonym privacy, cross-instance idempotence, interrupted-write recovery, receipt validation, finish deduplication, UTC cohorts, aggregation, scan deadlines/caps, rate limits, and private Blob options. Live smoke tests should use a separate QA prefix or the excluded owner; do not invent production player events to test reporting.
+
+## Local Testnet view
+
+The same [local dashboard](../tools/arcade-stats/README.md) also reads Testnet contract history directly. This separate view does not send Testnet events to the Arcade collector, deploy contracts, or publish dashboard routes. It includes V1/V2 history and excludes the builder wallet. Unresolved runs are not treated as losses, and claimed runs are not treated as proof of positive rewards.

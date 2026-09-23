@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="color-scheme" content="dark">
   <meta name="robots" content="noindex,nofollow">
-  <title>Rare Rush | Private Arcade Stats</title>
+  <title>Rare Rush | Private Stats</title>
   <link rel="icon" href="/assets/rare-friend.svg" type="image/svg+xml">
   <link rel="stylesheet" href="/style.css">
   <script src="/app.js" defer></script>
@@ -18,9 +18,14 @@
     </header>
     <main>
       <section class="hero" aria-labelledby="page-title">
-        <div><p class="eyebrow">ARCADE / YOUR FIELD NOTES</p><h1 id="page-title">EVERY RUN.<br><span>IN VIEW.</span></h1></div>
-        <p class="intro">Who’s playing. How they rush.<br>Your private view of the Arcade.</p>
+        <div><p class="eyebrow" id="view-eyebrow">ARCADE / YOUR FIELD NOTES</p><h1 id="page-title">EVERY RUN.<br><span>IN VIEW.</span></h1></div>
+        <p class="intro" id="view-intro">Who’s playing. How they rush.<br>Your private view of the Arcade.</p>
       </section>
+      <section class="game-switcher" aria-label="Choose game stats">
+        <fieldset class="game-tabs"><legend class="sr-only">Game</legend><button type="button" data-game="arcade" aria-pressed="true">ARCADE <span>SIMULATED PLAY</span></button><button type="button" data-game="testnet" aria-pressed="false">TESTNET <span>PLAY TO MINT</span></button></fieldset>
+        <p class="source-label" id="source-label">CLIENT-REPORTED EVENTS</p>
+      </section>
+      <fieldset class="contract-filter" id="contract-filter" hidden><legend>CONTRACT HISTORY</legend><button type="button" data-version="all" aria-pressed="true">ALL VERSIONS</button><button type="button" data-version="v2" aria-pressed="false">CURRENT V2</button><button type="button" data-version="v1" aria-pressed="false">LEGACY V1</button></fieldset>
       <section class="toolbar" aria-label="Dashboard controls">
         <fieldset class="windows"><legend class="sr-only">Run start date window</legend><button type="button" data-days="7" aria-pressed="true">7 DAYS</button><button type="button" data-days="30" aria-pressed="false">30 DAYS</button><button type="button" data-days="all" aria-pressed="false">ALL TRACKED</button></fieldset>
         <div class="tools"><button type="button" id="export" disabled>CSV <span aria-hidden="true">↓</span></button><button type="button" id="refresh">REFRESH <span aria-hidden="true">↻</span></button></div>
@@ -30,20 +35,20 @@
       <section class="metric-grid" aria-label="Arcade totals" aria-busy="true" id="metrics">
         <article class="metric featured"><span class="eyebrow">UNIQUE PLAYING WALLETS</span><strong id="unique-players">—</strong><small>Wallets that started a run</small></article>
         <article class="metric"><span class="eyebrow">RUNS STARTED</span><strong id="started-runs">—</strong><small>Every recorded start</small></article>
-        <article class="metric"><span class="eyebrow">RUNS FINISHED</span><strong id="completed-runs">—</strong><small>Survived + lost</small></article>
-        <article class="metric"><span class="eyebrow">TIMER SURVIVED</span><strong id="survived-runs">—</strong><small id="survival-note">Of finished runs</small></article>
+        <article class="metric"><span class="eyebrow" id="third-label">RUNS FINISHED</span><strong id="completed-runs">—</strong><small id="third-note">Survived + lost</small></article>
+        <article class="metric"><span class="eyebrow" id="fourth-label">TIMER SURVIVED</span><strong id="survived-runs">—</strong><small id="survival-note">Of finished runs</small></article>
       </section>
-      <div class="outcomes"><p><span class="dot" aria-hidden="true"></span> LOST <strong id="lost-runs">—</strong></p><p><span class="dot hollow" aria-hidden="true"></span> NO FINISH REPORTED <strong id="unfinished-runs">—</strong></p><p class="outcomes-note">Closing a tab may leave a run unfinished.</p></div>
+      <div class="outcomes"><p><span class="dot" aria-hidden="true"></span> <span id="first-outcome-label">LOST</span> <strong id="lost-runs">—</strong></p><p id="second-outcome"><span class="dot hollow" aria-hidden="true"></span> <span id="second-outcome-label">NO FINISH REPORTED</span> <strong id="unfinished-runs">—</strong></p><p class="outcomes-note" id="outcomes-note">Closing a tab may leave a run unfinished.</p></div>
       <section class="panel activity" aria-labelledby="activity-title">
-        <div class="section-heading"><div><p class="eyebrow">01 / ACTIVITY</p><h2 id="activity-title">THE DAILY RUSH.</h2></div><div class="legend"><span><i class="legend-start" aria-hidden="true"></i> STARTED</span><span><i class="legend-finish" aria-hidden="true"></i> FINISHED</span></div></div>
+        <div class="section-heading"><div><p class="eyebrow">01 / ACTIVITY</p><h2 id="activity-title">THE DAILY RUSH.</h2></div><div class="legend"><span><i class="legend-start" aria-hidden="true"></i> STARTED</span><span><i class="legend-finish" aria-hidden="true"></i> <span id="chart-secondary-label">FINISHED</span></span></div></div>
         <div class="chart-scroll" id="chart" aria-live="off"><p class="empty-chart">Counts appear after a successful connection.</p></div>
-        <details class="daily-details"><summary>View daily numbers</summary><div class="table-scroll"><table><caption class="sr-only">Daily Arcade stats grouped by the UTC start date of each run</caption><thead><tr><th scope="col">UTC date</th><th scope="col">Wallets</th><th scope="col">Started</th><th scope="col">Finished</th><th scope="col">Survived</th><th scope="col">Lost</th><th scope="col">Unfinished</th></tr></thead><tbody id="daily-rows"><tr><td colspan="7">No data loaded.</td></tr></tbody></table></div></details>
+        <details class="daily-details"><summary>View daily numbers</summary><div class="table-scroll"><table><caption class="sr-only" id="daily-caption">Daily Arcade stats grouped by the UTC start date of each run</caption><thead><tr id="daily-head"><th scope="col">UTC date</th><th scope="col">Wallets</th><th scope="col">Started</th><th scope="col">Finished</th><th scope="col">Survived</th><th scope="col">Lost</th><th scope="col">Unfinished</th></tr></thead><tbody id="daily-rows"><tr><td colspan="7">No data loaded.</td></tr></tbody></table></div></details>
       </section>
       <div class="breakdown-grid">
-        <section class="panel" aria-labelledby="collection-title"><div class="section-heading"><div><p class="eyebrow">02 / FRIENDS</p><h2 id="collection-title">YOUR CREWS.</h2></div></div><div class="table-scroll"><table><caption class="sr-only">Collection breakdown</caption><thead><tr><th scope="col">Collection</th><th scope="col">Wallets</th><th scope="col">Starts</th><th scope="col">Finished</th></tr></thead><tbody id="collection-rows"><tr><td colspan="4">No data loaded.</td></tr></tbody></table></div></section>
-        <section class="panel" aria-labelledby="mode-title"><div class="section-heading"><div><p class="eyebrow">03 / DIFFICULTY</p><h2 id="mode-title">PICK YOUR PACE.</h2></div></div><div class="table-scroll"><table><caption class="sr-only">Difficulty breakdown</caption><thead><tr><th scope="col">Mode</th><th scope="col">Wallets</th><th scope="col">Starts</th><th scope="col">Finished</th></tr></thead><tbody id="mode-rows"><tr><td colspan="4">No data loaded.</td></tr></tbody></table></div></section>
+        <section class="panel" aria-labelledby="collection-title"><div class="section-heading"><div><p class="eyebrow">02 / FRIENDS</p><h2 id="collection-title">YOUR CREWS.</h2></div></div><div class="table-scroll"><table><caption class="sr-only">Collection breakdown</caption><thead><tr><th scope="col">Collection</th><th scope="col">Wallets</th><th scope="col">Starts</th><th scope="col" class="breakdown-secondary">Finished</th></tr></thead><tbody id="collection-rows"><tr><td colspan="4">No data loaded.</td></tr></tbody></table></div></section>
+        <section class="panel" aria-labelledby="mode-title"><div class="section-heading"><div><p class="eyebrow">03 / DIFFICULTY</p><h2 id="mode-title">PICK YOUR PACE.</h2></div></div><div class="table-scroll"><table><caption class="sr-only">Difficulty breakdown</caption><thead><tr><th scope="col">Mode</th><th scope="col">Wallets</th><th scope="col">Starts</th><th scope="col" class="breakdown-secondary">Finished</th></tr></thead><tbody id="mode-rows"><tr><td colspan="4">No data loaded.</td></tr></tbody></table></div></section>
       </div>
-      <section class="method" aria-labelledby="method-title"><div><p class="eyebrow" id="method-title">READING THESE NUMBERS</p><p>Unique wallets are wallets, not people. A wallet may appear in several collections or modes, so those wallet counts do not add up to the overall total.</p><p>Windows use the run’s start date in UTC. A finish reported later belongs to that same start date. These are client-reported Arcade events, not independently verified player activity.</p></div><dl><div><dt>OWNER WALLET</dt><dd>Excluded</dd></div><div><dt>HISTORICAL BACKFILL</dt><dd>None</dd></div><div><dt>FIRST START IN WINDOW</dt><dd id="first-observed">Not loaded</dd></div></dl></section>
+      <section class="method" aria-labelledby="method-title"><div><p class="eyebrow" id="method-title">READING THESE NUMBERS</p><p>Unique wallets are wallets, not people. A wallet may appear in several collections or modes, so those wallet counts do not add up to the overall total.</p><p id="method-source">Windows use the run’s start date in UTC. A finish reported later belongs to that same start date. These are client-reported Arcade events, not independently verified player activity.</p><p id="testnet-method" hidden>A claim confirms an onchain settlement; it does not necessarily mean the run earned tokens. An unresolved run is not a confirmed loss: it may be active, awaiting a claim, or expired without settlement.</p></div><dl><div><dt>OWNER WALLET</dt><dd>Excluded</dd></div><div><dt>HISTORICAL BACKFILL</dt><dd id="backfill">None</dd></div><div><dt>FIRST START IN WINDOW</dt><dd id="first-observed">Not loaded</dd></div><div id="snapshot-row" hidden><dt>CHAIN SNAPSHOT</dt><dd id="snapshot-block">Not loaded</dd></div><div id="snapshot-time-row" hidden><dt>SNAPSHOT TIME</dt><dd id="snapshot-time">Not loaded</dd></div></dl></section>
     </main>
     <footer><span>RARE RUSH <b>BY XIBOT</b></span><span>LOCAL VIEW. KEEP IT RARE.</span><span>127.0.0.1:4217</span></footer>
   </div>

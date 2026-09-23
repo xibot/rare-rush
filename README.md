@@ -33,7 +33,7 @@ The Rare Rush entry was submitted to the Rare Friends Vibeathon on September 20,
 
 The `rarerush` Vercel project belongs to XIBOT and serves [rarerush.app](https://rarerush.app) and [rarerush.vercel.app](https://rarerush.vercel.app). The committed configuration installs locked dependencies with `npm ci`, runs `npm run build`, and publishes `dist/` plus the two analytics API functions; the package selects Node.js 22. It preserves `/pitch/`, `/docs/`, `/arcade/`, `/genesis/`, `/play/`, and the sandbox documents without a catch-all rewrite. Gameplay requires no server secrets. Optional private analytics uses server-only credentials described below. Deployment remains separate from vibeathon submission.
 
-## Private Arcade statistics
+## Private Arcade and Testnet statistics
 
 Arcade hosts send a small event when a connected player starts a run and when that run ends naturally. The owner wallet is excluded. The collector stores a keyed wallet identifier in private Vercel Blob storage, never the raw wallet address or IP address. Read access requires a separate server-side key. Collection is best effort, does not gate gameplay, and is disabled on local/preview origins. These are client-reported playing-wallet counts, not a count of distinct people; closed tabs, blocked requests, or connection failures can leave runs unfinished or unrecorded. Earlier runs cannot be backfilled.
 
@@ -43,4 +43,6 @@ The private dashboard runs on your computer:
 npm run analytics:local
 ```
 
-Open http://127.0.0.1:4217. Its ignored `.env.analytics.local` file contains the API URL and read key; the key stays in the local server. Closing the dashboard does not stop production collection. See [dashboard setup and operations](tools/arcade-stats/README.md). Dashboard source is included in the repository, but its pages are excluded from deployment. Local secrets and stored statistics are not published to GitHub.
+Open http://127.0.0.1:4217 and switch between Arcade and Testnet. Testnet reads historical starts and settlements from the V1 and V2 contracts, excludes the owner, and distinguishes claims, abandonments, and unresolved runs. Its underlying chain records remain public; the dashboard stays local.
+
+Its ignored `.env.analytics.local` file contains the Arcade API URL/read key and optional Testnet RPC endpoint; credentials stay in the local server. Closing the dashboard does not stop production collection. See [dashboard setup and operations](tools/arcade-stats/README.md). Dashboard source is included in the repository, but its pages are excluded from deployment. Local secrets and stored statistics are not published to GitHub.

@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import { readFile } from 'node:fs/promises';
-import { createRequestHandler, parseConfig, sanitizeStats, UPSTREAM } from './server.mjs';
+import { createRequestHandler, parseConfig, parseTestnetConfig, sanitizeStats, sanitizeTestnetStats, UPSTREAM, TESTNET_RPC } from './server.mjs';
 
 const key = 'unit-test-admin-key-never-render';
 const counter = (startedRuns = 0, completedRuns = 0, survivedRuns = 0, uniquePlayers = 0) => ({ startedRuns, completedRuns, survivedRuns, lostRuns: completedRuns - survivedRuns, unfinishedRuns: startedRuns - completedRuns, uniquePlayers });
@@ -65,7 +65,7 @@ test('unknown fields and wallet identifiers cannot leak through aggregate respon
   const payload = sample(); payload.secret = key; payload.wallets = ['0x123']; payload.totals.debug = key; payload.daily[0].adminKey = key;
   const response = await invoke(handler(async () => Response.json(payload)));
   assert.equal(response.status, 200); assert.ok(!response.body.includes(key)); assert.ok(!response.body.includes('0x123')); assert.ok(!response.body.includes('adminKey'));
-  assert.deepEqual(JSON.parse(response.body), sample());
+  assert.deepEqual(JSON.parse(response.body), { mode: 'arcade', ...sample() });
 });
 
 test('partial, inconsistent, wrong-window and unsafe responses fail closed', async () => {
@@ -117,4 +117,88 @@ test('launcher reuses only the recognized local dashboard and never requests sta
   assert.equal(await inspectDashboard(async () => new Response('Some other service')), 'occupied');
   assert.equal(await inspectDashboard(async () => { throw Object.assign(new Error('closed'), { cause: { code: 'ECONNREFUSED' } }); }), 'closed');
   assert.equal(await inspectDashboard(async () => { throw new Error('timeout'); }), 'unavailable');
+});
+
+const chainCounter = (startedRuns = 0, claimedRuns = 0, abandonedRuns = 0, openRuns = 0, expiredRuns = 0, uniquePlayers = 0) =>
+  ({ uniquePlayers, startedRuns, claimedRuns, abandonedRuns, openRuns, expiredRuns, unresolvedRuns: openRuns + expiredRuns });
+function chainSample(days = '7', version = 'all') {
+  const totals = chainCounter(5, 2, 1, 1, 1, 2);
+  const versions = version === 'all' ? ['v1', 'v2'] : [version];
+  return { version: 1, mode: 'testnet', generatedAt: '2026-09-23T12:00:00.000Z',
+    window: { days, from: days === 'all' ? null : '2026-09-17T00:00:00.000Z', to: '2026-09-24T00:00:00.000Z', timezone: 'UTC' },
+    selection: { version }, totals,
+    byCollection: { genesis: chainCounter(2, 1, 1, 0, 0, 1), generations: chainCounter(3, 1, 0, 1, 1, 2) },
+    byDifficulty: { easy: chainCounter(2, 1, 0, 1, 0, 1), normal: chainCounter(2, 1, 1, 0, 0, 2), degen: chainCounter(1, 0, 0, 0, 1, 1) },
+    byVersion: Object.fromEntries(versions.map(name => [name, versions.length === 1 ? totals : name === 'v1' ? chainCounter(2, 1, 1, 0, 0, 1) : chainCounter(3, 1, 0, 1, 1, 2)])),
+    daily: [{ date: '2026-09-23', ...totals }], earliestObservedStart: '2026-09-23T11:00:00.000Z',
+    snapshot: { chainId: 46630, blockNumber: 123320789, blockTimestamp: '2026-09-23T12:00:00.000Z' },
+    scope: { source: 'onchain-testnet-runs', historicalBackfill: true, ownerExcluded: true, complete: true, versions } };
+}
+
+test('Testnet RPC configuration is server-only and restricted to the intended network providers', () => {
+  assert.deepEqual(parseTestnetConfig(''), { rpcUrl: TESTNET_RPC });
+  assert.deepEqual(parseTestnetConfig('RUSH_TESTNET_RPC_URL=\nRUSH_ANALYTICS_ADMIN_KEY=ignored'), { rpcUrl: TESTNET_RPC });
+  assert.deepEqual(parseTestnetConfig('RUSH_TESTNET_RPC_URL=""'), { rpcUrl: TESTNET_RPC });
+  const url = 'https://robinhood-testnet.g.alchemy.com/v2/private-testnet-key';
+  assert.deepEqual(parseTestnetConfig(`RUSH_TESTNET_RPC_URL="${url}"`), { rpcUrl: url });
+  for (const invalid of ['http://127.0.0.1:8545', 'https://evil.test/rpc', 'https://rpc.mainnet.chain.robinhood.com', 'https://user:pass@rpc.testnet.chain.robinhood.com', 'https://rpc.testnet.chain.robinhood.com:1234', 'https://rpc.testnet.chain.robinhood.com/#key']) {
+    assert.throws(() => parseTestnetConfig(`RUSH_TESTNET_RPC_URL=${invalid}`), { code: 'testnet-invalid-config' });
+  }
+});
+
+test('Arcade and Testnet read only their own configuration; Testnet works without an Arcade key', async () => {
+  let arcadeReads = 0, testnetReads = 0, factories = 0;
+  const calls = [];
+  const h = handler(undefined, {
+    configLoader: async () => { arcadeReads++; return { url: UPSTREAM, key }; },
+    testnetConfigLoader: async () => { testnetReads++; return { rpcUrl: TESTNET_RPC }; },
+    testnetReaderFactory: ({ rpcUrl }) => { factories++; assert.equal(rpcUrl, TESTNET_RPC); return { read: async options => { calls.push(options); return chainSample(options.days, options.version); } }; },
+  });
+  const arcade = await invoke(h, '/stats?mode=arcade&days=7'); assert.equal(arcade.status, 200); assert.equal(JSON.parse(arcade.body).mode, 'arcade');
+  assert.equal(arcadeReads, 1); assert.equal(testnetReads, 0);
+  for (const version of ['all', 'v2', 'v1']) {
+    const result = await invoke(h, `/stats?mode=testnet&days=all&version=${version}`);
+    assert.equal(result.status, 200); assert.equal(JSON.parse(result.body).mode, 'testnet');
+  }
+  assert.equal(arcadeReads, 1); assert.equal(testnetReads, 3); assert.equal(factories, 1);
+  assert.deepEqual(calls, ['all', 'v2', 'v1'].map(version => ({ days: 'all', version })));
+});
+
+test('unsupported or repeated game selectors cannot trigger Testnet RPC reads', async () => {
+  let reads = 0;
+  const h = handler(undefined, { testnetConfigLoader: async () => { reads++; return {}; } });
+  for (const url of ['/stats?mode=testnet&version=v3', '/stats?mode=bad', '/stats?mode=testnet&mode=arcade', '/stats?mode=testnet&version=all&version=v2', '/stats?mode=arcade&version=all', '/stats?mode=testnet&rpcUrl=https://evil.test', '/stats?mode=testnet&days=5']) {
+    assert.equal((await invoke(h, url)).status, 400);
+  }
+  for (const overrides of [{ headers: { ...headers, origin: 'https://evil.test' } }, { headers: { host: headers.host } }, { method: 'POST' }]) {
+    assert.ok([403, 405].includes((await invoke(h, '/stats?mode=testnet', overrides)).status));
+  }
+  assert.equal(reads, 0);
+});
+
+test('Testnet sanitizer returns only counts and a chain snapshot without raw identities or endpoint keys', () => {
+  const source = chainSample(); source.rpcUrl = 'private-rpc-key'; source.wallets = ['0x123']; source.totals.address = '0x456'; source.snapshot.secret = key;
+  const clean = sanitizeTestnetStats(source, '7', 'all');
+  assert.deepEqual(clean, chainSample());
+  assert.doesNotMatch(JSON.stringify(clean), /private-rpc-key|0x123|0x456|unit-test-admin/);
+});
+
+test('wrong-chain, wrong-version, partial and inconsistent Testnet reports are rejected', () => {
+  for (const mutate of [p => p.snapshot.chainId = 4663, p => p.snapshot.blockNumber = '123', p => p.scope.complete = false,
+    p => p.scope.ownerExcluded = false, p => p.scope.historicalBackfill = false, p => p.scope.versions = ['v2'], p => p.selection.version = 'v2',
+    p => p.window.days = 'all', p => p.totals.claimedRuns = 500, p => p.totals.unresolvedRuns = 30, p => p.totals.uniquePlayers = 40,
+    p => delete p.byVersion.v1, p => p.daily[0].date = 'bad']) {
+    const value = chainSample(); mutate(value); assert.throws(() => sanitizeTestnetStats(value, '7', 'all'));
+  }
+});
+
+test('Testnet errors stay sanitized and distinct from genuine zero activity', async () => {
+  for (const [readerCode, expected] of [['testnet-chain', 'testnet-wrong-chain'], ['testnet-limit', 'testnet-scan-limit'], ['testnet-timeout', 'testnet-timeout'], ['testnet-response', 'testnet-invalid-response'], ['testnet-rpc', 'testnet-unavailable']]) {
+    const h = handler(undefined, { testnetConfigLoader: async () => ({ rpcUrl: TESTNET_RPC }), testnetReaderFactory: () => ({ read: async () => { throw Object.assign(new Error(`private RPC ${key}`), { code: readerCode }); } }) });
+    const result = await invoke(h, '/stats?mode=testnet'); assert.equal(result.status, 503); assert.equal(JSON.parse(result.body).code, expected); assert.ok(!result.body.includes(key));
+  }
+  const zero = chainSample(); zero.totals = chainCounter(); zero.daily = []; zero.earliestObservedStart = null;
+  for (const group of [zero.byCollection, zero.byDifficulty, zero.byVersion]) for (const name of Object.keys(group)) group[name] = chainCounter();
+  const h = handler(undefined, { testnetConfigLoader: async () => ({ rpcUrl: TESTNET_RPC }), testnetReaderFactory: () => ({ read: async () => zero }) });
+  const result = await invoke(h, '/stats?mode=testnet'); assert.equal(result.status, 200); assert.equal(JSON.parse(result.body).totals.startedRuns, 0);
 });
