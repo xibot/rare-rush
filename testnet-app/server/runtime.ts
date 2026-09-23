@@ -7,6 +7,7 @@ import { ENGINE_VERSION } from '../generated/engine-version.ts';
 import { verifyAndSignCore } from '../generated/infra/testnet/src/verifier-core.ts';
 import { AUTH_CHAIN_ID, AUTH_GAME } from '../src/shared/authorization.ts';
 import { createVerifierHandlers, RunVerificationRejected, type VerifierStatus } from './handler.ts';
+import { verifierRpcUrl } from './rpc-config.ts';
 
 const EXPECTED_VERIFIER = deployment.verifier;
 const EXPECTED_REWARD_TOKEN = deployment.contracts.rewardToken;
@@ -15,11 +16,12 @@ const chain = defineChain({
   nativeCurrency: { name: 'Test Ether', symbol: 'ETH', decimals: 18 },
   rpcUrls: { default: { http: ['https://rpc.testnet.chain.robinhood.com'] } },
 });
-const client = createPublicClient({ chain, transport: http(chain.rpcUrls.default.http[0], {
+const rpcUrl = verifierRpcUrl(process.env.RUSH_RPC_URL);
+const client = rpcUrl ? createPublicClient({ chain, transport: http(rpcUrl, {
   // Group independent pinned reads; do not replay a slow 12-second request twice
   // before the status page gets a chance to recover.
   batch: { wait: 10, batchSize: 20 }, timeout: 4_000, retryCount: 1, retryDelay: 250,
-}), cacheTime: 0 });
+}), cacheTime: 0 }) : null;
 const gameAbi = gameArtifact.abi as Abi;
 const nftAbi = nftArtifact.abi as Abi;
 
@@ -35,6 +37,7 @@ async function status(): Promise<VerifierStatus> {
   const base = { ready: false, chainId: AUTH_CHAIN_ID as 46630, game: AUTH_GAME, engineVersion: ENGINE_VERSION, verifier: null };
   const key = signingKey();
   if (!key) return { ...base, reason: 'not-configured' };
+  if (!client) return { ...base, reason: 'configuration-mismatch' };
   const signer = privateKeyToAccount(key).address;
   if (signer !== getAddress(EXPECTED_VERIFIER)) return { ...base, reason: 'configuration-mismatch' };
   try {
@@ -62,6 +65,7 @@ export const handlers = createVerifierHandlers({
   async verify({ runId, replay, expectedPlayer }) {
     const key = signingKey();
     if (!key) throw new Error('Verifier is not configured.');
+    if (!client) throw new Error('Verifier is not configured.');
     try {
       return await verifyAndSignCore({
         client, chainId: AUTH_CHAIN_ID, game: AUTH_GAME, runId, replay, expectedPlayer,
