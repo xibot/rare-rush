@@ -1,48 +1,111 @@
 # Rare Rush
 
-By XIBOT · [Public source repository](https://github.com/xibot/rare-rush)
+**Small Friend. Big Rush.**
 
-A retro SVG arcade runner **by XIBOT**, using canonical Rare Friends artwork. A public landing page shows a random Friend jumping, sliding and growing through an autoplay run. Choose Easy (120s), Normal (90s) or Degen (60s), with tougher obstacles, more scattered coins and higher demo rewards in harder modes. Surprise bear coins fly in at double size for 10× the current mode's demo coin reward, within the shared emission cap.
+[Play Arcade](https://rarerush.app/arcade/) · [Try Testnet](https://testnet.rarerush.app/) · [Game Guide](https://rarerush.app/docs/) · [Pitch](https://rarerush.app/pitch/)
 
-The playable Arcade now follows connected horizontal, upward and free-fall tracks. Every run opens on the classic lane; surprise ceiling intakes and floor breaks lead into fast shafts with coins, obstacles and continuous character rotation. Shaft exits occasionally send the runner left: Easy saves rare reversals for late in the run, Normal adds occasional reversals, and DEGEN gets more surprises. The seed fixes the same route on replay. Left/right controls steer in vertical sections; on horizontal tracks, hold the running direction to accelerate. The site, wallet gates, original run durations and simulated reward rules remain the same. The landing preview remains unchanged. The same presentation is available in the separate Testnet app, preserving its V2 physics and replay protocol.
+Rare Rush is a browser-based arcade runner built for the Rare Friends ecosystem. Bring your Friend, collect coins, dodge obstacles, and race the timer through a world that can change direction beneath your feet.
+
+A run starts as a classic side-scroller. Then comes the rare twist: an air intake pulls you into a spinning climb, a break in the floor sends you into free fall, and the next exit might send you running backwards. Familiar controls, unexpected turns, and one more reason to run it back.
+
+Created by **XIBOT** for the [Rare Friends Vibeathon](https://github.com/spokesz/rarefriends-vibeathon).
+
+## Two ways to play
+
+| | Arcade MVP | Play-to-mint Testnet |
+| --- | --- | --- |
+| **Play** | [rarerush.app](https://rarerush.app/arcade/) | [testnet.rarerush.app](https://testnet.rarerush.app/) |
+| **Your Friend** | Your owned Genesis or eligible Generations NFT | Free test Genesis or Generations NFT |
+| **Network** | Robinhood mainnet for ownership checks | Robinhood Testnet |
+| **Economy** | Simulated entry fees, rewards, and prize pool | Onchain test entries and verified `tRARERUSH` reward claims |
+| **Transactions** | None required to play | Test ETH for gas; test RF for Generations entries |
+
+**Arcade** is the Vibeathon MVP. Connect a browser wallet, choose Genesis or Generations, and pick your difficulty. Genesis holders enter free; Generations uses an owned hardwired NFT, generation 1 or higher. All Arcade balances and rewards are simulated. You can also watch the landing-page preview without connecting a wallet.
+
+**Testnet** lets you try the full play → verify → mint flow. Build a free test kit on the landing page, choose a Friend, and survive the timer with at least one heart. The verifier replays your inputs before authorizing an onchain reward claim. Each test NFT gets three starts per UTC day. Genesis entry is free; Generations entry is 110 tRF, split into 100 for prizes and 10 for treasury.
+
+Test assets have no monetary value and are separate from real Rare Friends holdings. Testnet economics are provisional; a mainnet RARERUSH token, liquidity pools, and final launch tokenomics are still in development.
+
+On mobile, open the game in a supported wallet's built-in browser.
+
+## The rare twist
+
+- **Four directions.** Run right, rise, fall, and occasionally reverse left. Direction changes connect into one continuous course.
+- **Your Friend in motion.** Play with Genesis or Generations artwork, grow as you collect coins, and spin through vertical sections.
+- **Coins worth chasing.** Flying bonus coins, shields, and magnets add opportunities along the way.
+- **Three ways to rush.** Choose a longer, gentler run or a shorter burst of Degen chaos.
+
+| Difficulty | Run time | Reward multiplier |
+| --- | --- | --- |
+| Easy | 120 seconds | 0.75× |
+| Normal | 90 seconds | 1× |
+| Degen | 60 seconds | 2× |
+
+Genesis adds a 100× token-reward multiplier, subject to each mode's economy and supply limits. Token multipliers do not multiply the arcade score.
+
+**Controls:** Space / ↑ / W to jump; press again to double jump. Hold ↓ / S to slide. Use ← / → to adjust pace on horizontal tracks and steer in vertical sections. Touch controls are built in. See the [game guide](https://rarerush.app/docs/) for the full rules.
+
+## Run locally
+
+Use **Node.js 22.18+ within the 22.x release line** and npm.
 
 ```sh
+git clone https://github.com/xibot/rare-rush.git
+cd rare-rush
 npm ci
 npm run dev
 ```
 
-Open http://localhost:4173 for the landing page and wallet-free autoplay preview. The play button opens http://localhost:4173/arcade/ to choose a collection. Genesis holders use `/genesis/` with fresh ownership checks and their original portrait on a random animated Generations body; eligible hardwired Generations holders (generation ≥1) use the unchanged FriendSDK route at `/play/`. Both need a browser wallet on Robinhood mainnet (4663). Their matching entry pages show original artwork on Friend selection cards, with a top Choose Collection link to return to the collection selector. Phone controls are built in; open https://rarerush.app in your wallet’s browser for HTTPS wallet play.
-
-The visual [Rare Rush pitch](https://rarerush.app/pitch/) introduces the playable character experience, its game loop, the current demo economy and the planned token integrations. It includes a wallet-free autoplay run and links directly to the arcade.
-
-The public [Rare Rush 101 guide](https://rarerush.app/docs/) explains controls, difficulty, growth, surprise coins, and token plans using canonical SVG art and interactive examples. Its reward calculator uses the same reward code as the game to compare standard Generations rewards with the playable 100× Genesis demo boost.
-
-Genesis selects one body per run from 36 compatible Generations bodies, without back-to-back repeats; slide squeezes the whole character to fit under obstacles. Bodies remain cosmetic, with unchanged collision and reward rules.
-
-The Genesis animation showcase is preserved as an unpublished draft in [drafts/genesis-prototype/](drafts/genesis-prototype/). It is excluded from the public build.
-
-**This is a simulated economy prototype.** Entry fees, the reward token and prize pool have no monetary value and do not make transactions. The game implements a working local preview of the intended diminishing reward model. Verified Genesis testers enter free and earn 100× demo tokens per coin, stacked with difficulty and flying bonuses before the shared issuance cap. Real RARERUSH minting, the RARERUSH / RAREFRIENDS pair, and prize payouts remain future integrations.
-
-See [game instructions and exact rules](games/rare-rush/README.md), [economy design](docs/ECONOMY.md), and [submission details](docs/SUBMISSION.md).
-
-Run `npm run typecheck:rush`, `npm run test:rush`, `npm run check`, `npm run build`, `npm run test:browser`, `npm run test:landing`, `npm run test:docs`, `npm run test:pitch`, `npm run test:entry`, `npm run test:genesis`, `npm run test:bonus`, and `npm run test:twist` to validate Rare Rush. The unmodified FriendSDK v0.1.2 package is included for reproducibility. `dist/` is the static hosting output, with the landing page at its root, the public guide in `docs/`, the judge-facing pitch in `pitch/`, collection choice in `arcade/`, the Genesis tester host in `genesis/`, and the SDK game inside `play/`.
-
-The Rare Rush entry was submitted to the Rare Friends Vibeathon on September 20, 2026: [submission PR #22](https://github.com/spokesz/rarefriends-vibeathon/pull/22). It is open for organizer review.
-
-## Deployment
-
-The `rarerush` Vercel project belongs to XIBOT and serves [rarerush.app](https://rarerush.app) and [rarerush.vercel.app](https://rarerush.vercel.app). The committed configuration installs locked dependencies with `npm ci`, runs `npm run build`, and publishes `dist/` plus the two analytics API functions; the package selects Node.js 22. It preserves `/pitch/`, `/docs/`, `/arcade/`, `/genesis/`, `/play/`, and the sandbox documents without a catch-all rewrite. Gameplay requires no server secrets. Optional private analytics uses server-only credentials described below. Deployment remains separate from vibeathon submission.
-
-## Private Arcade and Testnet statistics
-
-Arcade hosts send a small event when a connected player starts a run and when that run ends naturally. The owner wallet is excluded. The collector stores a keyed wallet identifier in private Vercel Blob storage, never the raw wallet address or IP address. Read access requires a separate server-side key. Collection is best effort, does not gate gameplay, and is disabled on local/preview origins. These are client-reported playing-wallet counts, not a count of distinct people; closed tabs, blocked requests, or connection failures can leave runs unfinished or unrecorded. Earlier runs cannot be backfilled.
-
-The private dashboard runs on your computer:
+Open [localhost:4173](http://localhost:4173). The preview and build need no credentials. Arcade wallet play requires an eligible NFT on Robinhood mainnet, chain `4663`.
 
 ```sh
-npm run analytics:local
+npm run typecheck:rush
+npm run test:rush
+npm run check
+npm run build
 ```
 
-Open http://127.0.0.1:4217 and switch between Arcade and Testnet. Testnet reads historical starts and settlements from the V1 and V2 contracts, excludes the owner, and distinguishes claims, abandonments, and unresolved runs. Its underlying chain records remain public; the dashboard stays local.
+The production build is written to `dist/`. Additional browser checks are documented in the [developer game guide](games/rare-rush/README.md#build-and-verify). FriendSDK v0.1.2 is bundled in the repository for reproducible installation.
 
-Its ignored `.env.analytics.local` file contains the Arcade API URL/read key and optional Testnet RPC endpoint; credentials stay in the local server. Closing the dashboard does not stop production collection. See [dashboard setup and operations](tools/arcade-stats/README.md). Dashboard source is included in the repository, but its pages are excluded from deployment. Local secrets and stored statistics are not published to GitHub.
+For Testnet development, use the separate [Testnet branch and setup guide](https://github.com/xibot/rare-rush/blob/codex/testnet-infrastructure/testnet-app/README.md).
+
+## Explore the code
+
+Rare Rush uses **TypeScript, React, SVG rendering, and FriendSDK**. Testnet adds Solidity contracts and a server-side replay verifier.
+
+The `main` branch contains the Arcade site and its supporting tools:
+
+| Path | Purpose |
+| --- | --- |
+| [`games/rare-rush/`](games/rare-rush/) | Game, artwork rendering, economy, and site pages |
+| [`games/rare-rush/twist/`](games/rare-rush/twist/) | Directional gameplay and scene rendering |
+| [`tests/`](tests/) | Gameplay, economy, identity, and analytics checks |
+| [`scripts/`](scripts/) | Build tools and browser checks |
+| [`docs/`](docs/) | Design notes, validation, and submission record |
+| [`tools/arcade-stats/`](tools/arcade-stats/) | Private local Arcade/Testnet statistics dashboard |
+
+The [`codex/testnet-infrastructure` branch](https://github.com/xibot/rare-rush/tree/codex/testnet-infrastructure) contains the separately deployed Testnet app, contracts, verifier, and deployment records. Arcade and Testnet use separate hosting projects.
+
+## Documentation
+
+- [Rare Rush 101](https://rarerush.app/docs/) — player controls, collectibles, and difficulty.
+- [Project pitch](https://rarerush.app/pitch/) — the idea and game experience.
+- [Arcade economy](docs/ECONOMY.md) — exact rules for the simulated MVP.
+- [Testnet contracts and verification](https://github.com/xibot/rare-rush/blob/codex/testnet-infrastructure/infra/testnet/README.md) — onchain rules, setup, and trust assumptions.
+- [Current Testnet deployment](https://github.com/xibot/rare-rush/blob/codex/testnet-infrastructure/testnet-app/src/shared/deployment.json) — contract addresses and network configuration.
+- [Private statistics dashboard](tools/arcade-stats/README.md) — local setup and what the counts mean.
+- [Vibeathon submission](https://github.com/spokesz/rarefriends-vibeathon/pull/22) — the original entry, submitted September 20, 2026.
+
+## Feedback welcome
+
+Found a bug, an awkward turn, or an idea for the next run? [Open an issue](https://github.com/xibot/rare-rush/issues) or reach out to [XIBOT on X](https://x.com/xavieriturralde).
+
+For playtest reports, include Arcade or Testnet, your device/browser, difficulty, and what happened. A screenshot or short recording helps. Never include private keys, seed phrases, or private RPC credentials.
+
+## Credits
+
+Game design and development by **XIBOT**, building on the **Rare Friends** ecosystem. Rare Friends retains ownership of its character artwork.
+
+Rare Friends character artwork, world assets, token artwork, and SDK resources are credited to their creators and used under the applicable [FriendSDK notices](https://github.com/spokesz/friendsdk/blob/main/NOTICE.md). See [asset provenance](games/rare-rush/README.md#assets-and-provenance) and [font licenses](games/rare-rush/assets/fonts/provenance.md) for details.
+
+**Keep it rare.**
