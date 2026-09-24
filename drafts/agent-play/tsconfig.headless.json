@@ -1,0 +1,13 @@
+{
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "types": ["node"],
+    "typeRoots": ["../../testnet-app/node_modules/@types"]
+  },
+  "include": [
+    "cli.ts",
+    "jobs.ts",
+    "headless-testnet.ts",
+    "wallet-provider.ts"
+  ]
+}
