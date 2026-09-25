@@ -1,9 +1,6 @@
-import { memo, useId, useMemo, useState } from 'react';
-import { TokenCoin } from '../../games/rare-rush/CanonicalArt.tsx';
-import { FriendSprite } from '../../games/rare-rush/RunnerArt.tsx';
-import { GenesisRunnerSprite } from '../../games/rare-rush/genesis/GenesisRunnerSprite.tsx';
-import { testRunArt } from '../../testnet-app/src/play/art.ts';
-import { decodeRunArt, type RunRecord } from './feed-types.ts';
+import { memo, useCallback, useEffect, useId, useMemo, useRef, useState } from 'react';
+import type { RunRecord } from './feed-types.ts';
+import { RunPreview } from './RunPreview.tsx';
 import './runs-feed.css';
 
 export type RunsFeedProps = {
@@ -15,6 +12,7 @@ export type RunsFeedProps = {
   loading: boolean;
   error?: string;
   onRetry: () => void;
+  previewsPaused?: boolean;
 };
 
 type EnvironmentFilter = 'all' | RunRecord['source'];
@@ -22,6 +20,7 @@ const ENVIRONMENTS = [
   ['all', 'ALL RUNS'], ['local', 'PREVIEW'], ['arcade', 'ARCADE'], ['testnet', 'TESTNET'],
 ] as const;
 const PAGE_SIZE = 12;
+const MAX_ANIMATED_PREVIEWS = 4;
 const environmentName = (source: RunRecord['source']) => source === 'local' ? 'Preview' : source === 'arcade' ? 'Arcade' : 'Testnet';
 const collectionName = (collection: RunRecord['collection']) => collection === 1 ? 'Genesis' : 'Generations';
 const count = (value: number) => Math.max(0, Math.floor(value)).toLocaleString('en-US');
@@ -38,62 +37,23 @@ function savedTime(value: string) {
   });
 }
 
-function posterIndex(value: string) {
-  let hash = 2166136261;
-  for (const letter of value) hash = Math.imul(hash ^ letter.charCodeAt(0), 16777619);
-  return hash >>> 0;
-}
-
-const RunCard = memo(function RunCard({ record, liked, onToggleLike, onOpen }: {
+const RunCard = memo(function RunCard({ record, liked, animate, onToggleLike, onOpen }: {
   record: RunRecord;
   liked: boolean;
+  animate: boolean;
   onToggleLike: RunsFeedProps['onToggleLike'];
   onOpen: RunsFeedProps['onOpen'];
 }) {
-  // Covers never step a replay. Decoding belongs to this mounted card, not each
-  // render of the gallery or each frame of the game.
-  const savedArt = useMemo(() => {
-    try { return decodeRunArt(record); } catch { return undefined; }
-  }, [record.art]);
-  const sampleArt = useMemo(() => record.source === 'arcade'
-    ? undefined : testRunArt(record.collection, record.tokenId, 'agent-play'),
-  [record.source, record.collection, record.tokenId]);
-  const art = savedArt ?? sampleArt;
   const title = `${collectionName(record.collection)} #${record.tokenId}`;
   const environment = environmentName(record.source);
-  const index = posterIndex(record.id);
-  const phase = record.metrics.phasesVisited[index % Math.max(1, record.metrics.phasesVisited.length)] ?? 'side';
-  const heading = phase === 'up' ? '↑' : phase === 'down' ? '↓' : index % 2 ? '←' : '→';
-  const light = index % 3 === 0;
-  const hasCharacter = record.collection === 1 ? !!art?.portraitUrl : !!art?.sprites;
-  const artLabel = savedArt && hasCharacter ? 'SAVED ONCHAIN ART' : sampleArt && hasCharacter ? 'SAMPLE ART' : 'ART NOT SAVED';
   const survived = record.metrics.outcome === 'survived';
 
   return (
     <article className="runs-feed-card" aria-label={`${title}, ${environment}, score ${count(record.metrics.score)}`} data-run-id={record.id}>
-      <button type="button" className="runs-feed-cover" onClick={() => onOpen(record)} aria-label={`Watch ${title}, ${environment} run`} aria-haspopup="dialog" data-tone={light ? 'light' : 'dark'}>
-        <svg className="runs-feed-poster" viewBox="0 0 360 280" aria-hidden="true" focusable="false">
-          <rect width="360" height="280" fill={light ? '#fff' : '#090909'} />
-          <g fill="none" stroke={light ? '#dedede' : '#292929'} strokeWidth="1">
-            <path d="M0 70H360M0 140H360M0 210H360M72 0V280M144 0V280M216 0V280M288 0V280" />
-            <path d="M0 280L144 140M360 280L216 140" />
-          </g>
-          <path d={phase === 'side' ? 'M0 237H63V222H131V237H245V215H302V237H360' : 'M39 280V166H54V81H39V0M321 280V191H306V108H321V0'} fill="none" stroke={light ? '#000' : '#fff'} strokeWidth="3" />
-          <text x="277" y="181" textAnchor="middle" fill={light ? '#e3e3e3' : '#242424'} fontFamily="monospace" fontSize="142" fontWeight="bold">{heading}</text>
-          <rect x="56" y="230" width="198" height="5" fill="#d6ff00" />
-          <TokenCoin x={index % 2 ? 276 : 55} y={60} size={42} phase={(index % 6) / 4} />
-          <TokenCoin x={index % 2 ? 62 : 283} y={174} size={27} phase={index % 3} />
-          {hasCharacter ? <g transform="translate(112 82) scale(8.7)">
-            {record.collection === 1 && art?.portraitUrl
-              ? <GenesisRunnerSprite portraitUrl={art.portraitUrl} bodyId={art.bodyId} frame={index % 8} walking={false} />
-              : art?.sprites && <FriendSprite sprites={art.sprites} frame={index % 8} walking={false} />}
-          </g> : <TokenCoin x={116} y={92} size={128} />}
-          <g fill={light ? '#000' : '#fff'}>
-            <path d="M73 91h13v3H73zm5-5h3v13h-3zM284 221h10v2h-10zm4-4h2v10h-2z" />
-          </g>
-        </svg>
+      <button type="button" className="runs-feed-cover" onClick={() => onOpen(record)} aria-label={`Watch ${title}, ${environment} run`} aria-haspopup="dialog" data-preview-id={record.id} data-preview-animated={animate}>
+        <RunPreview record={record} animate={animate} />
         <span className="runs-feed-cover-top"><span>{environment.toUpperCase()}</span><span>{durationLabel(record.metrics.elapsed)}</span></span>
-        <span className="runs-feed-art-label">{artLabel}</span>
+        <span className="runs-feed-preview-label">GAMEPLAY PREVIEW</span>
         <span className="runs-feed-watch"><svg viewBox="0 0 16 16" aria-hidden="true"><path d="M5 3 13 8 5 13Z" fill="currentColor" /></svg> WATCH REPLAY</span>
       </button>
 
@@ -112,13 +72,22 @@ const RunCard = memo(function RunCard({ record, liked, onToggleLike, onOpen }: {
   );
 });
 
-export function RunsFeed({ records, likes, onToggleLike, onOpen, onBack, loading, error, onRetry }: RunsFeedProps) {
+export function RunsFeed({ records, likes, onToggleLike, onOpen, onBack, loading, error, onRetry, previewsPaused = false }: RunsFeedProps) {
   const id = useId();
   const [environment, setEnvironment] = useState<EnvironmentFilter>('all');
   const [likedOnly, setLikedOnly] = useState(false);
   const [sort, setSort] = useState<'newest' | 'score'>('newest');
   const [query, setQuery] = useState('');
   const [visible, setVisible] = useState(PAGE_SIZE);
+  const [previewsEnabled, setPreviewsEnabled] = useState(true);
+  const [reducedMotion, setReducedMotion] = useState(() => window.matchMedia('(prefers-reduced-motion: reduce)').matches);
+  const [pageVisible, setPageVisible] = useState(() => !document.hidden);
+  const [visibleCovers, setVisibleCovers] = useState<ReadonlySet<string>>(() => new Set());
+  const grid = useRef<HTMLDivElement>(null);
+  const actions = useRef({ onOpen, onToggleLike });
+  actions.current = { onOpen, onToggleLike };
+  const openRun = useCallback((record: RunRecord) => actions.current.onOpen(record), []);
+  const toggleLike = useCallback((runId: string) => actions.current.onToggleLike(runId), []);
   const filtered = useMemo(() => {
     const terms = query.toLowerCase().replace(/#/g, '').trim().split(/\s+/).filter(Boolean);
     return records.filter(record => {
@@ -131,6 +100,45 @@ export function RunsFeed({ records, likes, onToggleLike, onOpen, onBack, loading
       return scoreOrder || (Date.parse(b.createdAt) || 0) - (Date.parse(a.createdAt) || 0) || a.id.localeCompare(b.id);
     });
   }, [records, environment, likedOnly, likes, query, sort]);
+  const shownRecords = filtered.slice(0, visible);
+  const shownIds = shownRecords.map(record => record.id).join(',');
+  const motionEnabled = previewsEnabled && !reducedMotion;
+  const animatedIds = new Set(shownRecords.filter(record => visibleCovers.has(record.id))
+    .slice(0, MAX_ANIMATED_PREVIEWS).map(record => record.id));
+
+  useEffect(() => {
+    const media = window.matchMedia('(prefers-reduced-motion: reduce)');
+    const motionChanged = () => setReducedMotion(media.matches);
+    const visibilityChanged = () => setPageVisible(!document.hidden);
+    motionChanged();
+    visibilityChanged();
+    media.addEventListener('change', motionChanged);
+    document.addEventListener('visibilitychange', visibilityChanged);
+    return () => {
+      media.removeEventListener('change', motionChanged);
+      document.removeEventListener('visibilitychange', visibilityChanged);
+    };
+  }, []);
+
+  useEffect(() => {
+    setVisibleCovers(previous => previous.size ? new Set() : previous);
+    if (!grid.current || typeof IntersectionObserver === 'undefined') return;
+    const inView = new Set<string>();
+    let active = true;
+    const observer = new IntersectionObserver(entries => {
+      if (!active) return;
+      for (const entry of entries) {
+        const runId = (entry.target as HTMLElement).dataset.previewId;
+        if (!runId) continue;
+        if (entry.isIntersecting && entry.intersectionRatio >= .25) inView.add(runId);
+        else inView.delete(runId);
+      }
+      setVisibleCovers(previous => previous.size === inView.size && [...previous].every(runId => inView.has(runId))
+        ? previous : new Set(inView));
+    }, { threshold: .25 });
+    grid.current.querySelectorAll<HTMLElement>('[data-preview-id]').forEach(cover => observer.observe(cover));
+    return () => { active = false; observer.disconnect(); };
+  }, [shownIds]);
 
   function resetFilters() {
     setEnvironment('all');
@@ -159,11 +167,21 @@ export function RunsFeed({ records, likes, onToggleLike, onOpen, onBack, loading
         </div>
       </div>
 
+      <div className="runs-feed-preview-controls">
+        <button type="button" aria-label="ANIMATED PREVIEWS" aria-pressed={motionEnabled} disabled={reducedMotion}
+          aria-describedby={reducedMotion ? `${id}-motion-note` : undefined}
+          onClick={() => setPreviewsEnabled(value => !value)}>
+          <span aria-hidden="true">{motionEnabled ? 'Ⅱ' : '▶'}</span> ANIMATED PREVIEWS <b aria-hidden="true">{motionEnabled ? 'ON' : 'OFF'}</b>
+        </button>
+        {reducedMotion && <p id={`${id}-motion-note`}>Motion is off in your system settings.</p>}
+      </div>
+
       {error && <div className="runs-feed-error"><p role="alert">{error}</p><button type="button" onClick={onRetry}>RETRY RUNS</button></div>}
       {loading && <p className="runs-feed-loading" role="status">{records.length ? 'Updating saved runs…' : 'Loading saved runs…'}</p>}
       {!!filtered.length && <>
         <p className="runs-feed-showing" role="status">SHOWING {Math.min(visible, filtered.length)} OF {filtered.length} {filtered.length === 1 ? 'RUN' : 'RUNS'}</p>
-        <div className="runs-feed-grid">{filtered.slice(0, visible).map(record => <RunCard key={record.id} record={record} liked={likes.has(record.id)} onToggleLike={onToggleLike} onOpen={onOpen} />)}</div>
+        <div ref={grid} className="runs-feed-grid">{shownRecords.map(record => <RunCard key={record.id} record={record} liked={likes.has(record.id)}
+          animate={motionEnabled && !previewsPaused && pageVisible && animatedIds.has(record.id)} onToggleLike={toggleLike} onOpen={openRun} />)}</div>
         {visible < filtered.length && <div className="runs-feed-more"><button type="button" onClick={() => setVisible(value => value + PAGE_SIZE)}>LOAD MORE RUNS <span aria-hidden="true">↓</span></button></div>}
       </>}
       {!loading && !error && !filtered.length && <div className="runs-feed-empty">
@@ -172,7 +190,7 @@ export function RunsFeed({ records, likes, onToggleLike, onOpen, onBack, loading
         <p>{!records.length ? 'Complete a run in Agent Play to save a score and watchable replay.' : likedOnly ? 'Like a run with its heart button, or adjust your filters.' : 'Try another collection, token ID, or environment.'}</p>
         <div>{!!records.length && <button type="button" onClick={resetFilters}>CLEAR FILTERS</button>}<button type="button" onClick={onBack}>BACK TO AGENT PLAY <span aria-hidden="true">↗</span></button></div>
       </div>}
-      <p className="runs-feed-note">Illustrated covers · saved replays. Likes stay on this browser.</p>
+      <p className="runs-feed-note">Short gameplay previews · full saved replays. Likes stay on this browser.</p>
     </section>
   );
 }
