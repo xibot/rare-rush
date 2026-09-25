@@ -115,7 +115,7 @@ export function AgenticPanel() {
         </div>
         <span className="agentic-local">LOCAL SKILL</span>
       </div>
-      <p className="agentic-intro">Give your agent the skill to run Rare Rush, save its score, and leave a replay to watch.</p>
+      <p className="agentic-intro">Give your agent the skill to run Rare Rush with its own wallet, save its score, and leave a replay to watch.</p>
 
       <div className="agentic-grid">
         <div className="agentic-reader">
@@ -147,7 +147,7 @@ export function AgenticPanel() {
 
         <div className="agentic-guide">
           <h3><span>02</span> CONFIGURE YOUR AGENT</h3>
-          <p>Use the full skill folder, including its references, in your agent’s skill loader:</p>
+          <p>Use OpenClaw, Hermes, Bankr, or another agent runtime with a compatible wallet integration. Load the full skill folder, including its references:</p>
           <code className="agentic-path">drafts/agent-play/skills/rarerushgame/</code>
           <p>Your agent needs this Rare Rush checkout, Node 22.18+, and installed dependencies. The skill walks through setup.</p>
 
@@ -159,7 +159,7 @@ export function AgenticPanel() {
           <p className="agentic-command-note">Run from the checkout. Retrying this sample job returns its saved result.</p>
 
           <ul className="agentic-notes">
-            <li><b>BRING YOUR OWN WALLET</b><span>Arcade reads real NFT ownership and art. Testnet needs an owned test NFT, a compatible trusted signer, and an authorized approve/start/claim workflow.</span></li>
+            <li><b>BRING YOUR OWN WALLET</b><span>Arcade reads your wallet’s real NFT ownership and art. Testnet needs an owned test NFT and an EVM wallet that supports Robinhood, transaction signing, and typed-message signing. The current verifier supports EOA wallets.</span></li>
             <li><b>ONE ID PER SCHEDULED RUN</b><span>Your agent configures the schedule. Use a stable job ID for each scheduled period and reuse it on retries.</span></li>
             <li><b>KEEP YOUR BEST RUNS</b><span>Save jobs to the preview server’s jobs directory to show the best score per environment, collection, and Rare Friend, with watchable replays.</span></li>
           </ul>
@@ -173,7 +173,7 @@ export function AgenticPanel() {
           <textarea id={`${id}-copy`} ref={manualRef} readOnly value={manualCopy.text} spellCheck={false} />
         </div>
       )}
-      <p className="agentic-local-note">Local checkout only. Copying the skill does not configure a wallet or schedule. A public install URL and native Bankr compatibility are not available yet.</p>
+      <p className="agentic-local-note">Local checkout only. Configure your agent’s wallet connector and schedule using the skill. Compatibility depends on its wallet capabilities; individual framework integrations still need testing. A public install URL is not available yet.</p>
     </section>
   );
 }

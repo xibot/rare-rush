@@ -30,7 +30,7 @@ The run library is shared between both views. Selecting Agentic does not connect
 
 ## Autonomous agents and scheduled runs
 
-The browser is optional. Agents can run the same controller from Node, then leave a replay for the page to display. Start with the included no-wallet example:
+The browser is optional. OpenClaw, Hermes, Bankr, or any other agent runtime can use the same local Node runner through a compatible wallet integration, then leave a replay for the page to display. The skill and runner do not depend on a particular framework or wallet vendor. Start with the included no-wallet example:
 
 ```sh
 node drafts/agent-play/cli.mjs run --job drafts/agent-play/examples/preview-job.json
@@ -40,7 +40,7 @@ The local skill is [rarerushgame/SKILL.md](skills/rarerushgame/SKILL.md); its li
 
 A scheduler invokes one job per authorized slot and assigns a stable ID for that slot. Retrying the same ID returns or resumes that run, rather than starting another. Wallet locks prevent overlapping or uncertain Testnet jobs from allocating another entry. Jobs and transaction recovery are saved atomically to `data/jobs/`; completed gameplay remains available even when a later claim needs attention. Do not remove locks to bypass an unresolved transaction.
 
-Arcade supports an agent's real Genesis or Generations NFT. Address-only mode observes its onchain owner; it is not cryptographic proof that the caller controls that wallet. Testnet requires an explicitly configured external signer provider and transaction policy. A compatible agent signer can apply existing authorization without human browser prompts. The provider keeps wallet custody and spending limits in the agent's own environment. No real signer has been configured for this draft, and native Bankr compatibility is not established. The current verifier accepts ECDSA player signatures; smart-contract wallets need additional support.
+Arcade supports an agent's real Genesis or Generations NFT. Address-only mode observes its onchain owner; it is not cryptographic proof that the caller controls that wallet. Testnet requires an explicitly configured external signer provider and transaction policy. A compatible agent signer can apply existing authorization without human browser prompts. The provider keeps wallet custody and spending limits in the agent's own environment. No real signer or named framework integration has been configured or tested for this draft. Testnet requires transaction broadcasting and EIP-712 typed-message signing by the same ECDSA wallet on Robinhood Testnet. The current helper rejects accounts with deployed code, including smart accounts and delegated-code accounts. Arcade address-only reads can still inspect NFTs held by those accounts.
 
 The scheduler and the computer running jobs must remain available; the webpage need not be open. When the local page opens, it imports and checks finished job replays and refreshes the library automatically. Its default data directory must be the parent of the CLI job directory (`data/jobs`). If jobs run on another machine, their records stay there until you explicitly arrange synchronization. Creating the skill does not install or activate a schedule.
 
@@ -56,7 +56,7 @@ Testnet checkpoints and pending transaction references additionally live in this
 
 ## Current scope
 
-This is a deterministic autopilot prototype with a local skill and headless job interface. Public skill hosting, native Bankr integration, a public leaderboard, signed community hearts and daily NFT mint caps are later work.
+This is a deterministic autopilot prototype with a local skill and headless job interface. Public skill hosting, tested framework-specific wallet connectors, smart-account Testnet support, a public leaderboard, signed community hearts and daily NFT mint caps are later work.
 
 No production files, deployments or contracts are changed by launching this draft. Browser Testnet transactions use visible wallet actions; unattended Testnet jobs require their explicit policy and an already authorized external signer. Automated jobs do not mint NFTs or call faucets.
 

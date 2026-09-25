@@ -1,11 +1,13 @@
 ---
 name: rarerushgame
-description: Run Rare Rush headless jobs for an autonomous agent, including scheduled runs with its own wallet, safe retry of the same job, and saved scores and watchable replays. Use for Preview, real-NFT Arcade, or explicitly authorized Testnet play through the local Rare Rush CLI.
+description: Run Rare Rush headless jobs for any agent runtime with a compatible wallet integration, including scheduled runs with its own wallet, safe retry of the same job, and saved scores and watchable replays. Use for Preview, real-NFT Arcade, or explicitly authorized Testnet play through the local Rare Rush CLI.
 ---
 
 # Rare Rush agent jobs
 
 Execute one configured run per job with the repository's deterministic autopilot. It uses the existing engine and legal recorded controls. No browser interaction or LLM calls per game tick are needed.
+
+The skill is agent- and wallet-provider-neutral. OpenClaw, Hermes, Bankr, and other agent runtimes use the same job and external wallet interface; no particular framework, model, wallet vendor, or browser extension is required. Compatibility depends on the actual wallet's chain and signing capabilities, not the agent's name. This is an integration contract, not a claim that each named platform has been connected or tested.
 
 This is a local skill package. Use or install the whole `drafts/agent-play/skills/rarerushgame/` folder with its `references/` directory in the agent's skill loader. Keep the Rare Rush checkout containing `drafts/agent-play/cli.mjs` separately available. The local preview exposes `/agent-skill/SKILL.md`; remote publishing and a public install URL are still pending. No scheduler or wallet is configured by this package.
 
@@ -14,7 +16,7 @@ This is a local skill package. Use or install the whole `drafts/agent-play/skill
 1. Resolve the user's Rare Rush checkout and persistent job storage. Use Node 22.18 or newer and installed lockfile dependencies. If dependencies are missing, run `npm ci` in that checkout and `npm --prefix testnet-app ci`. Keep a stable checkout and data directory across scheduled invocations.
 2. Read [the job and wallet contract](references/jobs.md) when constructing a job or using a wallet. Choose the requested environment, collection, token ID, and difficulty. Never substitute another wallet or NFT after an ownership error.
 3. For scheduled runs, derive `id` from the **scheduled period**, then write the job JSON once. For example, the intended noon UTC slot could be `rr-arcade-genesis-42-normal-20260924t1200z`. Retries of that slot reuse that exact ID and file, even after midnight or a restart. A later slot gets a new ID only when it represents another authorized run.
-4. For Arcade or Testnet, obtain the address from the agent's existing wallet configuration. Reuse its external provider module where required. Keep that module in the agent's wallet environment; never import private keys into a job, this skill, the Rare Rush repository, or chat.
+4. For Arcade or Testnet, obtain the address from the agent's existing wallet configuration. Reuse its trusted wallet integration through the external provider module where required. If its wallet exposes an SDK, API, CLI, or agent tool instead of EIP-1193, configure a local bridge to that existing integration using the method contract in the reference. Do not invent framework APIs or assume that holding an NFT and signing transactions also provides typed-message signing. Keep that module in the agent's wallet environment; never import private keys into a job, this skill, the Rare Rush repository, or chat.
 5. Confirm the requested job is within the existing authorization. A user may pre-authorize a bounded workflow for this agent, wallet, chain, NFT, cadence, and permitted transaction actions. Apply that authorization without repeated human confirmation on each scheduled run. Missing or exceeded authority stops the relevant action; the skill does not grant broader wallet permissions.
 
 ## Execute once
@@ -46,4 +48,4 @@ Do not erase a pending transaction, remove its lock, rotate to a new job ID, or 
 
 Completed records feed the local run library, which retains watchable replays and shows the best score per environment, collection, and Rare Friend across difficulties. A difficulty filter narrows that comparison. Keep the full record rather than rewriting totals or submitting a client-supplied score. Local replay verification is distinct from a confirmed Testnet claim. When reporting a reward, use the recorded verified claim result, not simulation metrics.
 
-For an existing scheduled invocation, run once and exit. Creating this skill or running a job does not create a cron schedule. Set up or change a schedule only when the user explicitly requests it, with their cadence and timezone. Do not claim Bankr compatibility: its support for these chains, provider methods, and replay-signature type has not been confirmed.
+For an existing scheduled invocation, run once and exit. Creating this skill or running a job does not create a cron schedule. Set up or change a schedule only when the user explicitly requests it, with their cadence and timezone. Report compatibility for the configured wallet only after checking the required chain, account and methods. Do not claim a framework-specific integration was tested merely because it can load Markdown instructions. If an agent cannot execute the local Node runner or reach its trusted wallet integration, report that missing setup.

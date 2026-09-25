@@ -60,7 +60,8 @@ and optionally close a loss. It never mints an NFT or retries hashless sends.
 providerModule is a trusted local .mjs/.js file, relative to the job JSON.
 It must export createProvider({chainId,address,rpcUrl}) returning an EIP-1193
 provider. Keep secrets and transaction policy inside that external signer.
-There is no native Bankr connector in this prototype.
+Any agent runtime can supply this interface; no wallet vendor is required.
+Named framework integrations need their own configured and tested connector.
 
 Results/checkpoints: drafts/agent-play/data/jobs/<id>.json by default.
 Pending/ambiguous wallet operations retain a wallet lock. Resume that same ID;
