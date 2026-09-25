@@ -30,6 +30,7 @@ header.site-header a {
   -webkit-tap-highlight-color: transparent;
 }
 header.site-header a:hover { color: inherit; text-decoration: underline; transform: none; }
+header.site-header a.site-logo:hover { text-decoration: none; }
 header.site-header a:focus-visible { outline: 3px solid #ccff00; outline-offset: 5px; }
 .site-header .site-logo { display: flex; align-items: center; gap: 12px; flex-shrink: 0; }
 .site-logo > .brand-icon { display: block; width: 42px; height: 42px; max-width: none; }
