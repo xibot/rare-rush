@@ -5,9 +5,13 @@ import { BrandMark } from '../../games/rare-rush/BrandMark.tsx';
 import { FIXED_STEP } from '../../games/rare-rush/twist/engine.ts';
 import { DIFFICULTIES } from '../../games/rare-rush/difficulty.ts';
 import { createAgentSession, advanceAgent, createReplaySession, advanceReplay, resumeAgentSession, exportAgentReplay, PROTOCOL_VERSION,
-  type Difficulty, type RunSession, type AgentReplay, type RunMetrics } from './runner.ts';
+  type Difficulty, type RunSession } from './runner.ts';
 import { AgentStage } from './Stage.tsx';
 import { AgenticPanel } from './AgenticPanel.tsx';
+import { RunsFeed } from './RunsFeed.tsx';
+import { ReplayModal } from './ReplayModal.tsx';
+import { useFeedLikes } from './feed-likes.ts';
+import type { RunRecord } from './feed-types.ts';
 import { createTestnetAdapter } from './testnet.ts';
 import { connectArcade, loadArcadeFriend, getArcadeSession, type ArcadeFriend } from './arcade.ts';
 import { decodeGenerationSprites } from '@rarefriends/friendsdk/sprites';
@@ -16,7 +20,7 @@ import './style.css';
 
 type Source = 'local'|'arcade'|'testnet';
 type Identity = {source:Source;collection:0|1;tokenId:string;difficulty:Difficulty;seed:string;runId?:string;player?:string};
-type SavedRecord = Identity & {id:string;createdAt:string;metrics:RunMetrics;agent:string;verification:string;agentJobId?:string;replay?:AgentReplay};
+type SavedRecord = RunRecord;
 type Adapter = ReturnType<typeof createTestnetAdapter>;
 type TestnetState = ReturnType<Adapter['snapshot']>;
 const MODES:Difficulty[] = ['easy','normal','degen'];
@@ -32,6 +36,11 @@ async function request(path:string, body?:unknown) {
 
 function App() {
   const [view,setView] = useState<'autopilot'|'agentic'>('autopilot');
+  const [page,setPage] = useState<'play'|'feed'>(()=>location.hash==='#runs-feed'?'feed':'play');
+  const [feedRun,setFeedRun] = useState<RunRecord|null>(null);
+  const {likes,toggleLike,likesError}=useFeedLikes();
+  const [recordsLoading,setRecordsLoading]=useState(true), [recordsError,setRecordsError]=useState('');
+  const recordsRequest=useRef<Promise<void>|null>(null);
   const [source,setSource] = useState<Source>('local');
   const [collection,setCollection] = useState<0|1>(1), [tokenId,setTokenId] = useState('1');
   const [difficulty,setDifficulty] = useState<Difficulty>('degen');
@@ -89,7 +98,30 @@ function App() {
     try {await work();} catch(e) {setError(err(e));}
     finally {actionLock.current=false;setBusy('');}
   }
-  async function loadRecords() {const result=await request('/api/runs');setRecords(result.runs);}
+  function loadRecords():Promise<void> {
+    if(recordsRequest.current)return recordsRequest.current;
+    recordsRequest.current=(async()=>{
+      try {const result=await request('/api/runs');setRecords(result.runs);setRecordsError('');}
+      catch(e){setRecordsError(err(e));throw e;}
+      finally {recordsRequest.current=null;setRecordsLoading(false);}
+    })();
+    return recordsRequest.current;
+  }
+  function openFeed(){if(actionLock.current||tn?.busy)return;location.hash='runs-feed';}
+  function backToPlay(){location.hash='agent-play';}
+  useEffect(()=>{
+    const route=()=>{
+      const next=location.hash==='#runs-feed'?'feed':'play';
+      if(next==='feed'&&runningRef.current){stop();try{checkpoint();}catch(e){setError(err(e));}setNotice('Your Autopilot run is paused. Choose Resume when you return.');}
+      setPage(next);if(next==='play')setFeedRun(null);
+    };
+    window.addEventListener('hashchange',route);
+    return()=>window.removeEventListener('hashchange',route);
+  },[]);
+  useEffect(()=>{
+    document.title=page==='feed'?'Rare Rush | Runs Feed':'Rare Rush | Agent Play';
+    requestAnimationFrame(()=>window.scrollTo({top:0,behavior:'instant'}));
+  },[page]);
   useEffect(()=>{
     const client=createTestnetAdapter({onState:next=>{
       if(identity.current?.source==='testnet' && live.current.kind==='agent' && (next.account?.toLowerCase()!==identity.current.player?.toLowerCase()||next.chainId!==46630)) {stop();setNotice('Testnet wallet changed. Reconnect the original wallet to resume.');}
@@ -159,8 +191,9 @@ function App() {
   function launch(s:RunSession,id:Identity,art?:any) {
     setView('autopilot');
     live.current=s;setSession(s);identity.current=id;setCurrent(id);setRecord(null);setTick(s.run._tick);completed.current=false;checkpointTick.current=s.run._tick;
-    setScreen('watch');setSpeed(1);speedRef.current=1;artRef.current=art??null;setArcadeArt(art??null);play();
-    requestAnimationFrame(()=>stageAnchor.current?.scrollIntoView({behavior:'smooth',block:'start'}));
+    setScreen('watch');setSpeed(1);speedRef.current=1;artRef.current=art??null;setArcadeArt(art??null);
+    if(location.hash==='#runs-feed'){stop();setNotice('Your Autopilot run is paused. Choose Resume when you return.');}
+    else {play();requestAnimationFrame(()=>stageAnchor.current?.scrollIntoView({behavior:'smooth',block:'start'}));}
   }
   async function begin() {
     if(!validId(tokenId))throw new Error('Enter a positive Friend ID.');
@@ -218,8 +251,9 @@ function App() {
   const isTestnetRun=current?.source==='testnet' && session.kind==='agent';
   const matchesSaved=isTestnetRun && stateRun?.run.runId===current?.runId;
   return <div className="agent-app">
-    <header className="site-header"><a className="brand" href="/" aria-label="Rare Rush Agent Play"><BrandMark/></a><nav aria-label="Main navigation"><a href="#leaderboard">RUN LIBRARY</a><a href="https://rarerush.app" target="_blank" rel="noreferrer">ARCADE ↗</a><span className="local-label">LOCAL PROTOTYPE</span></nav></header>
+    <header className="site-header"><a className="brand" href="/" aria-label="Rare Rush Agent Play"><BrandMark/></a><nav aria-label="Main navigation">{page==='feed'?<a href="#agent-play">AGENT PLAY</a>:<a href="#runs-feed" aria-disabled={!!busy||!!tn?.busy} onClick={event=>{event.preventDefault();openFeed();}}>RUNS FEED</a>}<a href="https://rarerush.app" target="_blank" rel="noreferrer">ARCADE ↗</a><span className="local-label">LOCAL PROTOTYPE</span></nav></header>
     <main>
+      <div id="agent-play" hidden={page!=='play'}>
       <section className="hero"><div><p className="eyebrow">YOUR FRIEND. A NEW PLAYER.</p><h1>AGENT <span>PLAY.</span></h1></div><p>Your Friend. Your agent.<br/>Choose how you want to rush.</p></section>
       <div className="play-modes" role="tablist" aria-label="Agent Play mode">{(['autopilot','agentic'] as const).map(mode=><button key={mode} id={`${mode}-tab`} role="tab" aria-label={mode.toUpperCase()} aria-selected={view===mode} aria-controls={`${mode}-panel`} tabIndex={view===mode?0:-1} disabled={!!busy||!!tn?.busy} onClick={()=>chooseView(mode)} onKeyDown={event=>{
         if(!['ArrowLeft','ArrowRight','Home','End'].includes(event.key))return;
@@ -232,7 +266,7 @@ function App() {
       <div id="autopilot-panel" role="tabpanel" aria-labelledby="autopilot-tab" hidden={view!=='autopilot'}>
       <div ref={stageAnchor} className="watch-section" data-screen={screen} data-tick={tick}>
         <div className="section-top"><span className="eyebrow">01 / {session.kind==='replay'?'WATCH THE REPLAY':'WATCH THE RUSH'}</span><span>{screen==='ready'?'READY WHEN YOU ARE':screen==='result'?'RUN COMPLETE':running?'AGENT AT THE CONTROLS':'PAUSED'}</span></div>
-        <AgentStage run={session.run} collection={displayCollection} tokenId={validId(displayToken)?displayToken:'1'} running={running} reducedMotion={reduced} label={(current?.source??source)==='testnet'?'TESTNET':(current?.source??source)==='arcade'?'ARCADE':'LOCAL PREVIEW'} art={arcadeArt} fieldOverlay={screen==='result'&&<div className="agent-result-overlay" role="dialog" aria-label="Agent run result"><section className="result-card"><p className="eyebrow">{session.run.finishReason==='time'?'TIMER SURVIVED.':'OUT OF HEARTS.'}</p><h2 ref={resultHeading} tabIndex={-1}>{session.run.finishReason==='time'?'KEEP IT RARE.':'ANOTHER RUSH AWAITS.'}</h2><div className="result-score">{session.run.score.toLocaleString()}<span>POINTS</span></div><div className="result-stats"><span><b>{Math.floor(session.run.distance).toLocaleString()}m</b>DISTANCE</span><span><b>{session.run.coins}</b>COINS</span><span><b>{session.run.hearts}</b>HEARTS</span></div><p>{record?'✓ Replay checked locally and saved to this computer.':'Replay ready to save.'}</p><div className="inline-actions"><button onClick={download}>SAVE REPLAY ↓</button>{record&&<button disabled={!!busy} onClick={()=>void act('Loading replay…',async()=>{await replayRecord(record);})}>WATCH REPLAY ▶</button>}{!record&&<button disabled={!!busy} onClick={()=>void act('Saving replay…',async()=>{await finish(session);})}>RETRY SAVE</button>}</div>
+        <AgentStage run={session.run} collection={displayCollection} tokenId={validId(displayToken)?displayToken:'1'} running={running} reducedMotion={reduced} label={(current?.source??source)==='testnet'?'TESTNET':(current?.source??source)==='arcade'?'ARCADE':'LOCAL PREVIEW'} art={arcadeArt} fieldOverlay={screen==='result'&&<div className="agent-result-overlay" role="dialog" aria-label="Agent run result"><section className="result-card"><p className="eyebrow">{session.run.finishReason==='time'?'TIMER SURVIVED.':'OUT OF HEARTS.'}</p><h2 ref={resultHeading} tabIndex={-1}>{session.run.finishReason==='time'?'KEEP IT RARE.':'ANOTHER RUSH AWAITS.'}</h2><div className="result-score">{session.run.score.toLocaleString()}<span>POINTS</span></div><div className="result-stats"><span><b>{Math.floor(session.run.distance).toLocaleString()}m</b>DISTANCE</span><span><b>{session.run.coins}</b>COINS</span><span><b>{session.run.hearts}</b>HEARTS</span></div><p>{record?'✓ Replay checked locally and saved to this computer.':'Replay ready to save.'}</p><div className="inline-actions"><button onClick={download}>SAVE REPLAY ↓</button>{record&&<button disabled={!!busy} onClick={openFeed}>VIEW IN RUNS FEED ↗</button>}{record&&<button disabled={!!busy} onClick={()=>void act('Loading replay…',async()=>{await replayRecord(record);})}>WATCH REPLAY ▶</button>}{!record&&<button disabled={!!busy} onClick={()=>void act('Saving replay…',async()=>{await finish(session);})}>RETRY SAVE</button>}</div>
           {isTestnetRun&&matchesSaved&&stateRun&&<div className="claim-actions">{stateRun.status==='claimed'?<p className="lime">MINT CONFIRMED · {stateRun.reward?`${fmt(BigInt(stateRun.reward),6)} tRARERUSH`:''}</p>:!claimWindowOpen?<p>This run’s claim window expired. Pick your next run; its replay remains saved locally.</p>:session.run.finishReason==='time'?<><p>Survived runs can request a verifier signature, then claim through your wallet.</p><button disabled={!!busy||!!pending} onClick={()=>void act(freshClaim?'Confirm claim in your wallet…':'Sign replay authorization…',async()=>{if(freshClaim){await adapter.current!.claim();setNotice('Your Testnet mint is confirmed.');}else{await adapter.current!.verify();setNotice('Replay verified. Claim in your wallet when ready.');}})}>{freshClaim?'CLAIM TESTNET REWARD ↗':'VERIFY TESTNET RUN ↗'}</button></>:stateRun.status!=='abandoned'&&<><p>This run earned no claim. Close it onchain to free this NFT for its next attempt.</p><button disabled={!!busy||!!pending} onClick={()=>void act('Close run in your wallet…',async()=>{await adapter.current!.abandon();setNotice('Run closed. Remaining daily attempts are available.');})}>CLOSE TESTNET RUN</button></>}</div>}
           <button className="primary next-run" disabled={!!busy} onClick={()=>void act('Preparing next run…',reset)}>PICK NEXT RUN ↗</button>
           {busy&&<p className="result-progress" role="status">{busy}</p>}
@@ -266,10 +300,14 @@ function App() {
       </section>
       </div>
       <div id="agentic-panel" role="tabpanel" aria-labelledby="agentic-tab" hidden={view!=='agentic'}><AgenticPanel/></div>
-      <section id="leaderboard" className="library"><div className="section-top"><div><p className="eyebrow">03 / YOUR LOCAL RUN LIBRARY</p><h2>BEST OF THE <span>RUSH.</span></h2></div><span className="count">{records.length} SAVED {records.length===1?'RUN':'RUNS'}</span></div><p className="muted">Best run per Friend and environment. Scheduled agent runs appear automatically. Filter by difficulty to explore more. Community voting comes later.</p><div className="inline-actions filters" role="group" aria-label="Leaderboard difficulty">{(['all',...MODES] as const).map(m=><button key={m} aria-pressed={filter===m} onClick={()=>setFilter(m)}>{m.toUpperCase()}</button>)}</div>
+      <section id="leaderboard" className="library"><div className="section-top"><div><p className="eyebrow">03 / YOUR LOCAL RUN LIBRARY</p><h2>BEST OF THE <span>RUSH.</span></h2></div><span className="count">{records.length} SAVED {records.length===1?'RUN':'RUNS'}</span></div><p className="muted">Best run per Friend and environment. Scheduled agent runs appear automatically. Filter by difficulty to explore more. Community voting comes later.</p><a className="feed-library-link" href="#runs-feed" onClick={event=>{event.preventDefault();openFeed();}}>VIEW ALL SAVED RUNS ↗</a><div className="inline-actions filters" role="group" aria-label="Leaderboard difficulty">{(['all',...MODES] as const).map(m=><button key={m} aria-pressed={filter===m} onClick={()=>setFilter(m)}>{m.toUpperCase()}</button>)}</div>
         {best.length?<div className="run-list">{best.map((r,i)=><article key={r.id} className="run-row"><span className="rank">{String(i+1).padStart(2,'0')}</span><div><b>{r.collection===1?'GENESIS':'GENERATIONS'} #{r.tokenId}</b><small>{r.source==='local'?'PREVIEW':r.source.toUpperCase()} · {r.difficulty.toUpperCase()} · {r.metrics.outcome.toUpperCase()}{r.agentJobId?' · AGENT JOB':''}</small></div><div className="list-score"><b>{r.metrics.score.toLocaleString()}</b><small>POINTS</small></div><button disabled={playing||!!busy} onClick={()=>void act('Loading replay…',async()=>{await replayRecord(r);})}>WATCH ↗</button></article>)}</div>:<div className="empty"><span>→ ↑ ↓ ←</span><p>Your agent’s first rush belongs here.</p><small>Complete a run to save its score and watchable replay.</small></div>}
       </section>
-    </main><footer><BrandMark/><p>SMALL FRIEND. NEW PLAYER. SAME BIG RUSH.</p><span>AGENT PLAY · LOCAL PROTOTYPE</span></footer>
+      </div>
+      {page==='feed'&&<div id="runs-feed"><RunsFeed records={records} likes={likes} onToggleLike={toggleLike} onOpen={setFeedRun} onBack={backToPlay} loading={recordsLoading} error={recordsError} onRetry={()=>{setRecordsLoading(true);void loadRecords().catch(()=>{});}}/>{likesError&&<p className="message" role="status">{likesError}</p>}</div>}
+    </main>
+    {page==='feed'&&feedRun&&<ReplayModal record={feedRun} liked={likes.has(feedRun.id)} onToggleLike={()=>toggleLike(feedRun.id)} onClose={()=>setFeedRun(null)}/>}
+    <footer><BrandMark/><p>SMALL FRIEND. NEW PLAYER. SAME BIG RUSH.</p><span>AGENT PLAY · LOCAL PROTOTYPE</span></footer>
   </div>;
 }
 createRoot(document.getElementById('app')!).render(<App/>);
