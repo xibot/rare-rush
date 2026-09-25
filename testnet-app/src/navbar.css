@@ -36,20 +36,6 @@ header.site-header a:focus-visible { outline: 3px solid #ccff00; outline-offset:
 .site-logo > .brand-name { font: 400 20px/1 var(--pixel); letter-spacing: 0; }
 .site-logo > .brand-name > span { color: #ccff00; }
 .site-header nav { display: flex; gap: 32px; align-items: center; font: 400 11px Sometype, monospace; letter-spacing: .5px; }
-.site-header nav a.arcade-link {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  min-height: 44px;
-  padding: 12px 14px;
-  border: 1px solid #ccff00;
-  border-radius: 0;
-  background: #ccff00;
-  color: #000;
-  white-space: nowrap;
-  text-decoration: none;
-}
-.site-header nav a.arcade-link:is(:hover, :focus-visible) { background: #fff; border-color: #fff; color: #000; text-decoration: none; }
 .site-header nav a.play-link {
   display: inline-flex;
   align-items: center;

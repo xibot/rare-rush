@@ -33,20 +33,6 @@ header.site-header a:focus-visible { outline: 3px solid #ccff00; outline-offset:
 .site-logo > .brand-name { font: 400 20px/1 var(--rush-font-display); letter-spacing: 0; }
 .site-logo > .brand-name > span { color: #ccff00; }
 .site-header nav { display: flex; gap: 32px; align-items: center; font: 400 11px var(--rush-font-mono); letter-spacing: .5px; }
-.site-header nav a.nav-testnet {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  min-height: 44px;
-  padding: 12px 14px;
-  border: 1px solid #ccff00;
-  border-radius: 0;
-  background: #ccff00;
-  color: #000;
-  white-space: nowrap;
-  text-decoration: none;
-}
-.site-header nav a.nav-testnet:is(:hover, :focus-visible) { background: #fff; border-color: #fff; color: #000; text-decoration: none; }
 .site-header nav a.nav-arcade {
   display: inline-flex;
   align-items: center;
@@ -87,5 +73,5 @@ header.site-header a:focus-visible { outline: 3px solid #ccff00; outline-offset:
 
 /* Allow the public play/feed links to fit the same header at tablet widths. */
 @media(min-width:601px) and (max-width:1250px){.site-header{height:auto;min-height:102px;padding-block:18px;flex-wrap:wrap}.site-header nav{gap:20px;flex-wrap:wrap}.site-header-shell .site-header nav{margin-left:auto}}
-@media(max-width:600px){.site-header nav{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px 12px}.site-header nav>a{justify-content:center}.site-header nav a.nav-testnet,.site-header nav a.nav-arcade{grid-column:span 1;padding-inline:8px;font-size:9px}.site-header nav a.nav-arcade>span{margin-left:5px}}
+@media(max-width:600px){.site-header nav{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px 12px}.site-header nav>a{justify-content:center}.site-header nav a.nav-arcade{grid-column:span 1;padding-inline:8px;font-size:9px}.site-header nav a.nav-arcade>span{margin-left:5px}}
 @media(max-width:380px){.site-header nav{grid-template-columns:repeat(2,minmax(0,1fr))}}
