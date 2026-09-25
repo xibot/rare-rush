@@ -13,3 +13,36 @@ footer{border-top:1px solid #555;padding:30px 0 40px;display:flex;align-items:ce
 @media(max-width:800px){.site-header{height:80px}.brand-icon{width:32px;height:32px}.brand-name{font-size:16px}.brand-name small{font-size:7px;margin-top:7px}.brand{gap:10px}.site-header nav{gap:14px;font-size:9px}.local-label{font-size:8px;padding:11px}.hero{display:block;padding:43px 0 27px}.hero>p{margin-top:20px;font-size:14px}.hero h1{font-size:45px}.prototype-note{align-items:center;font-size:10px}.prototype-note p{max-width:270px}.setup-grid{grid-template-columns:1fr;gap:25px}.sources small{font-size:10px}.sources b{font-size:12px}.choices b{font-size:14px}.mode-description{line-height:1.8}.pilot-card{margin:20px 0}.watch-controls{align-items:flex-start;flex-direction:column;gap:12px}.run-row{grid-template-columns:35px 1fr 100px 75px;gap:12px}.run-row b{font-size:12px}.run-row .list-score b{font-size:20px}.result-card{padding:30px 24px}.result-card .result-stats{gap:15px}.result-stats b{font-size:25px}.wallet-heading{align-items:flex-start;flex-direction:column}}
 @media(max-width:600px){.agent-app{padding:0 20px}.site-header{height:auto;min-height:118px;flex-wrap:wrap;padding:20px 0;gap:18px}.site-header nav{width:100%;justify-content:space-between;font-size:10px;gap:12px}.local-label{font-size:8px;padding:10px}.hero h1{font-size:36px}.hero .eyebrow{font-size:10px}.hero>p{font-size:12px}.prototype-note{flex-direction:column;align-items:flex-start;gap:10px;margin-bottom:25px}.prototype-note p{text-align:left;max-width:none}.setup{padding:19px 16px}.sources{gap:7px;margin-bottom:25px}.sources button{padding:13px 7px}.sources b{font-size:10px}.sources small{font-size:8px;line-height:1.6}.choices b{font-size:11px}.collections small{font-size:8px}.choices button{padding:16px 7px}.choices small{font-size:9px}.mode-description{font-size:11px}.primary{font-size:12px;padding:19px 15px}.entry-note{font-size:9px}.section-top{font-size:10px}.section-top .eyebrow{font-size:10px}.watch-section{margin-top:36px}.watch-section>.section-top>span:last-child{font-size:8px;text-align:right}.result-card{padding:25px 16px}.result-card h2{font-size:19px}.result-stats b{font-size:21px}.result-stats>span{font-size:9px}.library{margin-top:42px}.library h2{font-size:21px}.count{font-size:8px;padding:8px}.library>.section-top{gap:10px}.run-row{grid-template-columns:28px 1fr 85px;gap:10px}.run-row button{grid-column:2/4;width:100%;padding:11px}.run-row b{font-size:11px}.run-row .list-score b{font-size:18px}.run-row small{font-size:8px}.rank{font-size:14px}.empty{padding:35px 12px}.empty>span{font-size:23px;letter-spacing:7px}.empty p{font-size:12px}.empty small{font-size:10px;line-height:1.6;display:block}.balances{gap:16px}.balances>span:last-child{margin-left:0}.balances b{font-size:15px}.saved-notice{padding:12px;font-size:11px}.inline-actions input{width:100%}footer p{margin:10px 0 0;width:100%;font-size:8px}footer>span:last-child{text-align:left;font-size:8px}}
 @media(prefers-reduced-motion:reduce){html{scroll-behavior:auto}button{transition:none}}
+
+/* The same local run stays mounted while its mode panel is hidden. */
+[hidden]{display:none!important}
+.play-modes{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin:0 0 24px;max-width:670px}
+.play-modes button{text-align:left;padding:18px 22px;border-color:#777}
+.play-modes b{display:block;font-family:var(--rush-font-display);font-size:17px;font-weight:400}
+.play-modes span{display:block;font-size:11px;margin-top:8px;line-height:1.5}
+.play-modes [aria-selected=true]{background:var(--lime);border-color:var(--lime);color:#000}
+#autopilot-panel .watch-section{margin-top:0}
+#autopilot-panel .setup{margin-top:34px}
+.agent-result-overlay{position:absolute;inset:0;z-index:5;background:#fff;color:#000;overflow:auto;overscroll-behavior:contain;scrollbar-color:#888 #fff;color-scheme:light}
+.agent-result-overlay .result-card{width:100%;min-height:100%;max-width:640px;margin:0 auto;padding:22px 32px;display:flex;flex-direction:column;justify-content:center;border:0}
+.agent-result-overlay .result-card .eyebrow{align-self:center;font-size:10px;margin:0 0 10px}
+.agent-result-overlay .result-card h2{font-size:20px;line-height:1.4}
+.agent-result-overlay .result-card h2:focus{outline:none}
+.result-score{font-family:var(--rush-font-display);font-size:40px;line-height:1.1;margin:12px 0 0}
+.result-score>span{display:block;font-size:10px;letter-spacing:2px;margin-top:6px}
+.agent-result-overlay .result-card .result-stats{width:100%;gap:12px;margin:16px auto 12px;padding:12px 0}
+.agent-result-overlay .result-stats>span+span{border-left:1px solid #000}
+.agent-result-overlay .result-stats b{font-size:23px;margin-bottom:5px}
+.agent-result-overlay .result-stats>span{font-size:10px}
+.agent-result-overlay .result-card>p{font-size:10px;line-height:1.5;margin-bottom:12px}
+.agent-result-overlay .inline-actions{gap:8px}
+.agent-result-overlay .inline-actions button{padding:10px;font-size:9px}
+.agent-result-overlay .claim-actions{margin-top:16px;padding-top:14px;font-size:11px}
+.agent-result-overlay .claim-actions p{margin-bottom:10px}
+.agent-result-overlay .claim-actions button{font-size:11px;padding:13px}
+.agent-result-overlay .next-run{margin-top:16px;font-size:12px;padding:16px;justify-content:center;background:var(--lime);color:#000}
+.agent-result-overlay .result-card .result-progress{margin:12px 0 0}
+.agent-result-overlay .result-card .result-error{margin:12px 0 0;color:#9d250f;overflow-wrap:anywhere}
+@media(min-width:801px){#autopilot-panel .setup{width:75%;margin-inline:auto}}
+@media(min-width:801px) and (max-width:1200px){#autopilot-panel .setup-grid{grid-template-columns:1fr;gap:25px}}
+@media(max-width:600px){.play-modes{gap:8px}.play-modes button{padding:15px 12px}.play-modes b{font-size:13px}.play-modes span{font-size:9px}.agent-result-overlay .result-card{padding:16px 14px}.agent-result-overlay .result-card h2{font-size:17px}.result-score{font-size:30px}.agent-result-overlay .result-stats b{font-size:19px}.agent-result-overlay .result-stats>span{font-size:9px}.agent-result-overlay .next-run{font-size:10px;padding:14px}.agent-result-overlay .inline-actions button{font-size:8px;padding:9px}}

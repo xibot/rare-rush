@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState, type CSSProperties } from 'react';
+import { useEffect, useMemo, useRef, useState, type CSSProperties, type ReactNode } from 'react';
 import { TokenCoin } from '../../games/rare-rush/CanonicalArt.tsx';
 import { FriendSprite } from '../../games/rare-rush/RunnerArt.tsx';
 import { GenesisRunnerSprite } from '../../games/rare-rush/genesis/GenesisRunnerSprite.tsx';
@@ -18,12 +18,13 @@ export type AgentStageProps = {
   label?: string;
   /** Real ownership-checked artwork supplied by the trusted Arcade host. */
   art?: ArcadeFriend;
+  fieldOverlay?: ReactNode;
 };
 
 const ZONES = ['GARDEN COMMONS', 'CIRCUIT COURTYARD', 'CRYSTAL MESA'];
 
 /** Watch-only presentation. The host owns time, inputs, replay, and run controls. */
-export function AgentStage({ run, collection, tokenId, running, reducedMotion, label = 'LOCAL', art: realArt }: AgentStageProps) {
+export function AgentStage({ run, collection, tokenId, running, reducedMotion, label = 'LOCAL', art: realArt, fieldOverlay }: AgentStageProps) {
   const shell = useRef<HTMLElement>(null);
   const [viewportWidth, setViewportWidth] = useState(960);
   const testArt = useMemo(() => testRunArt(collection, tokenId, 'agent-play'), [collection, tokenId]);
@@ -100,6 +101,7 @@ export function AgentStage({ run, collection, tokenId, running, reducedMotion, l
       <div className="agent-stage-modifiers"><span>SIZE <b>{run.growth.toFixed(2)}×</b></span><span>{vertical ? 'STEER' : 'PACE'} <b>{vertical ? screenAxis < 0 ? '←' : screenAxis > 0 ? '→' : '—' : `${run.speedMultiplier.toFixed(2)}×`}</b></span></div>
       <div className="agent-stage-state" data-active={active}><i aria-hidden="true"/>{status}</div>
       <div className="agent-stage-progress" role="progressbar" aria-label="Run elapsed" aria-valuemin={0} aria-valuemax={run.duration} aria-valuenow={Math.min(run.duration, Math.floor(run.elapsed))}><i style={{ width: `${Math.min(100, Math.max(0, run.elapsed / run.duration * 100))}%` }}/></div>
+      {fieldOverlay}
     </div>
 
     <div className="agent-stage-direction">

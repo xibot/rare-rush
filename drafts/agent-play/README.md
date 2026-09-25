@@ -14,6 +14,14 @@ Then open **http://127.0.0.1:4220/**. On this Mac, you can also double-click `La
 
 `AGENT_PLAY_PORT` can override the port. `AGENT_PLAY_DATA_DIR` can override the replay folder. Build files are generated at startup; restart the server after editing source files.
 
+## Choose your mode
+
+**AUTOPILOT** puts the centered gameplay screen first, with playback controls and run setup below. At the end of a run, results, replay actions and any Testnet verification/claim controls appear over the game field.
+
+**AGENTIC** shows the local skill Markdown, copy/download actions, the first Preview command and wallet/scheduling instructions. Switching to Agentic pauses an active browser run and retains its state. Return to Autopilot and select **Resume** to continue. Watching a library replay opens Autopilot automatically.
+
+The run library is shared between both views. Selecting Agentic does not connect a wallet, submit a transaction or activate a schedule.
+
 ## Three ways to test
 
 - **Preview:** no wallet. Choose a sample Genesis or Generations Friend and a difficulty, then watch the autopilot. Pause, resume or accelerate playback. This does not represent NFT ownership or mint rewards.
@@ -28,7 +36,7 @@ The browser is optional. Agents can run the same controller from Node, then leav
 node drafts/agent-play/cli.mjs run --job drafts/agent-play/examples/preview-job.json
 ```
 
-The local skill is [rarerushgame/SKILL.md](skills/rarerushgame/SKILL.md); its linked reference describes Arcade and Testnet job configuration. Install/use the whole skill folder in your agent's skill loader and keep this repository available as its runtime. The page also links to the skill.
+The local skill is [rarerushgame/SKILL.md](skills/rarerushgame/SKILL.md); its linked reference describes Arcade and Testnet job configuration. Install/use the whole skill folder in your agent's skill loader and keep this repository available as its runtime. The Agentic panel displays the full skill and links its setup reference.
 
 A scheduler invokes one job per authorized slot and assigns a stable ID for that slot. Retrying the same ID returns or resumes that run, rather than starting another. Wallet locks prevent overlapping or uncertain Testnet jobs from allocating another entry. Jobs and transaction recovery are saved atomically to `data/jobs/`; completed gameplay remains available even when a later claim needs attention. Do not remove locks to bypass an unresolved transaction.
 
@@ -64,4 +72,4 @@ node drafts/agent-play/serve.mjs --build-only
 node drafts/agent-play/browser-check.mjs
 ```
 
-The browser check uses installed Chrome, an isolated local port and temporary data. Tests cover deterministic replay, invalid inputs, ownership gates, actual artwork decoding and persistence, wallet changes, responsive layouts and mocked Testnet approval/start/verification/claim recovery. Headless checks cover duplicate and overlapping jobs, durable crash recovery and replay retention before claiming. An isolated end-to-end check ran two CLI jobs for one Friend, retried one without a duplicate, and confirmed automatic library refresh, best-run selection and watchable replay. Live read-only checks confirmed current Testnet contract configuration and verifier readiness during development. A complete transaction sequence using a real wallet has not been broadcast as part of these prototype checks.
+The browser check uses installed Chrome, an isolated local port and temporary data. It checks both mode panels, keyboard navigation, pause/resume across tabs, exact skill loading and download, clipboard fallback, and the result overlay at desktop and mobile widths. Tests also cover deterministic replay, invalid inputs, ownership gates, actual artwork decoding and persistence, wallet changes, responsive layouts and mocked Testnet approval/start/verification/claim recovery. Headless checks cover duplicate and overlapping jobs, durable crash recovery and replay retention before claiming. An isolated end-to-end check ran two CLI jobs for one Friend, retried one without a duplicate, and confirmed automatic library refresh, best-run selection and watchable replay. Live read-only checks confirmed current Testnet contract configuration and verifier readiness during development. A complete transaction sequence using a real wallet has not been broadcast as part of these prototype checks.

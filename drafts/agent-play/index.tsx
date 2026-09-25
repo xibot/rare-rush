@@ -7,6 +7,7 @@ import { DIFFICULTIES } from '../../games/rare-rush/difficulty.ts';
 import { createAgentSession, advanceAgent, createReplaySession, advanceReplay, resumeAgentSession, exportAgentReplay, PROTOCOL_VERSION,
   type Difficulty, type RunSession, type AgentReplay, type RunMetrics } from './runner.ts';
 import { AgentStage } from './Stage.tsx';
+import { AgenticPanel } from './AgenticPanel.tsx';
 import { createTestnetAdapter } from './testnet.ts';
 import { connectArcade, loadArcadeFriend, getArcadeSession, type ArcadeFriend } from './arcade.ts';
 import { decodeGenerationSprites } from '@rarefriends/friendsdk/sprites';
@@ -30,6 +31,7 @@ async function request(path:string, body?:unknown) {
 }
 
 function App() {
+  const [view,setView] = useState<'autopilot'|'agentic'>('autopilot');
   const [source,setSource] = useState<Source>('local');
   const [collection,setCollection] = useState<0|1>(1), [tokenId,setTokenId] = useState('1');
   const [difficulty,setDifficulty] = useState<Difficulty>('degen');
@@ -51,6 +53,8 @@ function App() {
   const [pendingHash,setPendingHash] = useState(''), [recoverId,setRecoverId] = useState('');
   const [now,setNow]=useState(Date.now());
   const stageAnchor=useRef<HTMLDivElement>(null);
+  const setupAnchor=useRef<HTMLElement>(null);
+  const resultHeading=useRef<HTMLHeadingElement>(null);
   const callback=useRef<(s:RunSession)=>void>(()=>{});
   const checkpointTick=useRef(0);
   const completed=useRef(false);
@@ -67,6 +71,18 @@ function App() {
 
   const stop = () => {runningRef.current=false;setRunning(false);};
   const play = () => {runningRef.current=true;setRunning(true);};
+  function chooseView(next:'autopilot'|'agentic') {
+    if(actionLock.current||tn?.busy)return;
+    if(next==='agentic'&&runningRef.current){
+      stop();
+      try{checkpoint();}catch(e){setError(err(e));}
+      setNotice('Autopilot is paused. Return to Autopilot and choose Resume to continue.');
+    }
+    setView(next);
+  }
+  useEffect(()=>{
+    if(screen==='result'&&view==='autopilot')resultHeading.current?.focus({preventScroll:true});
+  },[screen,view]);
   async function act(label:string, work:()=>Promise<void>) {
     if(actionLock.current)return;
     actionLock.current=true;setBusy(label);setError('');setNotice('');
@@ -141,6 +157,7 @@ function App() {
     if(next==='testnet')void act('Checking wallet…',async()=>{await adapter.current!.restore();});
   }
   function launch(s:RunSession,id:Identity,art?:any) {
+    setView('autopilot');
     live.current=s;setSession(s);identity.current=id;setCurrent(id);setRecord(null);setTick(s.run._tick);completed.current=false;checkpointTick.current=s.run._tick;
     setScreen('watch');setSpeed(1);speedRef.current=1;artRef.current=art??null;setArcadeArt(art??null);play();
     requestAnimationFrame(()=>stageAnchor.current?.scrollIntoView({behavior:'smooth',block:'start'}));
@@ -195,7 +212,7 @@ function App() {
     const url=URL.createObjectURL(new Blob([JSON.stringify(payload,(_,v)=>typeof v==='bigint'?v.toString():v,2)],{type:'application/json'}));
     const link=document.createElement('a');link.href=url;link.download=`rare-rush-agent-${current?.runId??'local'}-${Date.now()}.json`;link.click();setTimeout(()=>URL.revokeObjectURL(url),1000);
   }
-  async function reset(){stop();setScreen('ready');setCurrent(null);identity.current=null;setRecord(null);setNotice('');if(source==='testnet'&&tn?.account)await adapter.current!.inspectFriend(collection,tokenId);}
+  async function reset(){stop();setScreen('ready');setCurrent(null);identity.current=null;setRecord(null);setNotice('');requestAnimationFrame(()=>setupAnchor.current?.scrollIntoView({behavior:reduced?'instant':'smooth',block:'start'}));if(source==='testnet'&&tn?.account)await adapter.current!.inspectFriend(collection,tokenId);}
   const best = [...records].filter(r=>filter==='all'||r.difficulty===filter).sort((a,b)=>b.metrics.score-a.metrics.score).filter((r,i,list)=>list.findIndex(q=>`${q.source}:${q.collection}:${q.tokenId}`===`${r.source}:${r.collection}:${r.tokenId}`)===i);
   const displayCollection=current?.collection??collection, displayToken=current?.tokenId??tokenId;
   const isTestnetRun=current?.source==='testnet' && session.kind==='agent';
@@ -203,10 +220,29 @@ function App() {
   return <div className="agent-app">
     <header className="site-header"><a className="brand" href="/" aria-label="Rare Rush Agent Play"><BrandMark/></a><nav aria-label="Main navigation"><a href="#leaderboard">RUN LIBRARY</a><a href="https://rarerush.app" target="_blank" rel="noreferrer">ARCADE ↗</a><span className="local-label">LOCAL PROTOTYPE</span></nav></header>
     <main>
-      <section className="hero"><div><p className="eyebrow">YOUR FRIEND. A NEW PLAYER.</p><h1>AGENT <span>PLAY.</span></h1></div><p>Pick your Friend. Set the pace.<br/>Watch the agent take the rare turns.</p></section>
-      <div className="prototype-note"><span><i/> PROTOTYPE AUTOPILOT</span><p>One run at a time. The same game, played with legal controls.</p></div>
-      <section className="setup" aria-label="Agent run setup">
-        <div className="section-top"><span className="eyebrow">01 / SET UP YOUR RUN</span><span className="muted">→ ↑ ↓ ←</span></div>
+      <section className="hero"><div><p className="eyebrow">YOUR FRIEND. A NEW PLAYER.</p><h1>AGENT <span>PLAY.</span></h1></div><p>Your Friend. Your agent.<br/>Choose how you want to rush.</p></section>
+      <div className="play-modes" role="tablist" aria-label="Agent Play mode">{(['autopilot','agentic'] as const).map(mode=><button key={mode} id={`${mode}-tab`} role="tab" aria-label={mode.toUpperCase()} aria-selected={view===mode} aria-controls={`${mode}-panel`} tabIndex={view===mode?0:-1} disabled={!!busy||!!tn?.busy} onClick={()=>chooseView(mode)} onKeyDown={event=>{
+        if(!['ArrowLeft','ArrowRight','Home','End'].includes(event.key))return;
+        event.preventDefault();
+        const next=event.key==='Home'?'autopilot':event.key==='End'?'agentic':mode==='autopilot'?'agentic':'autopilot';
+        chooseView(next);document.getElementById(`${next}-tab`)?.focus();
+      }}><b>{mode.toUpperCase()}</b><span>{mode==='autopilot'?'Watch in your browser':'Run with your own agent'}</span></button>)}</div>
+      <div className="prototype-note"><span><i/> {view==='autopilot'?'BROWSER AUTOPILOT':'AUTONOMOUS AGENT'}</span><p>{view==='autopilot'?'Choose a Friend below. The controller takes the turns.':'Give your agent the skill. Configure its wallet and schedule.'}</p></div>
+      {error&&<div className="message error" role="alert">{error}</div>}{notice&&<div className="message" role="status">{notice}</div>}
+      <div id="autopilot-panel" role="tabpanel" aria-labelledby="autopilot-tab" hidden={view!=='autopilot'}>
+      <div ref={stageAnchor} className="watch-section" data-screen={screen} data-tick={tick}>
+        <div className="section-top"><span className="eyebrow">01 / {session.kind==='replay'?'WATCH THE REPLAY':'WATCH THE RUSH'}</span><span>{screen==='ready'?'READY WHEN YOU ARE':screen==='result'?'RUN COMPLETE':running?'AGENT AT THE CONTROLS':'PAUSED'}</span></div>
+        <AgentStage run={session.run} collection={displayCollection} tokenId={validId(displayToken)?displayToken:'1'} running={running} reducedMotion={reduced} label={(current?.source??source)==='testnet'?'TESTNET':(current?.source??source)==='arcade'?'ARCADE':'LOCAL PREVIEW'} art={arcadeArt} fieldOverlay={screen==='result'&&<div className="agent-result-overlay" role="dialog" aria-label="Agent run result"><section className="result-card"><p className="eyebrow">{session.run.finishReason==='time'?'TIMER SURVIVED.':'OUT OF HEARTS.'}</p><h2 ref={resultHeading} tabIndex={-1}>{session.run.finishReason==='time'?'KEEP IT RARE.':'ANOTHER RUSH AWAITS.'}</h2><div className="result-score">{session.run.score.toLocaleString()}<span>POINTS</span></div><div className="result-stats"><span><b>{Math.floor(session.run.distance).toLocaleString()}m</b>DISTANCE</span><span><b>{session.run.coins}</b>COINS</span><span><b>{session.run.hearts}</b>HEARTS</span></div><p>{record?'✓ Replay checked locally and saved to this computer.':'Replay ready to save.'}</p><div className="inline-actions"><button onClick={download}>SAVE REPLAY ↓</button>{record&&<button disabled={!!busy} onClick={()=>void act('Loading replay…',async()=>{await replayRecord(record);})}>WATCH REPLAY ▶</button>}{!record&&<button disabled={!!busy} onClick={()=>void act('Saving replay…',async()=>{await finish(session);})}>RETRY SAVE</button>}</div>
+          {isTestnetRun&&matchesSaved&&stateRun&&<div className="claim-actions">{stateRun.status==='claimed'?<p className="lime">MINT CONFIRMED · {stateRun.reward?`${fmt(BigInt(stateRun.reward),6)} tRARERUSH`:''}</p>:!claimWindowOpen?<p>This run’s claim window expired. Pick your next run; its replay remains saved locally.</p>:session.run.finishReason==='time'?<><p>Survived runs can request a verifier signature, then claim through your wallet.</p><button disabled={!!busy||!!pending} onClick={()=>void act(freshClaim?'Confirm claim in your wallet…':'Sign replay authorization…',async()=>{if(freshClaim){await adapter.current!.claim();setNotice('Your Testnet mint is confirmed.');}else{await adapter.current!.verify();setNotice('Replay verified. Claim in your wallet when ready.');}})}>{freshClaim?'CLAIM TESTNET REWARD ↗':'VERIFY TESTNET RUN ↗'}</button></>:stateRun.status!=='abandoned'&&<><p>This run earned no claim. Close it onchain to free this NFT for its next attempt.</p><button disabled={!!busy||!!pending} onClick={()=>void act('Close run in your wallet…',async()=>{await adapter.current!.abandon();setNotice('Run closed. Remaining daily attempts are available.');})}>CLOSE TESTNET RUN</button></>}</div>}
+          <button className="primary next-run" disabled={!!busy} onClick={()=>void act('Preparing next run…',reset)}>PICK NEXT RUN ↗</button>
+          {busy&&<p className="result-progress" role="status">{busy}</p>}
+          {error&&<p className="result-error">{error}</p>}
+        </section></div>}/>
+        <div className="watch-controls"><div className="inline-actions">{playing&&<button className="light-button" disabled={!!busy} onClick={()=>void act(running?'Saving pause…':'Resuming…',async()=>{if(running){stop();checkpoint();}else await resume();})}>{running?'PAUSE Ⅱ':'RESUME ▶'}</button>}<button aria-pressed={reduced} onClick={()=>setReduced(v=>!v)}>FX {reduced?'OFF':'ON'}</button>{playing&&<button disabled={!!busy} onClick={()=>void act('Saving run…',async()=>{try{checkpoint();}catch(e){setNotice(`Kept the last saved checkpoint. ${err(e)}`);}finally{await reset();}})}>{current?.source==='testnet'?'SAVE & EXIT':'EXIT RUN'}</button>}{playing&&!isTestnetRun&&<button onClick={()=>setSpeed(v=>v===1?2:v===2?4:1)}>{speed}× PLAYBACK</button>}</div><span className="muted">{session.kind==='replay'?'RECORDED INPUTS':session.lastControl?.jump?'↑ JUMP':session.lastControl?.slide?'↓ SLIDE':session.lastControl?.pace===-1?'← STEER':session.lastControl?.pace===1?'→ STEER':'AUTO RUN'} · {Math.floor(session.run.score).toLocaleString()} POINTS</span></div>
+
+      </div>
+      <section ref={setupAnchor} className="setup" aria-label="Agent run setup">
+        <div className="section-top"><span className="eyebrow">02 / SET UP YOUR RUN</span><span className="muted">→ ↑ ↓ ←</span></div>
         <div className="sources" role="group" aria-label="Game environment">{([{id:'local',label:'PREVIEW',copy:'No wallet · sample Friend'},{id:'arcade',label:'ARCADE',copy:'Your real Rare Friend · simulated rewards'},{id:'testnet',label:'TESTNET',copy:'Test Friend · play to mint'}] as const).map(m=><button key={m.id} disabled={frozen} aria-pressed={source===m.id} onClick={()=>chooseSource(m.id)}><b>{m.label}</b><small>{m.copy}</small></button>)}</div>
         <div className="setup-grid"><div>
           <label className="field-title">CHOOSE YOUR COLLECTION</label><div className="choices collections">{([1,0] as const).map(c=><button key={c} aria-pressed={collection===c} disabled={frozen} onClick={()=>{setCollection(c);setArcadeArt(null);}}><b>{c===1?'GENESIS':'GENERATIONS'}</b><small>{c===1?'THE ORIGINAL FRIENDS':'THE NEXT GENERATION'}</small></button>)}</div>
@@ -214,7 +250,7 @@ function App() {
           {source==='local'&&<p className="muted small">Cosmetic preview artwork. No NFT ownership or token rewards are claimed.</p>}
           {source==='arcade'&&<div className="wallet-box"><p className="small">Play with the Genesis or Generations NFT held by your agent’s wallet. Ownership and artwork are read from Robinhood mainnet.</p><div className="inline-actions"><button disabled={running||!!busy} onClick={()=>void act('Connecting Arcade wallet…',async()=>{setArcade(await connectArcade());})}>{arcade?.account?short(arcade.account):'CONNECT ARCADE WALLET'}</button>{arcade?.account&&<button disabled={frozen||!validId(tokenId)} onClick={()=>void act('Checking your Friend…',async()=>{setArcadeArt(await loadArcadeFriend(arcade.provider,arcade.account,collection,tokenId));setNotice('Ownership confirmed. Ready for Arcade.');})}>CHECK FRIEND ↗</button>}</div>{arcadeArt&&<p className="lime small">✓ {arcadeArt.label} · OWNERSHIP CHECKED</p>}<p className="muted small">Arcade play requests no spending approval or game transaction.</p></div>}
         </div><div><label className="field-title">PICK YOUR PACE</label><div className="choices difficulties">{MODES.map(mode=><button key={mode} disabled={frozen} aria-pressed={difficulty===mode} onClick={()=>setDifficulty(mode)}><b>{mode.toUpperCase()}</b><small>{DIFFICULTIES[mode].seconds}s · {DIFFICULTIES[mode].rewardLabel}</small></button>)}</div><p className="mode-description">{DIFFICULTIES[difficulty].description}<br/>Sideways. Upwards. Free fall. A rare reverse.</p>
-          <div className="pilot-card"><span className="pilot-icon" aria-hidden="true">⌘</span><div><b>RARE RUSH AUTOPILOT</b><p>A deterministic controller. Agents can also run it without a browser using the local skill and job runner.</p><a className="skill-link" href="/agent-skill/SKILL.md" target="_blank" rel="noreferrer">READ AGENT SKILL ↗</a></div></div>
+          <div className="pilot-card"><span className="pilot-icon" aria-hidden="true">⌘</span><div><b>RARE RUSH AUTOPILOT</b><p>You choose the Friend and pace. Autopilot handles the moves; you confirm any Testnet wallet actions.</p></div></div>
           <button className="primary start" disabled={frozen||!validId(tokenId)||(source==='arcade'&&!arcade?.account)||(source==='testnet'&&(!tnReady||activeSaved))} onClick={()=>void act(source==='testnet'?(needApproval?'Approve entry in your wallet…':'Confirm the run in your wallet…'):'Preparing the agent…',begin)}>{busy|| (source==='testnet' ? needApproval?'APPROVE 110 tRF':'START AGENT RUN':'WATCH AGENT PLAY')}<span>↗</span></button>
           <p className="entry-note">{source==='testnet'?collection===1?'FREE ENTRY · 100× GENESIS REWARDS':'110 tRF ENTRY · 100 PRIZES + 10 TREASURY':source==='arcade'?'REAL NFT · SIMULATED REWARDS':'LOCAL PREVIEW · NO WALLET NEEDED'}</p>
         </div></div>
@@ -227,15 +263,8 @@ function App() {
           <details><summary>Test kit & run recovery</summary><p className="small muted">Uses the existing unrestricted test NFT faucets. Each mint, faucet or recovery transaction needs your wallet approval.</p><div className="inline-actions"><button disabled={frozen||!tn?.verified||!!pending} onClick={()=>void act('Mint Genesis in your wallet…',async()=>{const minted=await adapter.current!.mint(1);if(minted?.tokenIds[0]){setCollection(1);setTokenId(String(minted.tokenIds[0]));}})}>MINT TEST GENESIS</button><button disabled={frozen||!tn?.verified||!!pending} onClick={()=>void act('Mint Generations in your wallet…',async()=>{const minted=await adapter.current!.mint(0);if(minted?.tokenIds[0]){setCollection(0);setTokenId(String(minted.tokenIds[0]));}})}>MINT TEST GENERATIONS</button><button disabled={frozen||!tn?.verified||!!pending} onClick={()=>void act('Claim tRF in your wallet…',async()=>{await adapter.current!.faucet();})}>GET TEST tRF</button><a href="https://faucet.testnet.chain.robinhood.com" target="_blank" rel="noreferrer">TEST ETH FAUCET ↗</a></div><div className="inline-actions"><input aria-label="Recover onchain run ID" placeholder="Onchain run ID" value={recoverId} onChange={e=>setRecoverId(e.target.value)}/><button disabled={frozen||!tn?.verified||!validId(recoverId)} onClick={()=>void act('Recovering run…',async()=>{await adapter.current!.recoverRun(recoverId);resumeSaved();})}>RECOVER RUN</button></div></details>
         </div>}
       </section>
-      {error&&<div className="message error" role="alert">{error}</div>}{notice&&<div className="message" role="status">{notice}</div>}
-      <div ref={stageAnchor} className="watch-section" data-screen={screen} data-tick={tick}>
-        <div className="section-top"><span className="eyebrow">02 / {session.kind==='replay'?'WATCH THE REPLAY':'WATCH THE RUSH'}</span><span>{screen==='ready'?'READY WHEN YOU ARE':screen==='result'?'RUN COMPLETE':running?'AGENT AT THE CONTROLS':'PAUSED'}</span></div>
-        <AgentStage run={session.run} collection={displayCollection} tokenId={validId(displayToken)?displayToken:'1'} running={running} reducedMotion={reduced} label={current?.source==='testnet'?'TESTNET':current?.source==='arcade'?'ARCADE':'LOCAL PREVIEW'} art={arcadeArt}/>
-        <div className="watch-controls"><div className="inline-actions">{playing&&<button className="light-button" disabled={!!busy} onClick={()=>void act(running?'Saving pause…':'Resuming…',async()=>{if(running){stop();checkpoint();}else await resume();})}>{running?'PAUSE Ⅱ':'RESUME ▶'}</button>}{screen==='result'&&<button className="light-button" disabled={!!busy} onClick={()=>void act('Preparing next run…',reset)}>PICK NEXT RUN ↗</button>}<button aria-pressed={reduced} onClick={()=>setReduced(v=>!v)}>FX {reduced?'OFF':'ON'}</button>{playing&&<button disabled={!!busy} onClick={()=>void act('Saving run…',async()=>{try{checkpoint();}catch(e){setNotice(`Kept the last saved checkpoint. ${err(e)}`);}finally{await reset();}})}>{current?.source==='testnet'?'SAVE & EXIT':'EXIT RUN'}</button>}{playing&&!isTestnetRun&&<button onClick={()=>setSpeed(v=>v===1?2:v===2?4:1)}>{speed}× PLAYBACK</button>}</div><span className="muted">{session.kind==='replay'?'RECORDED INPUTS':session.lastControl?.jump?'↑ JUMP':session.lastControl?.slide?'↓ SLIDE':session.lastControl?.pace===-1?'← STEER':session.lastControl?.pace===1?'→ STEER':'AUTO RUN'} · {Math.floor(session.run.score).toLocaleString()} POINTS</span></div>
-        {screen==='result'&&<section className="result-card" aria-label="Agent run result"><p className="eyebrow">{session.run.finishReason==='time'?'TIMER SURVIVED.':'OUT OF HEARTS.'}</p><h2>{session.run.finishReason==='time'?'KEEP IT RARE.':'ANOTHER RUSH AWAITS.'}</h2><div className="result-stats"><span><b>{session.run.score.toLocaleString()}</b>POINTS</span><span><b>{session.run.coins}</b>COINS</span><span><b>{Math.floor(session.run.distance).toLocaleString()}m</b>DISTANCE</span></div><p>{record?'✓ Replay checked locally and saved to this computer.':'Replay ready to save.'}</p><div className="inline-actions"><button onClick={download}>SAVE REPLAY ↓</button>{record&&<button disabled={!!busy} onClick={()=>void act('Loading replay…',async()=>{await replayRecord(record);})}>WATCH REPLAY ▶</button>}{!record&&<button disabled={!!busy} onClick={()=>void act('Saving replay…',async()=>{await finish(session);})}>RETRY SAVE</button>}</div>
-          {isTestnetRun&&matchesSaved&&stateRun&&<div className="claim-actions">{stateRun.status==='claimed'?<p className="lime">MINT CONFIRMED · {stateRun.reward?`${fmt(BigInt(stateRun.reward),6)} tRARERUSH`:''}</p>:!claimWindowOpen?<p>This run’s claim window expired. Pick your next run; its replay remains saved locally.</p>:session.run.finishReason==='time'?<><p>Survived runs can request a verifier signature, then claim through your wallet.</p><button disabled={!!busy||!!pending} onClick={()=>void act(freshClaim?'Confirm claim in your wallet…':'Sign replay authorization…',async()=>{if(freshClaim){await adapter.current!.claim();setNotice('Your Testnet mint is confirmed.');}else{await adapter.current!.verify();setNotice('Replay verified. Claim in your wallet when ready.');}})}>{freshClaim?'CLAIM TESTNET REWARD ↗':'VERIFY TESTNET RUN ↗'}</button></>:stateRun.status!=='abandoned'&&<><p>This run earned no claim. Close it onchain to free this NFT for its next attempt.</p><button disabled={!!busy||!!pending} onClick={()=>void act('Close run in your wallet…',async()=>{await adapter.current!.abandon();setNotice('Run closed. Remaining daily attempts are available.');})}>CLOSE TESTNET RUN</button></>}</div>}
-        </section>}
       </div>
+      <div id="agentic-panel" role="tabpanel" aria-labelledby="agentic-tab" hidden={view!=='agentic'}><AgenticPanel/></div>
       <section id="leaderboard" className="library"><div className="section-top"><div><p className="eyebrow">03 / YOUR LOCAL RUN LIBRARY</p><h2>BEST OF THE <span>RUSH.</span></h2></div><span className="count">{records.length} SAVED {records.length===1?'RUN':'RUNS'}</span></div><p className="muted">Best run per Friend and environment. Scheduled agent runs appear automatically. Filter by difficulty to explore more. Community voting comes later.</p><div className="inline-actions filters" role="group" aria-label="Leaderboard difficulty">{(['all',...MODES] as const).map(m=><button key={m} aria-pressed={filter===m} onClick={()=>setFilter(m)}>{m.toUpperCase()}</button>)}</div>
         {best.length?<div className="run-list">{best.map((r,i)=><article key={r.id} className="run-row"><span className="rank">{String(i+1).padStart(2,'0')}</span><div><b>{r.collection===1?'GENESIS':'GENERATIONS'} #{r.tokenId}</b><small>{r.source==='local'?'PREVIEW':r.source.toUpperCase()} · {r.difficulty.toUpperCase()} · {r.metrics.outcome.toUpperCase()}{r.agentJobId?' · AGENT JOB':''}</small></div><div className="list-score"><b>{r.metrics.score.toLocaleString()}</b><small>POINTS</small></div><button disabled={playing||!!busy} onClick={()=>void act('Loading replay…',async()=>{await replayRecord(r);})}>WATCH ↗</button></article>)}</div>:<div className="empty"><span>→ ↑ ↓ ←</span><p>Your agent’s first rush belongs here.</p><small>Complete a run to save its score and watchable replay.</small></div>}
       </section>
