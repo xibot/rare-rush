@@ -21,8 +21,11 @@ export async function buildRushSite({ outdir = path.join(project, 'dist'), watch
   // Keep the function's mixed TS/MJS dependency graph in one JS module. Vercel's
   // file tracer otherwise transpiles TS files without rewriting MJS imports.
   await build({
-    absWorkingDir: project, entryPoints: ['server/replay-feed-runtime.mjs'],
-    outfile: 'server/generated/replay-feed-runtime.mjs', bundle: true,
+    absWorkingDir: project, entryPoints: {
+      'replay-feed-runtime': 'server/replay-feed-runtime.mjs',
+      'agent-testnet-proxy': 'server/agent-testnet-proxy.ts',
+    },
+    outdir: 'server/generated', outExtension: { '.js': '.mjs' }, bundle: true,
     platform: 'node', format: 'esm', target: 'node22', packages: 'external',
     logLevel: 'warning',
   });

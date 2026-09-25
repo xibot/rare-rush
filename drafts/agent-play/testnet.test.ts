@@ -2,7 +2,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { decodeFunctionData, encodeAbiParameters, encodeEventTopics, getAddress, keccak256, parseAbi, toHex, type Address, type Hash, type PublicClient } from 'viem';
 import { mnemonicToAccount } from 'viem/accounts';
-import { createTestnetAdapter, PLAY_CONTRACTS, ENGINE_VERSION, ENTRY_FEE } from './testnet.ts';
+import { createTestnetAdapter, createTestnetReadClient, isRetryableTestnetReadError, testnetFriendReadMessage, PLAY_CONTRACTS, ENGINE_VERSION, ENTRY_FEE } from './testnet.ts';
 import { nftAbi } from '../../testnet-app/src/abi.ts';
 import { emptyPlayState, savePlayState, stateKey } from '../../testnet-app/src/play/storage.ts';
 import { createRecorder, advanceRecorder, exportReplay, queueControls } from '../../testnet-app/src/play/recorder.ts';
@@ -95,6 +95,63 @@ test('restore and NFT inspection are read-only, isolated, and reflect three star
   assert.ok(f.methods.every(method => ['eth_accounts', 'eth_chainId'].includes(method)));
   assert.equal(f.store.getItem(stateKey(account)), null, 'production namespace stays untouched');
   assert.ok(f.store.getItem(prefix + stateKey(account)));
+});
+
+test('Friend preparation recovers failed initial RPC readiness without a wallet prompt or transaction', async () => {
+  const f = fixture(), original = f.client.getChainId;
+  f.client.getChainId = (async () => { throw new Error('HTTP request failed.'); }) as typeof original;
+  await assert.rejects(f.adapter.restore(), /HTTP request failed/);
+  assert.equal(f.adapter.snapshot().account, account);
+  assert.equal(f.adapter.snapshot().verified, false);
+  f.client.getChainId = original;
+  const selected = await f.adapter.prepareFriend(0, '7');
+  assert.equal(selected.tokenId, '7'); assert.equal(f.adapter.snapshot().verified, true);
+  assert.equal(f.adapter.snapshot().verifier, 'ready'); assert.ok(f.adapter.snapshot().balances);
+  assert.ok(f.methods.every(method => ['eth_accounts', 'eth_chainId'].includes(method)));
+  assert.equal(isRetryableTestnetReadError(new Error('HTTP request failed.')), true);
+  assert.equal(isRetryableTestnetReadError(new Error('This wallet does not own that test Friend.')), false);
+  assert.match(testnetFriendReadMessage(new Error('HTTP request failed.')), /No transaction was requested/);
+});
+
+test('balance failure clears readiness data and preparation retries all missing reads', async () => {
+  const f = fixture(); await f.adapter.restore(); await f.adapter.inspect(0, '7');
+  const original = f.client.getBalance;
+  f.client.getBalance = (async () => { throw new Error('HTTP request failed.'); }) as typeof original;
+  await assert.rejects(f.adapter.refresh());
+  assert.equal(f.adapter.snapshot().balances, null);
+  f.client.getBalance = original;
+  await f.adapter.prepareFriend(0, '7');
+  assert.ok(f.adapter.snapshot().balances); assert.equal(f.adapter.snapshot().selected?.tokenId, '7');
+});
+
+test('a slower old selection cannot overwrite the newer checked Friend', async () => {
+  const f = fixture(); await f.adapter.restore();
+  const original = f.client.readContract;
+  let release!: () => void;
+  const delayed = new Promise<void>(resolve => { release = resolve; });
+  f.client.readContract = (async (input: any) => {
+    if(input.functionName === 'ownerOf' && input.args[0] === 7n) await delayed;
+    return original(input);
+  }) as typeof original;
+  const old = f.adapter.prepareFriend(0, '7');
+  const rejection = assert.rejects(old, /selected Friend changed/);
+  await f.adapter.prepareFriend(0, '8'); release(); await rejection;
+  assert.equal(f.adapter.snapshot().selected?.tokenId, '8');
+  assert.ok(f.methods.every(method => ['eth_accounts', 'eth_chainId'].includes(method)));
+});
+
+test('the actual read transport batches parallel RPC requests into groups of at most twenty', async () => {
+  const batches: any[][] = [];
+  const client = createTestnetReadClient('https://rpc.test.invalid', async (_url, init) => {
+    const input = JSON.parse(String(init?.body));
+    assert.ok(Array.isArray(input)); batches.push(input);
+    return Response.json(input.map(item => ({ jsonrpc: '2.0', id: item.id,
+      result: item.method === 'eth_chainId' ? '0xb626' : '0x64' })));
+  });
+  const results = await Promise.all(Array.from({ length: 45 }, (_, index) => client.getBalance({ address: `0x${(index + 1).toString(16).padStart(40, '0')}` as Address })));
+  assert.ok(results.every(value => value === 100n));
+  assert.equal(batches.length, 3); assert.ok(batches.every(batch => batch.length <= 20));
+  assert.ok(batches.every(batch => batch.every(item => item.method === 'eth_getBalance')));
 });
 
 test('mint requires explicit call, persists before wallet send, validates receipt and remembers the minted ID', async () => {

@@ -49,9 +49,30 @@ const assetData = (kind: AssetPending['kind']) => kind === 'rf'
   ? encodeFunctionData({ abi: tokenAbi, functionName: 'faucet' })
   : encodeFunctionData({ abi: nftAbi, functionName: 'mint' });
 
+/** Connection failures may be retried as reads; ownership/contract failures may not. */
+export function isRetryableTestnetReadError(error: unknown): boolean {
+  let current = error;
+  for (let depth = 0; depth < 8 && current && typeof current === 'object'; depth++) {
+    const value = current as { name?: string; message?: string; status?: number; cause?: unknown };
+    if (['HttpRequestError', 'TimeoutError', 'FetchError'].includes(value.name ?? '')
+      || [408, 429, 500, 502, 503, 504].includes(value.status ?? 0)
+      || /HTTP request failed|Failed to fetch|fetch failed|Network request failed|request timed out/i.test(value.message ?? '')) return true;
+    current = value.cause;
+  }
+  return false;
+}
+export function testnetFriendReadMessage(error: unknown): string {
+  if (isRetryableTestnetReadError(error)) return 'Could not check this Friend on Robinhood Testnet. Use Check selected Friend to retry. No transaction was requested.';
+  const value = error as { shortMessage?: string; message?: string } | null;
+  return value?.shortMessage ?? value?.message ?? 'This Friend could not be checked. Try again.';
+}
+
+export function createTestnetReadClient(rpcUrl = '/api/rpc', fetchFn?: typeof fetch) {
+  return createPublicClient({ chain: TESTNET_CHAIN,
+    transport: http(rpcUrl, { fetchFn, timeout: 12_000, retryCount: 1, batch: { wait: 10, batchSize: 20 } }), cacheTime: 0 });
+}
 export function createTestnetAdapter(options: AgentTestnetOptions = {}) {
-  const client = options.client ?? createPublicClient({ chain: TESTNET_CHAIN,
-    transport: http('/api/rpc', { timeout: 12_000, retryCount: 1 }), cacheTime: 0 });
+  const client = options.client ?? createTestnetReadClient();
   // Same validation and durable-write checks as the deployed app, isolated from its keys.
   const backing = options.store ?? localStorage;
   const store: StorageLike = {
@@ -62,7 +83,7 @@ export function createTestnetAdapter(options: AgentTestnetOptions = {}) {
   let current: AgentTestnetSnapshot = { account: null, chainId: null, verified: false, paused: false,
     busy: null, playState: null, assetPending: null, balances: null, selected: null, verifier: 'checking' };
   let observed: BrowserWallet | undefined;
-  let epoch = 0, disposed = false, operation = false;
+  let epoch = 0, selectionRevision = 0, disposed = false, operation = false;
   const snapshot = () => ({ ...current });
   const emit = () => { if (!disposed) options.onState?.(snapshot()); };
   const assetKey = (account: Address) => `assets:${PLAY_CHAIN_ID}:${account.toLowerCase()}`;
@@ -89,7 +110,7 @@ export function createTestnetAdapter(options: AgentTestnetOptions = {}) {
     return state;
   }
   function invalidate() {
-    epoch++;
+    epoch++; selectionRevision++;
     current = { ...current, account: null, chainId: null, verified: false,
       playState: null, assetPending: null, balances: null, selected: null };
     emit();
@@ -146,9 +167,9 @@ export function createTestnetAdapter(options: AgentTestnetOptions = {}) {
     } catch { current.verifier = 'unavailable'; }
     emit(); return current.verifier;
   }
-  async function refresh() {
-    const who = current.account, revision = epoch;
-    current.verified = false; emit();
+  async function refreshInternal(recheckSelected: boolean) {
+    const who = current.account, revision = epoch, selectedAtStart = selectionRevision;
+    current.verified = false; current.balances = null; emit();
     const verified = await verifyPlayContracts(client);
     await checkVerifier();
     if (revision !== epoch) return snapshot();
@@ -172,22 +193,23 @@ export function createTestnetAdapter(options: AgentTestnetOptions = {}) {
     if (revision !== epoch || !same(current.account, who)) return snapshot();
     current.balances = { eth, rf, rush, genesis, generations, allowance };
     current.assetPending = loadAsset(who); persist(saved);
-    if (current.selected) await inspect(current.selected.collection, current.selected.tokenId);
+    if (recheckSelected && selectedAtStart === selectionRevision && current.selected) await inspect(current.selected.collection, current.selected.tokenId);
     return snapshot();
   }
+  const refresh = () => refreshInternal(true);
   async function restore() {
     const p = provider(), revision = ++epoch;
     const [accounts, chain] = await Promise.all([p.request({ method: 'eth_accounts' }), p.request({ method: 'eth_chainId' })]);
     if (revision !== epoch || disposed) return snapshot();
     current.account = accounts[0] ? getAddress(accounts[0]) : null; current.chainId = Number(chain);
-    current.verified = false; current.balances = null; current.selected = null;
+    current.verified = false; current.balances = null; current.selected = null; selectionRevision++;
     current.playState = current.account ? loadPlayState(store, current.account) : null;
     current.assetPending = current.account ? loadAsset(current.account) : null; emit();
     if (current.account && current.chainId === PLAY_CHAIN_ID) await refresh();
     else await checkVerifier();
     return snapshot();
   }
-  async function inspect(collection: Collection, tokenId: string) {
+  async function inspectCurrent(collection: Collection, tokenId: string, requestRevision: number) {
     const ctx = context(), revision = epoch;
     const friend = await readOwnedFriend(client, ctx.account, collection, tokenId);
     const block = await client.getBlock();
@@ -198,9 +220,20 @@ export function createTestnetAdapter(options: AgentTestnetOptions = {}) {
         args: functionName === 'dailyStarts' ? [key, block.timestamp / 86400n] : [key], blockNumber: block.number })));
     const result = { ...friend, remainingStarts: Math.max(0, 3 - Number(starts)), activeRunId: String(active), utcDay: String(block.timestamp / 86400n) };
     requireThat(revision === epoch && same(current.account, ctx.account), 'Wallet changed while inspecting the Friend.');
+    requireThat(requestRevision === selectionRevision, 'The selected Friend changed while its ownership was being checked.');
     const saved = loadPlayState(store, ctx.account);
     if (!saved.friends.some(f => f.collection === collection && f.tokenId === tokenId)) saved.friends = [...saved.friends, friend].slice(-100);
     current.selected = result; persist(saved); return result;
+  }
+  const inspect = (collection: Collection, tokenId: string) => inspectCurrent(collection, tokenId, ++selectionRevision);
+  /** Read-only recovery path after connection failure, and the shared selection preflight. */
+  async function prepareFriend(collection: Collection, tokenId: string) {
+    const requestRevision = ++selectionRevision, revision = epoch;
+    context();
+    requireThat(current.chainId === PLAY_CHAIN_ID, 'Switch to Robinhood Testnet before checking this Friend.');
+    if (!current.verified || !current.balances || current.verifier !== 'ready') await refreshInternal(false);
+    requireThat(revision === epoch && requestRevision === selectionRevision, 'The wallet or selected Friend changed during its check.');
+    return inspectCurrent(collection, tokenId, requestRevision);
   }
   function saveReplay(runId: string, replay: Replay, completedTicks: number) {
     const ctx = context(), state = loadPlayState(store, ctx.account), saved = state.savedRun;
@@ -303,7 +336,8 @@ export function createTestnetAdapter(options: AgentTestnetOptions = {}) {
     });
   }
   const api = {
-    snapshot, refresh, restore, inspect, inspectFriend: inspect, saveReplay, verify, checkVerifier,
+    snapshot, refresh, restore, inspect, inspectFriend: inspect, prepareFriend,
+    cancelFriendCheck() { selectionRevision++; }, saveReplay, verify, checkVerifier,
     connect: () => action('Connecting wallet', async () => { await provider().request({ method: 'eth_requestAccounts' }); return restore(); }),
     switchChain: () => action('Switching to testnet', async () => {
       const p = provider();

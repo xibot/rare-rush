@@ -35,6 +35,18 @@ test('cross-origin requests, RPC writes and large batches never reach upstream',
   await agentTestnetProxy(request('rpc', 'x'.repeat(1_800_001)), 'rpc', fetcher);
   assert.equal(calls, 0);
 });
+test('parallel contract reads pass as one bounded RPC batch without losing IDs', async () => {
+  const batch = Array.from({ length: 20 }, (_, id) => ({ ...rpc, id: id + 1 }));
+  let calls = 0;
+  const response = await agentTestnetProxy(request('rpc', batch), 'rpc', async (_url, init) => {
+    calls++;
+    assert.deepEqual(JSON.parse(String(init?.body)), batch);
+    return Response.json(batch.map(({ id }) => ({ jsonrpc: '2.0', id, result: '0xb626' })));
+  });
+  assert.equal(response.status, 200);
+  assert.equal(calls, 1);
+  assert.deepEqual((await response.json()).map((item: { id: number }) => item.id), batch.map(item => item.id));
+});
 test('oversize or failed upstream responses expose only a retryable generic error', async () => {
   for (const fetcher of [
     async () => { throw new Error('secret endpoint or key'); },

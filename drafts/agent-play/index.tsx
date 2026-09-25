@@ -16,7 +16,7 @@ import { RunsFeed } from './RunsFeed.tsx';
 import { ReplayModal } from './ReplayModal.tsx';
 import { useFeedLikes } from './feed-likes.ts';
 import type { RunRecord } from './feed-types.ts';
-import { createTestnetAdapter } from './testnet.ts';
+import { createTestnetAdapter, isRetryableTestnetReadError, testnetFriendReadMessage } from './testnet.ts';
 import { connectArcade, loadArcadeFriend, getArcadeSession, type ArcadeFriend } from './arcade.ts';
 import { decodeGenerationSprites } from '@rarefriends/friendsdk/sprites';
 import '../../games/rare-rush/fonts.css';
@@ -68,6 +68,8 @@ function App() {
   const [arcade,setArcade] = useState<any>(null), [arcadeArt,setArcadeArt] = useState<any>(null);
   const artRef=useRef<ArcadeFriend|null>(null);
   const [pendingHash,setPendingHash] = useState(''), [recoverId,setRecoverId] = useState('');
+  const [checkingFriend,setCheckingFriend]=useState(false);
+  const friendCheckAttempt=useRef(''), friendReadError=useRef<string|null>(null);
   const [now,setNow]=useState(Date.now());
   const stageAnchor=useRef<HTMLDivElement>(null);
   const setupAnchor=useRef<HTMLElement>(null);
@@ -81,7 +83,7 @@ function App() {
   const pending = tn?.playState?.pending || tn?.assetPending;
   const stateRun = tn?.playState?.savedRun;
   const needApproval = source==='testnet' && collection===0 && (tn?.balances?.allowance??0n)<110n*10n**18n;
-  const tnReady = !!tn?.account && tn.chainId===46630 && tn.verified && !tn.paused && tn.verifier==='ready' && selectionMatches && (tn.selected?.remainingStarts??0)>0 && !pending;
+  const tnReady = !!tn?.account && tn.chainId===46630 && tn.verified && !!tn.balances && !tn.paused && tn.verifier==='ready' && selectionMatches && (tn.selected?.remainingStarts??0)>0 && !pending;
   const activeSaved = !!stateRun && !['claimed','abandoned'].includes(stateRun.status) && Number(stateRun.run.claimUntil)*1000>now;
   const freshClaim=!!stateRun?.claim && Number(stateRun.claim.deadline)*1000>now+5000;
   const claimWindowOpen=!!stateRun && Number(stateRun.run.claimUntil)*1000>now;
@@ -106,6 +108,42 @@ function App() {
     try {await work();} catch(e) {setError(err(e));}
     finally {actionLock.current=false;setBusy('');}
   }
+  function clearFriendReadError() {
+    const previous=friendReadError.current;friendReadError.current=null;
+    if(previous)setError(current=>current===previous?'':current);
+  }
+  async function testnetRead<T,>(work:()=>Promise<T>):Promise<T> {
+    try {const result=await work();clearFriendReadError();return result;}
+    catch(error) {const message=testnetFriendReadMessage(error);friendReadError.current=message;throw new Error(message);}
+  }
+  const checkSelectedFriend=()=>testnetRead(()=>adapter.current!.prepareFriend(collection,tokenId));
+  useEffect(()=>{
+    if(source!=='testnet'||!tn?.account||tn.chainId!==46630||!validId(tokenId)) {friendCheckAttempt.current='';return;}
+    if(playing||busy||tn.busy)return;
+    const key=`${tn.account.toLowerCase()}:${tn.chainId}:${collection}:${tokenId}`;
+    const current=adapter.current?.snapshot();
+    if(current?.verified&&current.balances&&current.verifier==='ready'&&current.selected?.collection===collection&&current.selected.tokenId===tokenId)return;
+    if(friendCheckAttempt.current===key)return;
+    let cancelled=false;
+    const timer=setTimeout(()=>{
+      if(cancelled)return;
+      friendCheckAttempt.current=key;setCheckingFriend(true);
+      void (async()=>{
+        try {
+          for(let attempt=0;attempt<2;attempt++) {
+            try {await adapter.current!.prepareFriend(collection,tokenId);if(!cancelled)clearFriendReadError();return;}
+            catch(error) {
+              if(cancelled)return;
+              if(attempt===0&&isRetryableTestnetReadError(error)) {await new Promise(resolve=>setTimeout(resolve,800));if(cancelled)return;continue;}
+              const message=testnetFriendReadMessage(error);friendReadError.current=message;setError(message);return;
+            }
+          }
+        } finally {if(!cancelled)setCheckingFriend(false);}
+      })();
+    },300);
+    return ()=>{cancelled=true;clearTimeout(timer);setCheckingFriend(false);};
+    // Readiness emissions deliberately do not restart this bounded attempt.
+  },[source,tn?.account,tn?.chainId,collection,tokenId,playing,busy,tn?.busy]);
   function loadRecords():Promise<void> {
     if(recordsRequest.current)return recordsRequest.current;
     if(pagingRef.current)return Promise.resolve();
@@ -233,8 +271,8 @@ function App() {
     return()=>{cancelAnimationFrame(raf);document.removeEventListener('visibilitychange',hidden);window.removeEventListener('pagehide',unload);wallet?.removeListener?.('accountsChanged',changed);wallet?.removeListener?.('chainChanged',changed);wallet?.removeListener?.('disconnect',changed);};
   },[]);
   function chooseSource(next:Source) {
-    if(frozen)return;setSource(next);setError('');setNotice('');setScreen('ready');setRecord(null);setCurrent(null);identity.current=null;setArcadeArt(null);
-    if(next==='testnet')void act('Checking wallet…',async()=>{await adapter.current!.restore();});
+    if(frozen)return;adapter.current?.cancelFriendCheck();friendCheckAttempt.current='';setSource(next);setError('');setNotice('');setScreen('ready');setRecord(null);setCurrent(null);identity.current=null;setArcadeArt(null);
+    if(next==='testnet')void act('Checking wallet…',async()=>{await testnetRead(()=>adapter.current!.restore());});
   }
   function launch(s:RunSession,id:Identity,art?:any) {
     setView('autopilot');
@@ -327,8 +365,8 @@ function App() {
         <div className="section-top"><span className="eyebrow">02 / SET UP YOUR RUN</span><span className="muted">→ ↑ ↓ ←</span></div>
         <div className="sources" role="group" aria-label="Game environment">{([{id:'local',label:'PREVIEW',copy:'No wallet · sample Friend'},{id:'arcade',label:'ARCADE',copy:'Your real Rare Friend · simulated rewards'},{id:'testnet',label:'TESTNET',copy:'Test Friend · play to mint'}] as const).map(m=><button key={m.id} disabled={frozen} aria-pressed={source===m.id} onClick={()=>chooseSource(m.id)}><b>{m.label}</b><small>{m.copy}</small></button>)}</div>
         <div className="setup-grid"><div>
-          <label className="field-title">CHOOSE YOUR COLLECTION</label><div className="choices collections">{([1,0] as const).map(c=><button key={c} aria-pressed={collection===c} disabled={frozen} onClick={()=>{setCollection(c);setArcadeArt(null);}}><b>{c===1?'GENESIS':'GENERATIONS'}</b><small>{c===1?'THE ORIGINAL FRIENDS':'THE NEXT GENERATION'}</small></button>)}</div>
-          <label className="id-label" htmlFor="friend-id">{source==='local'?'PREVIEW FRIEND ID':'YOUR NFT ID'}<input id="friend-id" value={tokenId} onChange={e=>{setTokenId(e.target.value);setArcadeArt(null);}} inputMode="numeric" autoComplete="off" disabled={frozen} maxLength={77}/></label>
+          <label className="field-title">CHOOSE YOUR COLLECTION</label><div className="choices collections">{([1,0] as const).map(c=><button key={c} aria-pressed={collection===c} disabled={frozen} onClick={()=>{if(c===collection)return;adapter.current?.cancelFriendCheck();setCollection(c);setArcadeArt(null);}}><b>{c===1?'GENESIS':'GENERATIONS'}</b><small>{c===1?'THE ORIGINAL FRIENDS':'THE NEXT GENERATION'}</small></button>)}</div>
+          <label className="id-label" htmlFor="friend-id">{source==='local'?'PREVIEW FRIEND ID':'YOUR NFT ID'}<input id="friend-id" value={tokenId} onChange={e=>{adapter.current?.cancelFriendCheck();setTokenId(e.target.value);setArcadeArt(null);}} inputMode="numeric" autoComplete="off" disabled={frozen} maxLength={77}/></label>
           {source==='local'&&<p className="muted small">Cosmetic preview artwork. No NFT ownership or token rewards are claimed.</p>}
 
         </div><div><label className="field-title">PICK YOUR PACE</label><div className="choices difficulties">{MODES.map(mode=><button key={mode} disabled={frozen} aria-pressed={difficulty===mode} onClick={()=>setDifficulty(mode)}><b>{mode.toUpperCase()}</b><small>{DIFFICULTIES[mode].seconds}s · {DIFFICULTIES[mode].rewardLabel}</small></button>)}</div><p className="mode-description">{DIFFICULTIES[difficulty].description}<br/>Sideways. Upwards. Free fall. A rare reverse.</p>
@@ -337,10 +375,10 @@ function App() {
           <p className="entry-note">{source==='testnet'?collection===1?'FREE ENTRY · 100× GENESIS REWARDS':'110 tRF ENTRY · 100 PRIZES + 10 TREASURY':source==='arcade'?'REAL NFT · SIMULATED REWARDS':'LOCAL PREVIEW · NO WALLET NEEDED'}</p>
         </div></div>
         {source==='arcade'&&<div className="wallet-box arcade-wallet-panel" aria-label="Arcade wallet"><div className="wallet-heading"><div><span className="eyebrow">ROBINHOOD MAINNET · 4663</span><p>Play with the Genesis or Generations NFT held by your wallet.<br/>Ownership and artwork are read from Robinhood mainnet.</p></div><div className="inline-actions"><button className={!arcade?.account?'wallet-connect':undefined} disabled={running||!!busy} onClick={()=>void act('Connecting Arcade wallet…',async()=>{setArcade(await connectArcade());})}>{arcade?.account?short(arcade.account):'CONNECT WALLET'}</button>{arcade?.account&&<button disabled={frozen||!validId(tokenId)} onClick={()=>void act('Checking your Friend…',async()=>{setArcadeArt(await loadArcadeFriend(arcade.provider,arcade.account,collection,tokenId));setNotice('Ownership confirmed. Ready for Arcade.');})}>CHECK FRIEND ↗</button>}</div></div>{arcadeArt&&<p className="lime small">✓ {arcadeArt.label} · OWNERSHIP CHECKED</p>}<p className="muted small">Arcade play requests no spending approval or game transaction.</p></div>}
-        {source==='testnet'&&<div className="testnet-panel"><div className="wallet-heading"><div><span className="eyebrow">ROBINHOOD TESTNET · 46630</span><p>{tn?.account?short(tn.account):'Connect the wallet that owns your test Friend.'}</p></div><div className="inline-actions">{!tn?.account?<button className="wallet-connect" disabled={running||!!busy} onClick={()=>void act('Connecting Testnet wallet…',async()=>{await adapter.current!.connect();})}>CONNECT WALLET</button>:<><button disabled={running||!!busy} onClick={()=>void act('Refreshing…',async()=>{await adapter.current!.refresh();await adapter.current!.inspectFriend(collection,tokenId);})}>REFRESH ↻</button><button disabled={frozen} onClick={()=>{adapter.current!.disconnect();}}>DISCONNECT</button></>}</div></div>
-          {tn?.account&&tn.chainId!==46630&&<button disabled={running||!!busy} onClick={()=>void act('Switching network…',async()=>{await adapter.current!.switchChain();})}>SWITCH TO ROBINHOOD TESTNET</button>}
+        {source==='testnet'&&<div className="testnet-panel"><div className="wallet-heading"><div><span className="eyebrow">ROBINHOOD TESTNET · 46630</span><p>{tn?.account?short(tn.account):'Connect the wallet that owns your test Friend.'}</p></div><div className="inline-actions">{!tn?.account?<button className="wallet-connect" disabled={running||!!busy} onClick={()=>void act('Connecting Testnet wallet…',async()=>{await testnetRead(()=>adapter.current!.connect());})}>CONNECT WALLET</button>:<><button disabled={running||!!busy} onClick={()=>void act('Refreshing…',async()=>{await testnetRead(()=>adapter.current!.refresh());await checkSelectedFriend();})}>REFRESH ↻</button><button disabled={frozen} onClick={()=>{adapter.current!.disconnect();}}>DISCONNECT</button></>}</div></div>
+          {tn?.account&&tn.chainId!==46630&&<button disabled={running||!!busy} onClick={()=>void act('Switching network…',async()=>{await testnetRead(()=>adapter.current!.switchChain());})}>SWITCH TO ROBINHOOD TESTNET</button>}
           {tn?.balances&&<div className="balances"><span>TEST ETH <b>{fmt(tn.balances.eth)}</b></span><span>tRF <b>{fmt(tn.balances.rf)}</b></span><span>tRARERUSH <b>{fmt(tn.balances.rush,6)}</b></span><span className={tn.verifier==='ready'?'lime':'muted'}>VERIFIER {tn.verifier.toUpperCase()}</span></div>}
-          {tn?.account&&<div className="inline-actions"><button disabled={frozen||tn.chainId!==46630||!validId(tokenId)} onClick={()=>void act('Checking Friend…',async()=>{await adapter.current!.inspectFriend(collection,tokenId);})}>CHECK SELECTED FRIEND</button><span>{selectionMatches?`${tn?.selected?.remainingStarts} / 3 starts left today`:'Check this NFT to enable its run.'}</span>{tn?.verifier==='unavailable'&&<button disabled={frozen} onClick={()=>void act('Checking verifier…',async()=>{await adapter.current!.refresh();})}>CHECK AGAIN</button>}</div>}
+          {tn?.account&&<div className="inline-actions"><button disabled={frozen||checkingFriend||tn.chainId!==46630||!validId(tokenId)} onClick={()=>void act('Checking Friend…',async()=>{await checkSelectedFriend();})}>{checkingFriend?'CHECKING FRIEND…':'CHECK SELECTED FRIEND'}</button><span>{checkingFriend?'Checking ownership and remaining starts…':selectionMatches?`${tn?.selected?.remainingStarts} / 3 starts left today`:'Check this NFT to enable its run.'}</span>{tn?.verifier==='unavailable'&&<button disabled={frozen} onClick={()=>void act('Checking verifier…',async()=>{await testnetRead(()=>adapter.current!.refresh());await checkSelectedFriend();})}>CHECK AGAIN</button>}</div>}
           {activeSaved&&<div className="saved-notice"><span>Saved Testnet run #{stateRun?.run.runId} · {stateRun?.status}</span><button disabled={frozen||tn?.chainId!==46630||!tn?.verified||!!pending} onClick={()=>void act('Restoring run…',async()=>{resumeSaved();})}>OPEN SAVED RUN ↗</button></div>}
           {pending&&<div className="saved-notice"><p>A wallet operation needs confirmation before another transaction.</p>{pending.hash?<a href={`https://explorer.testnet.chain.robinhood.com/tx/${pending.hash}`} target="_blank" rel="noreferrer">VIEW TRANSACTION ↗</a>:<input aria-label="Pending transaction hash" placeholder="Paste transaction hash if broadcast" value={pendingHash} onChange={e=>setPendingHash(e.target.value)}/>}<button disabled={frozen} onClick={()=>void act('Recovering transaction…',async()=>{await adapter.current!.recover((pendingHash||undefined) as `0x${string}`|undefined);})}>CHECK TRANSACTION</button>{tn?.playState?.pending&&!tn.playState.pending.hash&&<><button disabled={frozen} onClick={()=>void act('Retry the reserved nonce in your wallet…',async()=>{await adapter.current!.retryPending();})}>RETRY SAME NONCE</button><button disabled={frozen} onClick={()=>void act('Cancel the reserved nonce in your wallet…',async()=>{await adapter.current!.cancelPending();})}>CANCEL PENDING</button></>}</div>}
           <details><summary>Test kit & run recovery</summary><p className="small muted">Uses the existing unrestricted test NFT faucets. Each mint, faucet or recovery transaction needs your wallet approval.</p><div className="inline-actions"><button disabled={frozen||!tn?.verified||!!pending} onClick={()=>void act('Mint Genesis in your wallet…',async()=>{const minted=await adapter.current!.mint(1);if(minted?.tokenIds[0]){setCollection(1);setTokenId(String(minted.tokenIds[0]));}})}>MINT TEST GENESIS</button><button disabled={frozen||!tn?.verified||!!pending} onClick={()=>void act('Mint Generations in your wallet…',async()=>{const minted=await adapter.current!.mint(0);if(minted?.tokenIds[0]){setCollection(0);setTokenId(String(minted.tokenIds[0]));}})}>MINT TEST GENERATIONS</button><button disabled={frozen||!tn?.verified||!!pending} onClick={()=>void act('Claim tRF in your wallet…',async()=>{await adapter.current!.faucet();})}>GET TEST tRF</button><a href="https://faucet.testnet.chain.robinhood.com" target="_blank" rel="noreferrer">TEST ETH FAUCET ↗</a></div><div className="inline-actions"><input aria-label="Recover onchain run ID" placeholder="Onchain run ID" value={recoverId} onChange={e=>setRecoverId(e.target.value)}/><button disabled={frozen||!tn?.verified||!validId(recoverId)} onClick={()=>void act('Recovering run…',async()=>{await adapter.current!.recoverRun(recoverId);resumeSaved();})}>RECOVER RUN</button></div></details>

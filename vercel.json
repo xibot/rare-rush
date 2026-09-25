@@ -71,7 +71,13 @@
     }
   ],
   "functions": {
-    "api/*.ts": {
+    "api/status.mjs": {
+      "maxDuration": 60
+    },
+    "api/rpc.mjs": {
+      "maxDuration": 60
+    },
+    "api/verify-run.mjs": {
       "maxDuration": 60
     },
     "api/runs.mjs": {
