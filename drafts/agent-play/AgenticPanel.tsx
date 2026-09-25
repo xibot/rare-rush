@@ -1,5 +1,6 @@
 import { useEffect, useId, useRef, useState } from 'react';
 import './agentic.css';
+import { PUBLIC_SITE } from './site-mode.ts';
 
 const SKILL_URL = '/agent-skill/SKILL.md';
 const PREVIEW_COMMAND = 'node drafts/agent-play/cli.mjs run --job drafts/agent-play/examples/preview-job.json';
@@ -12,7 +13,7 @@ type SkillState =
   | { status: 'error'; message: string };
 
 async function readSkill(response: Response): Promise<string> {
-  if (!response.ok) throw new Error(`The local skill returned HTTP ${response.status}.`);
+  if (!response.ok) throw new Error(`The skill returned HTTP ${response.status}.`);
   if (Number(response.headers.get('content-length')) > MAX_SKILL_BYTES) {
     throw new Error('The skill is too large to display safely. Use Open SKILL.md to read it.');
   }
@@ -37,7 +38,7 @@ async function readSkill(response: Response): Promise<string> {
   } finally {
     reader.releaseLock();
   }
-  if (!text.trim()) throw new Error('The local skill file is empty.');
+  if (!text.trim()) throw new Error('The skill file is empty.');
   return text;
 }
 
@@ -73,8 +74,8 @@ export function AgenticPanel() {
         setSkill({
           status: 'error',
           message: timedOut
-            ? 'The local skill took too long to load. Check that the preview server is running, then retry.'
-            : error instanceof Error ? error.message : 'The local skill could not be loaded.',
+            ? 'The skill took too long to load. Check your connection, then retry.'
+            : error instanceof Error ? error.message : 'The skill could not be loaded.',
         });
       })
       .finally(() => window.clearTimeout(timeout));
@@ -113,14 +114,14 @@ export function AgenticPanel() {
           <p className="agentic-eyebrow">AGENT SETUP</p>
           <h2 id={`${id}-title`}>LET YOUR AGENT RUSH.</h2>
         </div>
-        <span className="agentic-local">LOCAL SKILL</span>
+        <span className="agentic-local">{PUBLIC_SITE ? 'AGENT SKILL' : 'LOCAL SKILL'}</span>
       </div>
       <p className="agentic-intro">Give your agent the skill to run Rare Rush with its own wallet, save its score, and leave a replay to watch.</p>
 
       <div className="agentic-grid">
         <div className="agentic-reader">
           <h3><span>01</span> READ THE SKILL</h3>
-          <p>These are the actual instructions served by this checkout.</p>
+          <p>Read the skill, then connect it to your agent’s own wallet and schedule.</p>
           <div className="agentic-actions">
             <button type="button" disabled={skill.status !== 'ready'} onClick={() => {
               if (skill.status === 'ready') void copy(skill.text, 'SKILL.md');
@@ -129,7 +130,7 @@ export function AgenticPanel() {
             <a href={SKILL_URL} download="rarerushgame-SKILL.md">DOWNLOAD .MD <span aria-hidden="true">↓</span></a>
           </div>
 
-          {skill.status === 'loading' && <p className="agentic-load" role="status">Loading local skill…</p>}
+          {skill.status === 'loading' && <p className="agentic-load" role="status">Loading skill…</p>}
           {skill.status === 'error' && (
             <div className="agentic-error">
               <p role="alert">{skill.message}</p>
@@ -149,7 +150,7 @@ export function AgenticPanel() {
           <h3><span>02</span> CONFIGURE YOUR AGENT</h3>
           <p>Use OpenClaw, Hermes, Bankr, or another agent runtime with a compatible wallet integration. Load the full skill folder, including its references:</p>
           <code className="agentic-path">drafts/agent-play/skills/rarerushgame/</code>
-          <p>Your agent needs this Rare Rush checkout, Node 22.18+, and installed dependencies. The skill walks through setup.</p>
+          <p>Your agent needs the Rare Rush repository, Node 22.18+, and installed dependencies. The skill walks through setup.</p>
 
           <div className="agentic-command">
             <div><b>TRY ONE PREVIEW RUN</b><span>NO WALLET</span></div>
@@ -161,7 +162,7 @@ export function AgenticPanel() {
           <ul className="agentic-notes">
             <li><b>BRING YOUR OWN WALLET</b><span>Arcade reads your wallet’s real NFT ownership and art. Testnet needs an owned test NFT and an EVM wallet that supports Robinhood, transaction signing, and typed-message signing. The current verifier supports EOA wallets.</span></li>
             <li><b>ONE ID PER SCHEDULED RUN</b><span>Your agent configures the schedule. Use a stable job ID for each scheduled period and reuse it on retries.</span></li>
-            <li><b>KEEP YOUR BEST RUNS</b><span>Save jobs to the preview server’s jobs directory to show the best score per environment, collection, and Rare Friend, with watchable replays.</span></li>
+            <li><b>KEEP YOUR BEST RUNS</b><span>Completed jobs retain a local replay. Use the publish command to sign and share an Arcade or Testnet run in RUNS FEED. Publishing uses a wallet message signature, with no transaction or gas fee.</span></li>
           </ul>
         </div>
       </div>
@@ -173,7 +174,7 @@ export function AgenticPanel() {
           <textarea id={`${id}-copy`} ref={manualRef} readOnly value={manualCopy.text} spellCheck={false} />
         </div>
       )}
-      <p className="agentic-local-note">Local checkout only. Configure your agent’s wallet connector and schedule using the skill. Compatibility depends on its wallet capabilities; individual framework integrations still need testing. A public install URL is not available yet.</p>
+      <p className="agentic-local-note">Configure your agent’s wallet connector and schedule using the skill. Compatibility depends on its wallet capabilities; individual framework integrations still need testing. Download the skill and its job reference together.</p>
     </section>
   );
 }

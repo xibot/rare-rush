@@ -4,9 +4,9 @@ import type { GameClient } from '@rarefriends/friendsdk/game';
 import { createFriendReader, type GenerationSprites } from '@rarefriends/friendsdk/sprites';
 import { createFriendSoundKit, type FriendSoundKit } from '@rarefriends/friendsdk/sounds';
 import { GameMenu } from '@rarefriends/friendsdk/frame';
-import { createRun, jump, setSliding, setPace, stepRun, FIXED_STEP, type RunState } from './twist/engine';
+import { createRun, FIXED_STEP, type RunState } from './twist/engine';
 import { DirectionScene } from './twist/DirectionScene';
-import { canonicalAxis, headingFor } from './twist/presentation';
+import { headingFor } from './twist/presentation';
 import { startArcadeAnalytics, type ArcadeAnalyticsRun, type ArcadeSignal } from './analytics';
 import { createEconomy, enterRun, collectCoin, nextCoinReward, formatToken, formatRF } from './economy';
 import { DIFFICULTIES, DIFFICULTY_ORDER, type Difficulty } from './difficulty';
@@ -17,6 +17,8 @@ import { FriendSprite as Sprite, EntityArt } from './RunnerArt';
 import { GenesisRunnerSprite } from './genesis/GenesisRunnerSprite';
 import { DEFAULT_BODY_ID, pickGenesisBody } from './genesis/bodies';
 import { requestArcadeNavigation } from './navigation';
+import { advanceHumanRecording, createHumanRecording, exportHumanReplay, queueHumanJump, releaseHumanControls, type HumanRecording } from './replay-recorder';
+import { requestArcadeRunSave, requestSavedRunNavigation, type ArcadeRunCapture } from './run-save-bridge';
 import './style.css';
 
 type Screen = 'ready' | 'running' | 'result';
@@ -47,9 +49,12 @@ function Runner({ friendId, client, paused, genesis, onNavigate = requestArcadeN
   const [viewWidth, setViewWidth] = useState(960), [, draw] = useState(0);
   const [notice, setNotice] = useState(''), [difficulty, setDifficulty] = useState<Difficulty>('normal');
   const [best, setBest] = useState<Record<Difficulty, number>>({ easy: 0, normal: 0, degen: 0 });
+  const [saveBusy, setSaveBusy] = useState(false), [saveError, setSaveError] = useState(''), [savedRunId, setSavedRunId] = useState('');
+  const recording = useRef<HumanRecording | null>(null), captured = useRef<ArcadeRunCapture | null>(null);
+  const runArt = useRef<ArcadeRunCapture['art'] | null>(null), saving = useRef<AbortController | null>(null);
   const root = useRef<HTMLElement>(null), stage = useRef<SVGSVGElement>(null);
   const engine = useRef(createRun(1)), economy = useRef(createEconomy());
-  const reward = useRef(0n), sounds = useRef<FriendSoundKit | null>(null), seed = useRef(0);
+  const reward = useRef(0n), sounds = useRef<FriendSoundKit | null>(null);
   const analyticsRun = useRef<ArcadeAnalyticsRun | null>(null);
   const active = useRef(false), screenRef = useRef<Screen>('ready'), noticeUntil = useRef(0);
   const paceInputs = useRef(new Set<string>()), displayedGrowth = useRef(1);
@@ -61,6 +66,8 @@ function Runner({ friendId, client, paused, genesis, onNavigate = requestArcadeN
     mounted.current = true; startingRef.current = false; setStarting(false);
     setLoaded(false); setError(''); setSprites(null); setScreen('ready'); setUserPaused(false); setPanel(null); setDifficulty('normal'); setBest({ easy: 0, normal: 0, degen: 0 });
     economy.current = createEconomy(); engine.current = createRun(1); reward.current = 0n; displayedGrowth.current = 1; paceInputs.current.clear(); analyticsRun.current = null;
+    recording.current = null; captured.current = null; runArt.current = null; saving.current?.abort(); saving.current = null;
+    setSaveBusy(false); setSaveError(''); setSavedRunId('');
     previousGenesisBody.current = undefined; setGenesisBodyId(DEFAULT_BODY_ID);
     const load = async () => {
       if (genesis) return null;
@@ -74,7 +81,7 @@ function Runner({ friendId, client, paused, genesis, onNavigate = requestArcadeN
       if (cancelled) return;
       setSprites(art); setLoaded(true);
     }).catch(cause => { if (!cancelled) setError(cause instanceof Error ? cause.message : 'Could not load your Friend.'); });
-    return () => { cancelled = true; mounted.current = false; active.current = false; };
+    return () => { cancelled = true; mounted.current = false; active.current = false; saving.current?.abort(); };
   }, [friendId, client, retry, genesis?.portraitUrl]);
 
   useEffect(() => {
@@ -82,7 +89,7 @@ function Runner({ friendId, client, paused, genesis, onNavigate = requestArcadeN
     return () => { sounds.current?.dispose(); };
   }, []);
   useEffect(() => {
-    const observer = new ResizeObserver(([entry]) => setViewWidth(entry.contentRect.width < 600 ? 520 : 960));
+    const observer = new ResizeObserver(([entry]) => setViewWidth(entry.contentRect.width <= 600 ? 520 : 960));
     if (root.current) observer.observe(root.current);
     return () => observer.disconnect();
   }, []);
@@ -93,18 +100,18 @@ function Runner({ friendId, client, paused, genesis, onNavigate = requestArcadeN
     return () => preference.removeEventListener('change', changed);
   }, []);
   useEffect(() => {
-    let id = 0, previous = 0;
+    let id = 0, previous = 0, accumulator = 0;
+    let currentRecording: HumanRecording | null = null;
     const tick = (time: number) => {
       const frameDt = previous ? Math.min((time - previous) / 1000, .25) : 0; previous = time;
-      if (active.current) {
+      if (recording.current !== currentRecording) { currentRecording = recording.current; accumulator = 0; }
+      if (active.current && currentRecording) {
         // A slow render frame may span a shaft exit. Re-map held arrows at
-        // every physics step, preserving the engine's existing accumulator.
-        let remaining = frameDt;
-        while (remaining > 1e-10 && engine.current.status === 'running') {
-          const dt = Math.min(remaining, FIXED_STEP);
-          remaining -= dt;
-          applyPace();
-          const events = stepRun(engine.current, dt);
+        // every recorded physics step so playback receives identical controls.
+        accumulator += frameDt;
+        while (accumulator + 1e-10 >= FIXED_STEP && engine.current.status === 'running') {
+          accumulator = Math.max(0, accumulator - FIXED_STEP);
+          const events = advanceHumanRecording(currentRecording, screenAxis());
           for (const event of events) {
             if (event.type === 'coin') {
               const gained = collectCoin(economy.current, engine.current.difficulty, event.rewardMultiplier ?? 1, collection);
@@ -119,6 +126,8 @@ function Runner({ friendId, client, paused, genesis, onNavigate = requestArcadeN
               const finished = engine.current;
               if (event.reason === 'time' || event.reason === 'hearts') analyticsRun.current?.finish(event.reason, finished.elapsed);
               analyticsRun.current = null;
+              if (runArt.current) captured.current = { collection: runArt.current.collection, tokenId: runArt.current.tokenId,
+                seed: finished.seed, difficulty: finished.difficulty, replay: exportHumanReplay(currentRecording), art: runArt.current };
               active.current = false; setScreen('result'); setBest(old => ({ ...old, [finished.difficulty]: Math.max(old[finished.difficulty], finished.score) })); sounds.current?.play('reward');
             }
           }
@@ -126,28 +135,26 @@ function Runner({ friendId, client, paused, genesis, onNavigate = requestArcadeN
         displayedGrowth.current += (engine.current.growth - displayedGrowth.current) * (1 - Math.exp(-14 * frameDt));
         if (engine.current.elapsed > noticeUntil.current) setNotice('');
         draw(time);
-      }
+      } else accumulator = 0;
       id = requestAnimationFrame(tick);
     };
     id = requestAnimationFrame(tick);
     return () => cancelAnimationFrame(id);
   }, []);
 
-  function doJump() { if (active.current && jump(engine.current)) { void sounds.current?.unlock(); sounds.current?.play('action-start'); draw(performance.now()); } }
+  function doJump() { if (active.current && recording.current) { queueHumanJump(recording.current); void sounds.current?.unlock(); sounds.current?.play('action-start'); } }
   function focusWorld() { if (screenRef.current === 'running') requestAnimationFrame(() => stage.current?.focus()); }
-  function slide(value: boolean) { if (active.current || !value) { setSliding(engine.current, value); draw(performance.now()); } }
+  function slide(value: boolean) { if ((active.current || !value) && recording.current) recording.current.slide = value; }
   function paceInput(source: string, held: boolean) {
     if (held && !active.current) return;
     if (held) paceInputs.current.add(source); else paceInputs.current.delete(source);
-    applyPace();
   }
-  function applyPace() {
+  function screenAxis(): -1 | 0 | 1 {
     const left = [...paceInputs.current].some(key => key.endsWith('left'));
     const right = [...paceInputs.current].some(key => key.endsWith('right'));
-    const run = engine.current;
-    setPace(run, canonicalAxis(left === right ? 0 : right ? 1 : -1, run.phase, headingFor(run)));
+    return left === right ? 0 : right ? 1 : -1;
   }
-  function releaseControls() { paceInputs.current.clear(); setPace(engine.current, 0); setSliding(engine.current, false); }
+  function releaseControls() { paceInputs.current.clear(); if (recording.current) releaseHumanControls(recording.current); }
   useEffect(() => {
     const down = (event: KeyboardEvent) => {
       const target = event.target as HTMLElement;
@@ -175,6 +182,7 @@ function Runner({ friendId, client, paused, genesis, onNavigate = requestArcadeN
   }
   function backToDifficulty() {
     releaseControls();
+    saving.current?.abort(); captured.current = null; recording.current = null;
     engine.current = createRun(1, difficulty); displayedGrowth.current = 1; reward.current = 0n;
     setNotice(''); setUserPaused(false); setScreen('ready');
     requestAnimationFrame(() => root.current?.querySelector<HTMLButtonElement>('.difficulty-picker button[aria-pressed="true"]')?.focus());
@@ -186,17 +194,38 @@ function Runner({ friendId, client, paused, genesis, onNavigate = requestArcadeN
       if (genesis) await genesis.beforeRun();
       if (!mounted.current) return;
       if (!enterRun(economy.current, collection)) { setError('You used all 100 demo RF. Reset the simulation in Token lab to keep testing.'); return; }
+      let bodyId = genesisBodyId;
       if (genesis) {
         const body = pickGenesisBody(previousGenesisBody.current);
-        previousGenesisBody.current = body; setGenesisBodyId(body);
+        previousGenesisBody.current = body; setGenesisBodyId(body); bodyId = body;
       }
-    engine.current = createRun(++seed.current * 8191 + Number(friendId % 100000n), difficulty); reward.current = 0n; displayedGrowth.current = 1; paceInputs.current.clear();
+    const runSeed = `0x${Array.from(crypto.getRandomValues(new Uint8Array(32)), value => value.toString(16).padStart(2, '0')).join('')}`;
+    recording.current = createHumanRecording(runSeed, difficulty); engine.current = recording.current.run;
+    captured.current = null; saving.current?.abort(); saving.current = null; setSaveBusy(false); setSaveError(''); setSavedRunId('');
+    const tokenId = friendId.toString();
+    runArt.current = genesis ? { collection: 1, tokenId, chainId: 4663, label: `Genesis #${tokenId}`, portraitUrl: genesis.portraitUrl, bodyId }
+      : sprites ? { collection: 0, tokenId, chainId: 4663, label: `Generations #${tokenId}`, sprites: {
+        familyId: sprites.familyId, seed: sprites.seed, frames: sprites.frames.map(String) } } : null;
+    reward.current = 0n; displayedGrowth.current = 1; paceInputs.current.clear();
     analyticsRun.current = startArcadeAnalytics(collection, difficulty, onAnalytics);
     setNotice(''); setError(''); setUserPaused(false); setScreen('running');
     void sounds.current?.unlock(); sounds.current?.play('action-ready');
     requestAnimationFrame(() => stage.current?.focus());
     } catch { if (mounted.current) setError('Could not verify your Genesis. Reconnect from the arcade entry and try again.'); }
     finally { startingRef.current = false; if (mounted.current) setStarting(false); }
+  }
+  async function saveRun() {
+    const capture = captured.current;
+    if (!capture || saving.current || savedRunId) return;
+    const controller = new AbortController(); saving.current = controller; setSaveBusy(true); setSaveError('');
+    try {
+      const id = await requestArcadeRunSave(capture, controller.signal);
+      if (mounted.current && captured.current === capture && !controller.signal.aborted) setSavedRunId(id);
+    } catch (error) {
+      if (mounted.current && captured.current === capture && !controller.signal.aborted) setSaveError((error as Error).message || 'The run could not be saved. Try again.');
+    } finally {
+      if (saving.current === controller) { saving.current = null; if (mounted.current) setSaveBusy(false); }
+    }
   }
   const run = engine.current, e = economy.current, biome = Math.min(2, Math.floor(run.elapsed / run.duration * 3));
   const mode = DIFFICULTIES[run.difficulty], modeBest = best[run.difficulty];
@@ -225,7 +254,7 @@ function Runner({ friendId, client, paused, genesis, onNavigate = requestArcadeN
       <div className="life-hud"><span>KEEP IT RARE</span><strong aria-label={`${run.hearts} hearts remaining`}>{[0,1,2].map(i => <b key={i} className={i>=run.hearts?'lost':''}>♥</b>)}</strong></div>
     </div>
     <div className={`playfield ${running && !freeze ? 'playing' : ''}`}>
-      <svg ref={stage} className="world-svg" viewBox={`0 0 ${viewWidth} 500`} preserveAspectRatio="none" tabIndex={running ? 0 : -1} role="img" aria-label={vertical ? `Runner world. ${run.phase === 'up' ? 'Pulled upward' : 'Free falling'} automatically. Hold left or right to steer around obstacles.` : `Runner world. Space or up to jump, down to slide. Hold ${heading === -1 ? 'left' : 'right'} to speed up, ${heading === -1 ? 'right' : 'left'} to slow down.`} onPointerDown={event => { if (running) { event.preventDefault(); stage.current?.focus(); doJump(); } }}>
+      <svg ref={stage} className="world-svg" viewBox={`0 0 ${viewWidth} 500`} preserveAspectRatio="xMidYMid meet" tabIndex={running ? 0 : -1} role="img" aria-label={vertical ? `Runner world. ${run.phase === 'up' ? 'Pulled upward' : 'Free falling'} automatically. Hold left or right to steer around obstacles.` : `Runner world. Space or up to jump, down to slide. Hold ${heading === -1 ? 'left' : 'right'} to speed up, ${heading === -1 ? 'right' : 'left'} to slow down.`} onPointerDown={event => { if (running) { event.preventDefault(); stage.current?.focus(); doJump(); } }}>
         {screen !== 'ready' ? <DirectionScene run={run} reducedMotion={reduced} running={running && !freeze} biome={biome} growth={growth} renderCharacter={renderCharacter} viewportWidth={viewWidth}/> : <>
         <WorldArt distance={run.distance} elapsed={run.elapsed * 1000} reducedMotion={reduced || !running} biome={biome}/>
         {!running && screen === 'ready' && <g>{[0,1,2,3,4].map(i => <TokenCoin key={i} x={370+i*52} y={295 - Math.sin(i/4*Math.PI)*65} size={30}/>)}<EntityArt entity={{id:999,kind:'crystal',x:730,y:339,w:44,h:61} as RunState['entities'][number]} elapsed={0} reduced={reduced}/></g>}
@@ -256,7 +285,9 @@ function Runner({ friendId, client, paused, genesis, onNavigate = requestArcadeN
     </div>}
     {screen === 'result' && <div className="game-overlay result-screen"><div className="result-card"><span className="eyebrow">{mode.label.toUpperCase()} · {run.finishReason === 'time' ? 'TIME’S UP. NICE RUN.' : 'DOWN, BUT STILL RARE.'}</span><h2>{run.score >= modeBest ? `NEW ${mode.label.toUpperCase()} BEST` : 'ONE MORE RUN?'}</h2><div className="result-score">{run.score.toLocaleString()}<span>POINTS</span></div>
       <div className="results-grid"><div><b>{Math.floor(run.distance)}m</b><span>DISTANCE</span></div><div><b>{run.coins}</b><span>{run.bonusCoins ? `COINS · ${run.bonusCoins} BONUS` : 'COINS'}</span></div><div><b>+{formatToken(reward.current)}</b><span>DEMO $RUSH</span></div></div>
-      <p>Demo rewards banked. Nothing minted onchain.</p><div className="result-actions"><button className="primary" disabled={starting} onClick={start}>{starting ? 'CHECKING YOUR FRIEND…' : 'RUN IT BACK'} <span>↗</span></button><button className="change-difficulty" disabled={starting} onClick={backToDifficulty}><span aria-hidden="true">←</span> CHANGE DIFFICULTY</button></div>
+      <p>Demo rewards banked. Nothing minted onchain.</p>
+      <div className="run-save">{savedRunId ? <><p role="status">Run saved to the public feed.</p><button className="primary" onClick={() => requestSavedRunNavigation(savedRunId)}>VIEW SAVED RUN ↗</button></> : <><p>Sign to publish this replay to the public feed. No transaction.</p><button className="primary" disabled={saveBusy || !captured.current} onClick={saveRun}>{saveBusy ? 'WAITING FOR SAVE…' : saveError ? 'RETRY SAVE RUN' : 'SAVE RUN'}</button></>}{saveError && <p role="alert">{saveError}</p>}</div>
+      <div className="result-actions"><button className="primary" disabled={starting || saveBusy} onClick={start}>{starting ? 'CHECKING YOUR FRIEND…' : 'RUN IT BACK'} <span>↗</span></button><button className="change-difficulty" disabled={starting || saveBusy} onClick={backToDifficulty}><span aria-hidden="true">←</span> CHANGE DIFFICULTY</button></div>
       <small>{mode.label} best: {modeBest.toLocaleString()} · {formatToken(e.balance)} demo $RUSH collected</small></div></div>}
     {running && userPaused && !paused && !panel && <div className="game-overlay"><div className="pause-card"><span className="eyebrow">TAKE A BREATHER</span><h2>PAUSED</h2><p>Your timer is paused too.</p><button className="primary" onClick={() => { setUserPaused(false); stage.current?.focus(); }}>KEEP RUNNING <span>▶</span></button><button className="text-button" onClick={() => setPanel('rules')}>Controls & rules</button></div></div>}
 

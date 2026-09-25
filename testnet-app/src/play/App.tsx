@@ -13,6 +13,7 @@ import { createAuthorization, authorizationTypedData } from '../shared/authoriza
 import { EXPLORER_URL, RPC_URL, assertWalletContext } from '../safety.ts';
 import { createWalletSession } from '../wallet-session.ts';
 import { createVerifierStatusMonitor, fetchVerifierJson } from './verifier-status.ts';
+import { publishRun, RunPublicationError, runPublicationMessage } from '../../generated/games/rare-rush/public-runs.ts';
 
 const client = createPublicClient({ chain: TESTNET_CHAIN, transport: http(RPC_URL, { timeout: 12000, retryCount: 1, batch: { wait: 10, batchSize: 20 } }), cacheTime: 0 });
 const tokenAbi = parseAbi(['function balanceOf(address) view returns(uint256)', 'function allowance(address,address) view returns(uint256)']);
@@ -64,6 +65,8 @@ export function App() {
   const [stats, setStats] = useState<EngineSnapshot|null>(null);
   const [refreshCount,setRefreshCount]=useState(0);
   const [playbackSession,setPlaybackSession]=useState(0);
+  const [publishing, setPublishing] = useState(false), [publishError, setPublishError] = useState(''), [publishedId, setPublishedId] = useState('');
+  const publication = useRef<AbortController|null>(null);
   const playbackPermit=useRef(0);
   const walletSession=useRef<ReturnType<typeof createWalletSession>|null>(null);
   const serverMonitor=useRef<ReturnType<typeof createVerifierStatusMonitor>|null>(null);
@@ -73,11 +76,17 @@ export function App() {
   const actionBusy = useRef(false);
   const epoch = useRef(0);
   const run = state?.savedRun;
+  const currentRunId = useRef(run?.run.runId); currentRunId.current = run?.run.runId;
+  useEffect(() => {
+    publication.current?.abort(); publication.current = null;
+    setPublishing(false); setPublishError(''); setPublishedId('');
+    return () => { publication.current?.abort(); publication.current = null; };
+  }, [account, run?.run.runId]);
   const pending = state?.pending;
   const expired = run ? Number(run.run.claimUntil) * 1000 <= now : false;
   const liveSaved = run && !['claimed','abandoned'].includes(run.status) && !expired;
   const needsRunClose = !!liveSaved && run?.status === 'lost';
-  const canWrite = !!account && chainId === 46630 && verified && !busy && !pending;
+  const canWrite = !!account && chainId === 46630 && verified && !busy && !pending && !publishing;
   useEffect(()=>{
     if(pending?.kind==='approve'&&pending.hash&&actionBusy.current)setBusy('Approval submitted. Waiting for confirmation…');
   },[pending?.kind,pending?.hash]);
@@ -274,6 +283,30 @@ export function App() {
     const url=URL.createObjectURL(new Blob([JSON.stringify(run,null,2)],{type:'application/json'}));
     const a=document.createElement('a');a.href=url;a.download=`rare-rush-run-${run.run.runId}.json`;a.click();URL.revokeObjectURL(url);
   }
+  async function publishReplay() {
+    if (!run || !account || publication.current || publishedId || busy || pending) return;
+    const original = run, expectedAccount = account, requestEpoch = epoch.current;
+    const controller = new AbortController(); publication.current = controller;
+    setPublishing(true); setPublishError('');
+    try {
+      const recording = createRecorder(original.run.seed, MODES[original.run.difficulty], original.replay, original.completedTicks);
+      if (recording.run.status !== 'finished' || original.replay.frames.length !== original.completedTicks) {
+        throw new RunPublicationError('Finish the recorded run before publishing it.');
+      }
+      const assertActive = () => {
+        if (requestEpoch !== epoch.current || currentAccount.current !== expectedAccount || currentRunId.current !== original.run.runId) {
+          throw new RunPublicationError('The selected wallet or run changed. Return to this run before saving.');
+        }
+      };
+      const saved = await publishRun({ source: 'testnet', actor: 'human', collection: original.run.collection,
+        tokenId: original.run.tokenId, runId: original.run.runId, seed: original.run.seed,
+        difficulty: MODES[original.run.difficulty], player: original.run.player,
+        replay: { version: 'rare-rush-agent-local-v1', finalTick: original.completedTicks, inputs: original.replay } }, wallet(),
+      'https://rarerush.app/api/runs', { signal: controller.signal, assertActive });
+      assertActive(); if (!controller.signal.aborted) setPublishedId(saved.id);
+    } catch (error) { if (!controller.signal.aborted) setPublishError(runPublicationMessage(error)); }
+    finally { if (publication.current === controller) { publication.current = null; setPublishing(false); } }
+  }
   const claimFresh=run?.claim && Number(run.claim.deadline)*1000>now+15000;
   const showStoredRun = !!run && (route.runId === run.run.runId || (!!selected && !!liveSaved));
   const arcade = !dashboard && verified && chainId === 46630 && (showStoredRun || !!selected);
@@ -344,6 +377,12 @@ export function App() {
     <h2>{run.status==='claimed'?'KEEP IT RARE.':run.status==='survived'?'CLAIM YOUR RUSH.':run.status==='lost'?'NEXT RUN. BIGGER RUSH.':run.status==='abandoned'||expired?'READY FOR THE NEXT?':'READY TO RUSH?'}</h2>
     {!dashboard&&stats?.status==='finished'&&<div className="result-score">{stats.score.toLocaleString()}<span>POINTS</span></div>}
     {stats&&<div className="result-stats"><span><b>{Math.floor(stats.distance)}m</b>DISTANCE</span><span><b>{stats.coins}</b>COINS</span><span><b>{stats.hearts}</b>HEARTS</span></div>}
+    {stats?.status==='finished'&&stats.completedTicks===run.completedTicks&&<div className="run-save">
+      {publishedId ? <><p role="status">Run saved to the public feed.</p><a className="outline-link" href={`https://rarerush.app/runs-feed/?run=${publishedId}`}>VIEW SAVED RUN ↗</a></> : <>
+        <p>Sign to publish this replay to the public feed. No transaction; rewards are claimed separately.</p>
+        <button className={dashboard?'outline-button':'primary'} disabled={publishing||!!busy||!!pending||!account||chainId!==46630} onClick={()=>void publishReplay()}>{publishing?'WAITING FOR SAVE…':publishError?'RETRY SAVE RUN':'SAVE RUN'}</button>
+      </>}{publishError&&<p role="alert">{publishError}</p>}
+    </div>}
     {run.reward&&<p className="reward-total">+{amount(run.reward,6)} tRARERUSH minted</p>}
     {quote!==null&&run.status==='survived'&&<p className="reward-total">Estimated reward: {amount(quote,6)} tRARERUSH</p>}
     {liveSaved&&run.status==='survived'&&<div className="play-actions">

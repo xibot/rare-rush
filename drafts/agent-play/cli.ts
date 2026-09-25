@@ -3,13 +3,15 @@ import { randomBytes } from 'node:crypto';
 import { resolve } from 'node:path';
 import { setImmediate } from 'node:timers/promises';
 import { createPublicClient, http, type EIP1193Provider } from 'viem';
+import { publishRun, type PublishedRun } from '../../games/rare-rush/public-runs.ts';
+import { publicationPayloadHash, type ReplayPublication, type PublicRunArt } from '../../shared/replay-publication.ts';
 import { GENESIS_DEPLOYMENT } from '../../games/rare-rush/genesis/identity.ts';
 import { loadArcadeFriend, type ArcadeFriend, type ArcadeProvider } from './arcade.ts';
 import { loadExternalProvider } from './wallet-provider.ts';
 import { runHeadlessTestnet, type HeadlessTestnetProgress, type HeadlessTestnetOptions, type HeadlessTestnetResult } from './headless-testnet.ts';
 import { PROTOCOL_VERSION, advanceAgent, checkAgentReplay, createAgentSession, exportAgentReplay, resumeAgentSession,
   type Replay } from './runner.ts';
-import { JobError, openJob, readJobFile, type JobSpec, type JobRecord, type JobDocument } from './jobs.ts';
+import { JobError, openJob, readJobFile, readJobDocument, type JobSpec, type JobRecord, type JobDocument } from './jobs.ts';
 
 const TESTNET_RPC = 'https://rpc.testnet.chain.robinhood.com';
 const collectionId = (job: JobSpec): 0 | 1 => job.collection === 'genesis' ? 1 : 0;
@@ -35,10 +37,11 @@ const TESTNET_MESSAGES: Record<string, string> = {
   'job-attention': 'This existing job needs attention. Inspect its saved state before continuing.',
   'connection-error': 'A connection or signer operation did not finish. Resume this exact job; no automatic resend occurs.',
 };
-const HELP = `Rare Rush headless Agent Play (local prototype)
+const HELP = `Rare Rush headless Agent Play
 
 Usage:
   node drafts/agent-play/cli.mjs run --job <job.json> [--jobs-dir <directory>]
+  node drafts/agent-play/cli.mjs publish --job <job.json> [--jobs-dir <directory>] [--provider-module <trusted module>]
   node drafts/agent-play/cli.mjs --help
 
 Job JSON:
@@ -49,6 +52,13 @@ Modes: preview, arcade, testnet. Job IDs are required and never generated.
 Repeat the exact same job ID and configuration to resume or read its result;
 changing the ID creates a separate run and requires existing authorization.
 One job can start at most one run.
+
+publish reads an already completed Arcade/Testnet job and asks its wallet to
+sign public replay publication. It never runs, resumes, mints or transacts.
+Preview cannot be published. An address-only Arcade job needs an explicit
+--provider-module signer; its original job file and fingerprint stay unchanged.
+The replay, wallet address, Friend artwork and run statistics become public.
+Repeated publication is idempotent on the server and signs a fresh message.
 
 Arcade adds wallet:{address,providerModule?} and optional rpcUrl. Without a
 provider module, ownership is observed by address, not wallet-authenticated.
@@ -78,6 +88,70 @@ export interface RunJobOptions {
   readArcade?: typeof loadArcadeFriend;
   testnetRunner?: (options: HeadlessTestnetOptions) => Promise<HeadlessTestnetResult>;
   seed?: () => string;
+}
+
+export interface PublishJobOptions {
+  directory: string;
+  providerModule?: string;
+  provider?: EIP1193Provider;
+  loadProvider?: typeof loadExternalProvider;
+  fetcher?: typeof fetch;
+}
+
+function publicationPayload(job: JobSpec, document: JobDocument): ReplayPublication {
+  if (document.status !== 'completed' || !document.record) {
+    throw new JobError('NOT_COMPLETED', 'Only an already completed job with its saved replay can be published.');
+  }
+  if (job.mode === 'preview' || !job.wallet) throw new JobError('PREVIEW_PRIVATE', 'Preview runs stay local and cannot be published.');
+  const record = verifyRecord(job, document.record);
+  let art: PublicRunArt | undefined;
+  if (job.mode === 'arcade') {
+    if (!record.art || typeof record.art !== 'object' || Array.isArray(record.art)) throw new JobError('INVALID_STATE', 'The completed Arcade replay is missing its saved Friend artwork.');
+    const saved = record.art as PublicRunArt;
+    if (saved.collection !== record.collection || saved.tokenId !== record.tokenId || saved.chainId !== 4663
+      || typeof saved.owner !== 'string' || saved.owner.toLowerCase() !== job.wallet.address) {
+      throw new JobError('INVALID_STATE', 'The saved artwork does not match this job. Preserve the result for inspection.');
+    }
+    // Do not transmit arbitrary fields from local job/checkpoint/provider files.
+    art = { collection: saved.collection, tokenId: saved.tokenId, owner: saved.owner, chainId: 4663, label: saved.label,
+      ...(saved.blockNumber !== undefined ? { blockNumber: saved.blockNumber } : {}),
+      ...(record.collection === 1 ? { portraitUrl: saved.portraitUrl, bodyId: saved.bodyId } : {
+        sprites: saved.sprites ? { familyId: saved.sprites.familyId, seed: saved.sprites.seed, frames: saved.sprites.frames.map(String) } : undefined,
+      }) };
+  }
+  return { source: job.mode, collection: record.collection, tokenId: record.tokenId, difficulty: record.difficulty,
+    seed: record.seed, replay: record.replay, player: job.wallet.address, actor: 'agentic',
+    ...(job.mode === 'testnet' ? { runId: record.runId } : {}), ...(art ? { art } : {}) };
+}
+
+/** Public publication is separate from run/recovery. Completed job files are
+ * never rewritten and no run lease, wallet transaction or nonce is acquired.
+ */
+export async function publishJob(job: JobSpec, options: PublishJobOptions): Promise<PublishedRun> {
+  const document = readJobDocument(options.directory, job);
+  if (!document) throw new JobError('NOT_COMPLETED', 'No completed result exists for this exact job. Run it separately before publishing.');
+  const payload = publicationPayload(job, document), digest = publicationPayloadHash(payload);
+  const module = options.providerModule ?? job.wallet?.providerModule;
+  if (!options.provider && !module) throw new JobError('SIGNER_REQUIRED', 'Publishing needs this wallet’s trusted provider module. Use --provider-module without changing the original job file.');
+  const provider = options.provider ?? await (options.loadProvider ?? loadExternalProvider)({
+    providerModule: module!, chainId: job.mode === 'testnet' ? 46630 : 4663, address: job.wallet!.address,
+    rpcUrl: job.rpcUrl ?? (job.mode === 'testnet' ? TESTNET_RPC : GENESIS_DEPLOYMENT.rpcUrl),
+  });
+  const readonlyPublication = { request: ({ method, params }: { method: string; params?: readonly unknown[] | object }) => {
+    if (!['eth_accounts', 'eth_chainId', 'eth_signTypedData_v4'].includes(method)) {
+      throw new JobError('PUBLICATION_ONLY', 'Publication cannot request a transaction or a new run.');
+    }
+    return provider.request({ method, params } as never);
+  } };
+  const assertActive = () => {
+    const latest = readJobDocument(options.directory, job);
+    if (!latest || publicationPayloadHash(publicationPayload(job, latest)) !== digest) {
+      throw new JobError('JOB_CHANGED', 'The completed replay changed during publication. No new run was started.');
+    }
+  };
+  const saved = await publishRun(payload, readonlyPublication, 'https://rarerush.app/api/runs', { fetcher: options.fetcher, assertActive });
+  if (saved.id !== digest.slice(2)) throw new JobError('INVALID_RECEIPT', 'Publication returned an unexpected replay identity.');
+  return saved;
 }
 function cleanArt(art: ArcadeFriend): unknown {
   const { sprites, ...identity } = art;
@@ -190,22 +264,30 @@ export async function runJob(job: JobSpec, options: RunJobOptions): Promise<JobD
   } finally { lease.close(retainWallet); }
 }
 
-export async function runCli(args: string[], defaults: { directory: string; write?: (line: string) => void }): Promise<number> {
+export async function runCli(args: string[], defaults: { directory: string; write?: (line: string) => void;
+  publication?: Pick<PublishJobOptions, 'provider' | 'loadProvider' | 'fetcher'> }): Promise<number> {
   const write = defaults.write ?? (line => process.stdout.write(line + '\n'));
   if (args.length === 1 && ['--help', '-h'].includes(args[0])) { write(HELP); return 0; }
   let job: JobSpec | undefined;
   let directory = defaults.directory;
   try {
-    if (args[0] !== 'run') throw new JobError('INVALID_ARGS', 'Use run --job <job.json>, or --help.');
-    let file: string | undefined;
+    if (!['run', 'publish'].includes(args[0])) throw new JobError('INVALID_ARGS', 'Use run --job <job.json>, publish --job <job.json>, or --help.');
+    let file: string | undefined, providerModule: string | undefined;
     for (let index = 1; index < args.length; index += 2) {
       if (!args[index + 1] || args[index + 1].startsWith('--')) throw new JobError('INVALID_ARGS', 'Every CLI option needs a value.');
       if (args[index] === '--job' && !file) file = args[index + 1];
       else if (args[index] === '--jobs-dir' && directory === defaults.directory) directory = resolve(args[index + 1]);
+      else if (args[0] === 'publish' && args[index] === '--provider-module' && !providerModule) providerModule = resolve(args[index + 1]);
       else throw new JobError('INVALID_ARGS', 'Unsupported or repeated CLI option.');
     }
     if (!file) throw new JobError('INVALID_ARGS', 'A job JSON path is required. Job IDs are never generated.');
     job = readJobFile(resolve(file));
+    if (args[0] === 'publish') {
+      const saved = await publishJob(job, { directory, ...(providerModule ? { providerModule } : {}), ...defaults.publication });
+      write(JSON.stringify({ version: 1, jobId: job.id, status: 'published', id: saved.id,
+        url: `https://rarerush.app/runs-feed/?run=${saved.id}`, actor: saved.actor }));
+      return 0;
+    }
     const document = await runJob(job, { directory });
     let metrics;
     if (document.record) {

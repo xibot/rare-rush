@@ -2,7 +2,7 @@ import { BrandMark } from './BrandMark';
 import { SITE_LINKS } from './site-navigation';
 
 /** The landing header is the common site chrome, independent of page content width. */
-export function SiteHeader({ page }: { page: 'landing' | 'docs' | 'pitch' | 'genesis' }) {
+export function SiteHeader({ page }: { page: 'landing' | 'docs' | 'pitch' | 'genesis' | 'agent-play' | 'runs-feed' }) {
   return <div className="site-header-shell" id="top">
     <header className={`site-header ${page}-header`}>
       <a className={`site-logo ${page}-logo`} href={page === 'landing' ? '#top' : '/'} aria-label="Rare Rush by Xibot home"><BrandMark/></a>

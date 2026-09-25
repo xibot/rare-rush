@@ -1,6 +1,10 @@
 import { useEffect, useRef, useState } from 'react';
 import { createRoot } from 'react-dom/client';
 import { formatUnits } from 'viem';
+import { SiteHeader } from '../../games/rare-rush/SiteHeader.tsx';
+import { PUBLIC_SITE, AGENT_PATH, FEED_PATH, isFeedPage } from './site-mode.ts';
+import { publishRun } from '../../games/rare-rush/public-runs.ts';
+import type { ReplayPublication } from '../../shared/replay-publication.ts';
 import { BrandMark } from '../../games/rare-rush/BrandMark.tsx';
 import { FIXED_STEP } from '../../games/rare-rush/twist/engine.ts';
 import { DIFFICULTIES } from '../../games/rare-rush/difficulty.ts';
@@ -31,16 +35,19 @@ const fmt = (value:bigint|undefined,decimals=18) => value == null ? '—' : Numb
 const err = (error:unknown) => (error as any)?.shortMessage || (error as Error)?.message || 'Something did not connect. Try again.';
 async function request(path:string, body?:unknown) {
   const response = await fetch(path,{...(body === undefined ? {} : {method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body,(_,v)=>typeof v==='bigint'?v.toString():v)}),signal:AbortSignal.timeout(20_000)});
-  const value = await response.json(); if(!response.ok) throw new Error(value.error || 'The local preview did not respond.'); return value;
+  const value = await response.json(); if(!response.ok) throw new Error(value.error || 'The run service did not respond.'); return value;
 }
 
 function App() {
   const [view,setView] = useState<'autopilot'|'agentic'>('autopilot');
-  const [page,setPage] = useState<'play'|'feed'>(()=>location.hash==='#runs-feed'?'feed':'play');
+  const [page,setPage] = useState<'play'|'feed'>(()=>isFeedPage()?'feed':'play');
   const [feedRun,setFeedRun] = useState<RunRecord|null>(null);
   const {likes,toggleLike,likesError}=useFeedLikes();
   const [recordsLoading,setRecordsLoading]=useState(true), [recordsError,setRecordsError]=useState('');
   const recordsRequest=useRef<Promise<void>|null>(null);
+  const paginationStarted=useRef(false);
+  const [nextCursor,setNextCursor]=useState<string|null>(null);
+  const [loadingMore,setLoadingMore]=useState(false), pagingRef=useRef(false);
   const [source,setSource] = useState<Source>('local');
   const [collection,setCollection] = useState<0|1>(1), [tokenId,setTokenId] = useState('1');
   const [difficulty,setDifficulty] = useState<Difficulty>('degen');
@@ -55,6 +62,7 @@ function App() {
   const [busy,setBusy] = useState(''), actionLock=useRef(false);
   const [error,setError] = useState(''), [notice,setNotice] = useState('');
   const [record,setRecord] = useState<SavedRecord|null>(null), [records,setRecords] = useState<SavedRecord[]>([]);
+  const recordsRef=useRef(records);recordsRef.current=records;
   const [filter,setFilter] = useState<'all'|Difficulty>('all');
   const [tn,setTn] = useState<TestnetState|null>(null), adapter=useRef<Adapter|null>(null);
   const [arcade,setArcade] = useState<any>(null), [arcadeArt,setArcadeArt] = useState<any>(null);
@@ -100,24 +108,47 @@ function App() {
   }
   function loadRecords():Promise<void> {
     if(recordsRequest.current)return recordsRequest.current;
+    if(pagingRef.current)return Promise.resolve();
     recordsRequest.current=(async()=>{
-      try {const result=await request('/api/runs');setRecords(result.runs);setRecordsError('');}
+      try {const result=await request('/api/runs'),fresh=result.runs as RunRecord[];
+        const gap=PUBLIC_SITE&&recordsRef.current.length>0&&fresh.length>0&&!fresh.some(r=>recordsRef.current.some(old=>old.id===r.id));
+        setRecords(previous=>PUBLIC_SITE?[...fresh,...previous.filter(r=>!fresh.some(n=>n.id===r.id))]:fresh);
+        // If a full page of new runs arrived, traverse from its cursor to fill
+        // the gap instead of leaving those runs unreachable until a reload.
+        if(!paginationStarted.current||gap)setNextCursor(result.nextCursor??result.cursor??null);setRecordsError('');}
       catch(e){setRecordsError(err(e));throw e;}
       finally {recordsRequest.current=null;setRecordsLoading(false);}
     })();
     return recordsRequest.current;
   }
-  function openFeed(){if(actionLock.current||tn?.busy)return;location.hash='runs-feed';}
-  function backToPlay(){location.hash='agent-play';}
+  async function moreRecords() {
+    if(pagingRef.current||!nextCursor)return;
+    if(recordsRequest.current){await recordsRequest.current.catch(()=>{});return;}
+    pagingRef.current=true;setLoadingMore(true);
+    try{const result=await request('/api/runs?cursor='+encodeURIComponent(nextCursor));setRecords(previous=>[...previous,...(result.runs as RunRecord[]).filter(r=>!previous.some(p=>p.id===r.id))]);paginationStarted.current=true;setNextCursor(result.nextCursor??result.cursor??null);setRecordsError('');}
+    catch(e){setRecordsError(err(e));}finally{pagingRef.current=false;setLoadingMore(false);}
+  }
+  function navigateCommunity(feed:boolean) {
+    if(PUBLIC_SITE){history.pushState(null,'',feed?FEED_PATH:AGENT_PATH);window.dispatchEvent(new PopStateEvent('popstate'));}
+    else location.hash=feed?'runs-feed':'agent-play';
+  }
+  function openFeed(){if(actionLock.current||tn?.busy)return;navigateCommunity(true);}
+  function backToPlay(){navigateCommunity(false);}
   useEffect(()=>{
     const route=()=>{
-      const next=location.hash==='#runs-feed'?'feed':'play';
+      const next=isFeedPage()?'feed':'play';
       if(next==='feed'&&runningRef.current){stop();try{checkpoint();}catch(e){setError(err(e));}setNotice('Your Autopilot run is paused. Choose Resume when you return.');}
-      setPage(next);if(next==='play')setFeedRun(null);
+      setPage(next);if(PUBLIC_SITE)document.title=`Rare Rush | ${next==='feed'?'Runs Feed':'Agent Play'}`;if(next==='play')setFeedRun(null);
     };
-    window.addEventListener('hashchange',route);
-    return()=>window.removeEventListener('hashchange',route);
+    window.addEventListener('hashchange',route);window.addEventListener('popstate',route);
+    return()=>{window.removeEventListener('hashchange',route);window.removeEventListener('popstate',route);};
   },[]);
+  useEffect(()=>{
+    if(!PUBLIC_SITE||page!=='feed')return;
+    const id=new URLSearchParams(location.search).get('run');if(!id||!/^[a-f0-9]{64}$/.test(id))return;
+    let alive=true;void request('/api/runs/'+id).then(value=>{if(alive)setFeedRun(value);}).catch(e=>{if(alive)setRecordsError(err(e));});
+    return()=>{alive=false;};
+  },[page]);
   useEffect(()=>{
     document.title=page==='feed'?'Rare Rush | Runs Feed':'Rare Rush | Agent Play';
     requestAnimationFrame(()=>window.scrollTo({top:0,behavior:'instant'}));
@@ -131,7 +162,7 @@ function App() {
     const unsubscribe=getArcadeSession().subscribe(()=>{const next=getArcadeSession().getSnapshot();if(next.revision!==revision){revision=next.revision;if(identity.current?.source==='arcade'){stop();setArcade(null);setNotice('Arcade wallet changed. Reconnect before resuming.');}}});
     void loadRecords().catch(e=>setError(err(e)));
     const timer=setInterval(()=>setNow(Date.now()),1000);
-    const libraryTimer=setInterval(()=>{if(!document.hidden)void loadRecords().catch(()=>{});},5000);
+    const libraryTimer=setInterval(()=>{if(!document.hidden)void loadRecords().catch(()=>{});},PUBLIC_SITE?30_000:5000);
     const refreshLibrary=()=>{if(!document.hidden)void loadRecords().catch(()=>{});};
     document.addEventListener('visibilitychange',refreshLibrary);
     return ()=>{client.dispose();adapter.current=null;unsubscribe();clearInterval(timer);clearInterval(libraryTimer);document.removeEventListener('visibilitychange',refreshLibrary);};
@@ -143,11 +174,28 @@ function App() {
       checkpointTick.current=s.run._tick;
     }
   }
+  async function savePublicRun() {
+    const runIdentity=identity.current,s=live.current;
+    if(!runIdentity||runIdentity.source==='local'||s.kind==='replay'||s.run.status!=='finished')throw new Error('Complete an Arcade or Testnet run first.');
+    const provider=runIdentity.source==='arcade'?arcade?.provider:(window as any).ethereum;
+    if(!provider)throw new Error('Reconnect the wallet used for this run.');
+    const originalArt=artRef.current;
+    const art=originalArt?{collection:originalArt.collection,tokenId:originalArt.tokenId,owner:originalArt.owner,
+      chainId:originalArt.chainId,blockNumber:String(originalArt.blockNumber),label:originalArt.label,
+      ...(originalArt.portraitUrl?{portraitUrl:originalArt.portraitUrl,bodyId:originalArt.bodyId}:{}),
+      ...(originalArt.sprites?{sprites:{familyId:originalArt.sprites.familyId,seed:originalArt.sprites.seed,
+        frames:originalArt.sprites.frames.map(String)}}:{})}:undefined;
+    const payload={...runIdentity,source:runIdentity.source,player:runIdentity.player!,actor:'autopilot',replay:exportAgentReplay(s),...(runIdentity.source==='arcade'?{art}:{})} as ReplayPublication;
+    const saved=await publishRun(payload,provider);
+    if(live.current===s)setRecord(saved);
+    await loadRecords();setNotice('Your run is saved in the public Runs Feed.');
+  }
   async function finish(s:RunSession) {
     const runIdentity=identity.current,runArt=artRef.current;
     stop();setScreen('result');
     if(s.kind==='replay')return;
     try {checkpoint(s);}catch(e){setError(err(e));}
+    if(PUBLIC_SITE)return;
     try {
       const saved=await request('/api/runs',{...runIdentity,replay:exportAgentReplay(s),...(runIdentity?.source==='arcade'?{art:runArt}:{})});
       if(live.current===s&&identity.current===runIdentity)setRecord(saved);await loadRecords();
@@ -192,7 +240,7 @@ function App() {
     setView('autopilot');
     live.current=s;setSession(s);identity.current=id;setCurrent(id);setRecord(null);setTick(s.run._tick);completed.current=false;checkpointTick.current=s.run._tick;
     setScreen('watch');setSpeed(1);speedRef.current=1;artRef.current=art??null;setArcadeArt(art??null);
-    if(location.hash==='#runs-feed'){stop();setNotice('Your Autopilot run is paused. Choose Resume when you return.');}
+    if(isFeedPage()){stop();setNotice('Your Autopilot run is paused. Choose Resume when you return.');}
     else {play();requestAnimationFrame(()=>stageAnchor.current?.scrollIntoView({behavior:'smooth',block:'start'}));}
   }
   async function begin() {
@@ -250,8 +298,8 @@ function App() {
   const displayCollection=current?.collection??collection, displayToken=current?.tokenId??tokenId;
   const isTestnetRun=current?.source==='testnet' && session.kind==='agent';
   const matchesSaved=isTestnetRun && stateRun?.run.runId===current?.runId;
-  return <div className="agent-app">
-    <header className="site-header"><a className="brand" href="/" aria-label="Rare Rush Agent Play"><BrandMark/></a><nav aria-label="Main navigation">{page==='feed'?<a href="#agent-play">AGENT PLAY</a>:<a href="#runs-feed" aria-disabled={!!busy||!!tn?.busy} onClick={event=>{event.preventDefault();openFeed();}}>RUNS FEED</a>}<a href="https://rarerush.app" target="_blank" rel="noreferrer">ARCADE ↗</a><span className="local-label">LOCAL PROTOTYPE</span></nav></header>
+  return <div className={`agent-app ${PUBLIC_SITE?'public-community':''}`}>
+    {PUBLIC_SITE?<SiteHeader page={page==='feed'?'runs-feed':'agent-play'}/>:<header className="site-header"><a className="brand" href="/" aria-label="Rare Rush Agent Play"><BrandMark/></a><nav aria-label="Main navigation">{page==='feed'?<a href="#agent-play">AGENT PLAY</a>:<a href="#runs-feed" aria-disabled={!!busy||!!tn?.busy} onClick={event=>{event.preventDefault();openFeed();}}>RUNS FEED</a>}<a href="https://rarerush.app" target="_blank" rel="noreferrer">ARCADE ↗</a><span className="local-label">LOCAL PROTOTYPE</span></nav></header>}
     <main>
       <div id="agent-play" hidden={page!=='play'}>
       <section className="hero"><div><p className="eyebrow">YOUR FRIEND. A NEW PLAYER.</p><h1>AGENT <span>PLAY.</span></h1></div><p>Your Friend. Your agent.<br/>Choose how you want to rush.</p></section>
@@ -266,7 +314,7 @@ function App() {
       <div id="autopilot-panel" role="tabpanel" aria-labelledby="autopilot-tab" hidden={view!=='autopilot'}>
       <div ref={stageAnchor} className="watch-section" data-screen={screen} data-tick={tick}>
         <div className="section-top"><span className="eyebrow">01 / {session.kind==='replay'?'WATCH THE REPLAY':'WATCH THE RUSH'}</span><span>{screen==='ready'?'READY WHEN YOU ARE':screen==='result'?'RUN COMPLETE':running?'AGENT AT THE CONTROLS':'PAUSED'}</span></div>
-        <AgentStage run={session.run} collection={displayCollection} tokenId={validId(displayToken)?displayToken:'1'} running={running} reducedMotion={reduced} label={(current?.source??source)==='testnet'?'TESTNET':(current?.source??source)==='arcade'?'ARCADE':'LOCAL PREVIEW'} art={arcadeArt} fieldOverlay={screen==='result'&&<div className="agent-result-overlay" role="dialog" aria-label="Agent run result"><section className="result-card"><p className="eyebrow">{session.run.finishReason==='time'?'TIMER SURVIVED.':'OUT OF HEARTS.'}</p><h2 ref={resultHeading} tabIndex={-1}>{session.run.finishReason==='time'?'KEEP IT RARE.':'ANOTHER RUSH AWAITS.'}</h2><div className="result-score">{session.run.score.toLocaleString()}<span>POINTS</span></div><div className="result-stats"><span><b>{Math.floor(session.run.distance).toLocaleString()}m</b>DISTANCE</span><span><b>{session.run.coins}</b>COINS</span><span><b>{session.run.hearts}</b>HEARTS</span></div><p>{record?'✓ Replay checked locally and saved to this computer.':'Replay ready to save.'}</p><div className="inline-actions"><button onClick={download}>SAVE REPLAY ↓</button>{record&&<button disabled={!!busy} onClick={openFeed}>VIEW IN RUNS FEED ↗</button>}{record&&<button disabled={!!busy} onClick={()=>void act('Loading replay…',async()=>{await replayRecord(record);})}>WATCH REPLAY ▶</button>}{!record&&<button disabled={!!busy} onClick={()=>void act('Saving replay…',async()=>{await finish(session);})}>RETRY SAVE</button>}</div>
+        <AgentStage run={session.run} collection={displayCollection} tokenId={validId(displayToken)?displayToken:'1'} running={running} reducedMotion={reduced} label={(current?.source??source)==='testnet'?'TESTNET':(current?.source??source)==='arcade'?'ARCADE':'LOCAL PREVIEW'} art={arcadeArt} fieldOverlay={screen==='result'&&<div className="agent-result-overlay" role="dialog" aria-label="Agent run result"><section className="result-card"><p className="eyebrow">{session.run.finishReason==='time'?'TIMER SURVIVED.':'OUT OF HEARTS.'}</p><h2 ref={resultHeading} tabIndex={-1}>{session.run.finishReason==='time'?'KEEP IT RARE.':'ANOTHER RUSH AWAITS.'}</h2><div className="result-score">{session.run.score.toLocaleString()}<span>POINTS</span></div><div className="result-stats"><span><b>{Math.floor(session.run.distance).toLocaleString()}m</b>DISTANCE</span><span><b>{session.run.coins}</b>COINS</span><span><b>{session.run.hearts}</b>HEARTS</span></div><p>{record?(PUBLIC_SITE?'✓ Replay verified and saved to the public feed.':'✓ Replay checked locally and saved to this computer.'):'Replay ready to save.'}</p><div className="inline-actions"><button onClick={download}>SAVE REPLAY ↓</button>{record&&<button disabled={!!busy} onClick={openFeed}>VIEW IN RUNS FEED ↗</button>}{record&&<button disabled={!!busy} onClick={()=>void act('Loading replay…',async()=>{await replayRecord(record);})}>WATCH REPLAY ▶</button>}{!record&&(PUBLIC_SITE?current?.source!=='local':true)&&<button disabled={!!busy} onClick={()=>void act(PUBLIC_SITE?'Sign to publish your replay…':'Saving replay…',async()=>{if(PUBLIC_SITE)await savePublicRun();else await finish(session);})}>{PUBLIC_SITE?'SAVE RUN':'RETRY SAVE'}</button>}</div>{PUBLIC_SITE&&current?.source!=='local'&&!record&&<p className="community-publish-note">Sign to publish your wallet address, Friend and replay. No transaction or gas fee.</p>}
           {isTestnetRun&&matchesSaved&&stateRun&&<div className="claim-actions">{stateRun.status==='claimed'?<p className="lime">MINT CONFIRMED · {stateRun.reward?`${fmt(BigInt(stateRun.reward),6)} tRARERUSH`:''}</p>:!claimWindowOpen?<p>This run’s claim window expired. Pick your next run; its replay remains saved locally.</p>:session.run.finishReason==='time'?<><p>Survived runs can request a verifier signature, then claim through your wallet.</p><button disabled={!!busy||!!pending} onClick={()=>void act(freshClaim?'Confirm claim in your wallet…':'Sign replay authorization…',async()=>{if(freshClaim){await adapter.current!.claim();setNotice('Your Testnet mint is confirmed.');}else{await adapter.current!.verify();setNotice('Replay verified. Claim in your wallet when ready.');}})}>{freshClaim?'CLAIM TESTNET REWARD ↗':'VERIFY TESTNET RUN ↗'}</button></>:stateRun.status!=='abandoned'&&<><p>This run earned no claim. Close it onchain to free this NFT for its next attempt.</p><button disabled={!!busy||!!pending} onClick={()=>void act('Close run in your wallet…',async()=>{await adapter.current!.abandon();setNotice('Run closed. Remaining daily attempts are available.');})}>CLOSE TESTNET RUN</button></>}</div>}
           <button className="primary next-run" disabled={!!busy} onClick={()=>void act('Preparing next run…',reset)}>PICK NEXT RUN ↗</button>
           {busy&&<p className="result-progress" role="status">{busy}</p>}
@@ -300,14 +348,14 @@ function App() {
       </section>
       </div>
       <div id="agentic-panel" role="tabpanel" aria-labelledby="agentic-tab" hidden={view!=='agentic'}><AgenticPanel/></div>
-      <section id="leaderboard" className="library"><div className="section-top"><div><p className="eyebrow">03 / YOUR LOCAL RUN LIBRARY</p><h2>BEST OF THE <span>RUSH.</span></h2></div><span className="count">{records.length} SAVED {records.length===1?'RUN':'RUNS'}</span></div><p className="muted">Best run per Friend and environment. Scheduled agent runs appear automatically. Filter by difficulty to explore more. Community voting comes later.</p><a className="feed-library-link" href="#runs-feed" onClick={event=>{event.preventDefault();openFeed();}}>VIEW ALL SAVED RUNS ↗</a><div className="inline-actions filters" role="group" aria-label="Leaderboard difficulty">{(['all',...MODES] as const).map(m=><button key={m} aria-pressed={filter===m} onClick={()=>setFilter(m)}>{m.toUpperCase()}</button>)}</div>
+      <section id="leaderboard" className="library"><div className="section-top"><div><p className="eyebrow">{PUBLIC_SITE?'03 / COMMUNITY RUN LIBRARY':'03 / YOUR LOCAL RUN LIBRARY'}</p><h2>BEST OF THE <span>RUSH.</span></h2></div><span className="count">{records.length} SAVED {records.length===1?'RUN':'RUNS'}</span></div><p className="muted">{PUBLIC_SITE?'Published runs from people and agents. Best per Friend and environment among the loaded runs.':'Best run per Friend and environment. Scheduled agent runs appear automatically. Filter by difficulty to explore more. Community voting comes later.'}</p><a className="feed-library-link" href={FEED_PATH} onClick={event=>{event.preventDefault();openFeed();}}>VIEW ALL SAVED RUNS ↗</a><div className="inline-actions filters" role="group" aria-label="Leaderboard difficulty">{(['all',...MODES] as const).map(m=><button key={m} aria-pressed={filter===m} onClick={()=>setFilter(m)}>{m.toUpperCase()}</button>)}</div>
         {best.length?<div className="run-list">{best.map((r,i)=><article key={r.id} className="run-row"><span className="rank">{String(i+1).padStart(2,'0')}</span><div><b>{r.collection===1?'GENESIS':'GENERATIONS'} #{r.tokenId}</b><small>{r.source==='local'?'PREVIEW':r.source.toUpperCase()} · {r.difficulty.toUpperCase()} · {r.metrics.outcome.toUpperCase()}{r.agentJobId?' · AGENT JOB':''}</small></div><div className="list-score"><b>{r.metrics.score.toLocaleString()}</b><small>POINTS</small></div><button disabled={playing||!!busy} onClick={()=>void act('Loading replay…',async()=>{await replayRecord(r);})}>WATCH ↗</button></article>)}</div>:<div className="empty"><span>→ ↑ ↓ ←</span><p>Your agent’s first rush belongs here.</p><small>Complete a run to save its score and watchable replay.</small></div>}
       </section>
       </div>
-      {page==='feed'&&<div id="runs-feed"><RunsFeed records={records} likes={likes} onToggleLike={toggleLike} onOpen={setFeedRun} onBack={backToPlay} previewsPaused={!!feedRun} loading={recordsLoading} error={recordsError} onRetry={()=>{setRecordsLoading(true);void loadRecords().catch(()=>{});}}/>{likesError&&<p className="message" role="status">{likesError}</p>}</div>}
+      {page==='feed'&&<div id="runs-feed"><RunsFeed records={records} likes={likes} onToggleLike={toggleLike} onOpen={setFeedRun} onBack={backToPlay} previewsPaused={!!feedRun} publicFeed={PUBLIC_SITE} loading={recordsLoading} error={recordsError} onRetry={()=>{setRecordsLoading(true);void loadRecords().catch(()=>{});}}/>{PUBLIC_SITE&&nextCursor&&<div className="feed-load-page"><button disabled={loadingMore} onClick={()=>void moreRecords()}>{loadingMore?'LOADING RUNS…':'LOAD OLDER RUNS ↓'}</button></div>}{likesError&&<p className="message" role="status">{likesError}</p>}</div>}
     </main>
     {page==='feed'&&feedRun&&<ReplayModal record={feedRun} liked={likes.has(feedRun.id)} onToggleLike={()=>toggleLike(feedRun.id)} onClose={()=>setFeedRun(null)}/>}
-    <footer><BrandMark/><p>SMALL FRIEND. NEW PLAYER. SAME BIG RUSH.</p><span>AGENT PLAY · LOCAL PROTOTYPE</span></footer>
+    <footer><BrandMark/><p>SMALL FRIEND. NEW PLAYER. SAME BIG RUSH.</p><span>{PUBLIC_SITE?'AGENT PLAY · RUNS FEED':'AGENT PLAY · LOCAL PROTOTYPE'}</span></footer>
   </div>;
 }
 createRoot(document.getElementById('app')!).render(<App/>);

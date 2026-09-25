@@ -27,6 +27,7 @@ export type RunRecord = {
   createdAt: string;
   metrics: RunMetrics;
   agent: string;
+  actor?: 'human' | 'autopilot' | 'agentic';
   verification: string;
   agentJobId?: string;
   replay?: AgentReplay;

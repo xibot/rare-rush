@@ -5,14 +5,50 @@
   "buildCommand": "npm run build",
   "outputDirectory": "dist",
   "headers": [
-    { "source": "/genesis/child.js", "headers": [{ "key": "Access-Control-Allow-Origin", "value": "*" }] },
-    { "source": "/assets/(.*)", "headers": [{ "key": "Access-Control-Allow-Origin", "value": "*" }] },
-    { "source": "/genesis/game.html", "headers": [{ "key": "Content-Security-Policy", "value": "frame-ancestors 'self'" }] }
+    {
+      "source": "/genesis/child.js",
+      "headers": [
+        {
+          "key": "Access-Control-Allow-Origin",
+          "value": "*"
+        }
+      ]
+    },
+    {
+      "source": "/assets/(.*)",
+      "headers": [
+        {
+          "key": "Access-Control-Allow-Origin",
+          "value": "*"
+        }
+      ]
+    },
+    {
+      "source": "/genesis/game.html",
+      "headers": [
+        {
+          "key": "Content-Security-Policy",
+          "value": "frame-ancestors 'self'"
+        }
+      ]
+    }
   ],
   "redirects": [
-    { "source": "/pitch", "destination": "/pitch/", "permanent": true },
-    { "source": "/arcade", "destination": "/arcade/", "permanent": true },
-    { "source": "/genesis", "destination": "/genesis/", "permanent": true },
+    {
+      "source": "/pitch",
+      "destination": "/pitch/",
+      "permanent": true
+    },
+    {
+      "source": "/arcade",
+      "destination": "/arcade/",
+      "permanent": true
+    },
+    {
+      "source": "/genesis",
+      "destination": "/genesis/",
+      "permanent": true
+    },
     {
       "source": "/docs",
       "destination": "/docs/",
@@ -22,6 +58,27 @@
       "source": "/play",
       "destination": "/play/",
       "permanent": true
+    },
+    {
+      "source": "/agent-play",
+      "destination": "/agent-play/",
+      "permanent": true
+    },
+    {
+      "source": "/runs-feed",
+      "destination": "/runs-feed/",
+      "permanent": true
     }
-  ]
+  ],
+  "functions": {
+    "api/*.ts": {
+      "maxDuration": 60
+    },
+    "api/runs.mjs": {
+      "maxDuration": 60
+    },
+    "api/runs/*.mjs": {
+      "maxDuration": 60
+    }
+  }
 }

@@ -55,7 +55,7 @@ function loadPreview(record: RunRecord): Promise<PreviewSource> {
       if (controller.signal.aborted) throw new Error('Preview request expired.');
       const savedArt = decodeRunArt(full);
       if (full.source === 'arcade' && !savedArt) throw new Error('Saved Friend artwork is missing.');
-      return { catalogue, art: savedArt ?? testRunArt(full.collection, full.tokenId, 'agent-play'), clips: new Map<string, Promise<ReplayPreviewClip>>() };
+      return { catalogue, art: savedArt ?? testRunArt(full.collection, full.tokenId, full.actor === 'human' && full.source === 'testnet' ? full.runId! : 'agent-play'), clips: new Map<string, Promise<ReplayPreviewClip>>() };
     } finally { window.clearTimeout(timeout); }
   })();
   cache.set(key, promise);

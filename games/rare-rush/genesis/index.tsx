@@ -8,6 +8,8 @@ import { readGenesisEligibility, readGenesisIdentity, readOwnedGenesis } from '.
 import { parseGenesisIdentity, type GenesisIdentity } from './protocol';
 import { GenesisPortrait, useGenesisPortraits } from './GenesisPortrait';
 import { createArcadeEventReporter, parseArcadeSignal } from '../analytics';
+import { bindArcadeRunSaves } from '../host-run-saves';
+import { RunPublicationError } from '../public-runs';
 import './host.css';
 
 async function withDeadline<T>(read: (signal: AbortSignal) => Promise<T>, outer?: AbortSignal): Promise<T> {
@@ -154,6 +156,17 @@ function GenesisHost() {
 
   useEffect(() => {
     if (!active) return;
+    const saves = bindArcadeRunSaves(() => {
+      if (!iframe.current || activeRef.current?.key !== active.key) return null;
+      const assertActive = () => {
+        if (activeRef.current?.key !== active.key || !sameWallet({ account: active.identity.owner, revision: active.revision })) {
+          throw new RunPublicationError('Your selected Genesis or wallet changed. Choose it again before saving.');
+        }
+      };
+      return { frame: iframe.current, player: active.identity.owner as `0x${string}`, collection: 1, tokenId: active.identity.tokenId,
+        assertActive, verify: async () => { if (!await verifyCurrent()) throw new RunPublicationError('Genesis ownership could not be confirmed.'); },
+        provider: async () => { const provider = walletSession.getProvider(); if (!provider) throw new RunPublicationError('Reconnect your selected wallet before saving.'); return provider; } };
+    });
     const receive = async (event: MessageEvent) => {
       const child = iframe.current?.contentWindow;
       const data = event.data;
@@ -198,7 +211,9 @@ function GenesisHost() {
     const timer = window.setInterval(() => { if (!document.hidden) void verifyCurrent(); }, 30_000);
     window.addEventListener('message', receive);
     document.addEventListener('visibilitychange', visibility);
-    return () => { window.removeEventListener('message', receive); document.removeEventListener('visibilitychange', visibility); clearInterval(timer); closeBridge(); };
+    const pagehide = () => saves.close();
+    window.addEventListener('pagehide', pagehide);
+    return () => { saves.close(); window.removeEventListener('pagehide', pagehide); window.removeEventListener('message', receive); document.removeEventListener('visibilitychange', visibility); clearInterval(timer); closeBridge(); };
   }, [active?.key]);
 
   if (active) return <main className="genesis-game-shell" aria-label="Genesis arcade"><iframe ref={iframe} key={active.key} className="genesis-game-frame" src="./game.html" title={`Rare Rush — Genesis #${active.identity.tokenId}`} sandbox="allow-scripts"/><div className="genesis-game-toolbar"><span>GENESIS #{active.identity.tokenId}</span><b>100× · DEMO</b><button type="button" onClick={() => leave()}>CHANGE FRIEND</button><a href="/arcade/">EXIT ↗</a></div>{checking && <div className="genesis-checking" role="status">VERIFYING YOUR GENESIS…</div>}</main>;
@@ -212,7 +227,7 @@ function GenesisHost() {
     {wallet.error && <p role="alert">{wallet.error}</p>}
   </div>
   {wallet.status === 'connected' && <section className="owned-genesis" aria-label="Choose your Genesis"><div className="genesis-picker-heading"><h2>Your Genesis</h2><button disabled={status === 'loading' || status === 'verifying'} onClick={() => setRefresh(value => value + 1)}>REFRESH ↻</button></div>{status === 'loading' && <p role="status">Finding your original Friends…</p>}{status === 'verifying' && <p role="status">Checking ownership and loading original artwork…</p>}{status === 'ready' && !error && !friends.length && <p>No Genesis NFTs found in this wallet. Choose another wallet, or <a href="/play/">play with a hardwired Generations Friend</a>.</p>}{error && <p className="genesis-error" role="alert">{error}</p>}<div className="genesis-friends">{friends.map(friend => <button key={friend.id.toString()} disabled={status === 'verifying'} onClick={() => void choose(friend.id)}><GenesisPortrait id={friend.id} loader={portraits}/><span className="genesis-friend-name">{friend.label}</span><small>FREE ENTRY · 100×</small><b aria-hidden="true">↗</b></button>)}</div><form className="genesis-manual" onSubmit={event => { event.preventDefault(); if (/^(0|[1-9][0-9]{0,77})$/.test(manualId) && BigInt(manualId) < 1n << 256n) void choose(BigInt(manualId)); }}><label htmlFor="genesis-id">KNOW YOUR GENESIS NUMBER?</label><div><input id="genesis-id" inputMode="numeric" pattern="(0|[1-9][0-9]{0,77})" required maxLength={78} value={manualId} onChange={event => setManualId(event.target.value)} placeholder="e.g. 42"/><button disabled={status === 'verifying'} type="submit">VERIFY & PLAY ↗</button></div><small>We always verify that the connected wallet owns it.</small></form></section>}
-  <p className="genesis-caption">Genesis ownership is verified on Robinhood Chain before entry and before each run. Your original Genesis portrait gets a random Generations body for each run. All rewards are simulated; no activation payment, transaction, or signature is required.</p></main></div></>;
+  <p className="genesis-caption">Genesis ownership is verified on Robinhood Chain before entry and before each run. Your original Genesis portrait gets a random Generations body for each run. All rewards are simulated. Playing needs no activation payment, transaction, or signature. Publishing a replay requires a wallet signature.</p></main></div></>;
 }
 
 createRoot(document.getElementById('root')!).render(location.pathname.startsWith('/genesis') ? <GenesisHost/> : <ArcadeChoice/>);

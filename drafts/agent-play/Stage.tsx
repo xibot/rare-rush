@@ -16,8 +16,8 @@ export type AgentStageProps = {
   running: boolean;
   reducedMotion: boolean;
   label?: string;
-  /** Real ownership-checked artwork supplied by the trusted Arcade host. */
-  art?: ArcadeFriend;
+  /** Saved Arcade artwork or the cosmetic art for this Testnet run. */
+  art?: Pick<ArcadeFriend, 'sprites' | 'bodyId' | 'portraitUrl' | 'label'>;
   fieldOverlay?: ReactNode;
 };
 

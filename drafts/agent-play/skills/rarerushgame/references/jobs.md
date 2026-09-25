@@ -22,7 +22,7 @@ Use a UTF-8 JSON file with one job. `--job` is the file path, not an inline JSON
 | `tokenId` | Positive decimal string, at most 77 digits; retain string form. |
 | `difficulty` | `easy`, `normal`, or `degen` |
 | `wallet.address` | Required for Arcade and Testnet; the selected agent wallet's address. |
-| `wallet.providerModule` | Required for Testnet; path to an external local provider module. Optional for Arcade. |
+| `wallet.providerModule` | Required for Testnet and public publication; path to an external local provider module. Optional for local-only Arcade. |
 | `rpcUrl` | Optional HTTP(S) read endpoint for Arcade or Testnet; no username, password, or fragment. Use the correct chain and keep private RPC credentials out of shared jobs. |
 | `testnet` | Explicit permitted transaction actions for Testnet, described below. |
 
@@ -57,7 +57,7 @@ The same module contract applies to OpenClaw, Hermes, Bankr, or any other agent 
 | `eth_chainId` | Return the configured wallet network as a hex quantity: `0x1237` for Arcade, `0xb626` for Testnet. |
 | `eth_call`, `eth_blockNumber` | When using a provider module for Arcade, forward the read request to the correct chain and return its normal JSON-RPC result. Address-only Arcade uses the CLI's read client instead. |
 | `eth_sendTransaction` | For Testnet, sign and broadcast the supplied transaction under the agent's wallet policy. Return the actual 32-byte `0x` transaction hash, not a signed raw transaction, task ID, or user-operation hash. |
-| `eth_signTypedData_v4` | For Testnet, accept `[address, typedDataJson]` and return a 65-byte `0x` ECDSA signature by that same player wallet over the exact EIP-712 payload. Transaction signing alone is insufficient; `personal_sign` is not a substitute. |
+| `eth_signTypedData_v4` | For Testnet verification or public Arcade/Testnet publication, accept `[address, typedDataJson]` and return a 65-byte `0x` ECDSA signature by that same player wallet over the exact EIP-712 payload. Transaction signing alone is insufficient; `personal_sign` is not a substitute. |
 
 The unattended flow does not call `eth_requestAccounts` or switch the wallet's network. Configure its chain and active address before running the job. A provider object needs `request({ method, params })`; browser event listeners are optional. Preserve the supplied transaction's account, destination, calldata, value and reserved nonce. Fee/gas handling stays in the wallet's policy. If a wallet API is asynchronous, resolve its task to the actual broadcast hash without issuing a second send. An ambiguous send must stop and retain recovery state; never fabricate a hash or retry the send inside the bridge.
 
@@ -97,3 +97,11 @@ This object is the job's `testnet` field. It is configuration within an already 
 The existing Testnet game allows three starts per NFT per UTC day. Genesis entry has no tRF fee; Generations requires the existing exact `110 tRF` entry policy. Transactions still need test ETH for gas, enforced within the trusted wallet's spending policy. If balances, remaining attempts, claim readiness, or wallet capability are insufficient, report the blocker rather than minting, funding, approving extra value, or creating another job automatically.
 
 The external provider must run in the agent's own wallet environment. It may apply the user's pre-authorized policy without interactive prompts; this skill does not require a human click for every scheduled action. Keep signer secrets and custody implementation outside the Rare Rush job and repository. Each wallet integration must satisfy the method contract above; support is not inferred from the agent framework or wallet brand.
+
+## Public publication
+
+`publish --job <file> [--jobs-dir <directory>]` reads an existing completed job and its replay. It never calls the play, entry, approval, or claim workflow. Use the same persistent directory as `run`. The job must match its stored fingerprint and record identity.
+
+The external provider must support `eth_accounts`, `eth_chainId` and `eth_signTypedData_v4` for the job’s network. The signature binds every published field, its expiry, and `https://rarerush.app`. It grants no token allowance or spending permission. The current publication API accepts 65-byte ECDSA signatures; smart-contract wallet signatures require additional support.
+
+Published replays are visible to everyone. Actor labels describe the submitted mode, not proof of a human or AI player. The server recomputes scores from recorded inputs; Arcade NFT ownership is checked when a new replay is published, while Testnet identity is checked against the confirmed original run. Publication can fail if the Arcade NFT has moved to another wallet. Keep the local replay in that case; never substitute another NFT or player.

@@ -1,6 +1,7 @@
 import { parseArcadeNavigation } from './navigation';
 import { syncFriendPortraits, cleanupFriendPortraits } from './host-portraits';
 import { bindGenerationsAnalytics } from './host-analytics';
+import { bindGenerationsRunSaves } from './host-run-saves';
 import { createSdkSiteHeader } from './site-navigation';
 
 /** Site chrome for the outer SDK host. Wallet, ownership and gameplay stay in FriendSDK. */
@@ -8,9 +9,11 @@ function enhanceGenerationsEntry(): void {
   const root = document.getElementById('root');
   if (!root) return;
   const analytics = bindGenerationsAnalytics(root);
+  let saves = bindGenerationsRunSaves(root);
 
   const update = () => {
     analytics.update();
+    saves.update();
     let pickerOpen = false;
     for (const frame of root.querySelectorAll<HTMLElement>('.rf-game-frame')) {
       let framePickerOpen = false;
@@ -33,7 +36,7 @@ function enhanceGenerationsEntry(): void {
         if (!menu.querySelector('.rush-generations-caption')) {
           const caption = document.createElement('p');
           caption.className = 'rush-generations-caption';
-          caption.textContent = 'FriendSDK verifies your Generations NFT on Robinhood Chain. Generation 1 or later is required. Runs cost 1 demo RF; all fees and rewards are simulated. No transaction or signature is required.';
+          caption.textContent = 'FriendSDK verifies your Generations NFT on Robinhood Chain. Generation 1 or later is required. Runs cost 1 demo RF; all fees and rewards are simulated. Playing needs no transaction or signature. Publishing a replay requires a wallet signature.';
           menu.append(caption);
         }
         syncFriendPortraits(menu);
@@ -59,8 +62,8 @@ function enhanceGenerationsEntry(): void {
   const observer = new MutationObserver(update);
   const observe = () => { observer.observe(root, { childList: true, characterData: true, subtree: true }); update(); };
   observe();
-  window.addEventListener('pagehide', () => { observer.disconnect(); cleanupFriendPortraits(); analytics.close(); window.removeEventListener('message', navigate); });
-  window.addEventListener('pageshow', event => { if (event.persisted) { analytics.restore(); window.addEventListener('message', navigate); observe(); } });
+  window.addEventListener('pagehide', () => { observer.disconnect(); cleanupFriendPortraits(); analytics.close(); saves.close(); window.removeEventListener('message', navigate); });
+  window.addEventListener('pageshow', event => { if (event.persisted) { analytics.restore(); saves = bindGenerationsRunSaves(root); window.addEventListener('message', navigate); observe(); } });
 }
 
 if (window.self === window.top && /^\/play(?:\/|$)/.test(window.location.pathname)) {

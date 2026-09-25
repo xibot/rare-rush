@@ -2,7 +2,7 @@
 
 **Small Friend. Big Rush.**
 
-[Play Arcade](https://rarerush.app/arcade/) · [Try Testnet](https://testnet.rarerush.app/) · [Game Guide](https://rarerush.app/docs/) · [Pitch](https://rarerush.app/pitch/)
+[Play Arcade](https://rarerush.app/arcade/) · [Try Testnet](https://testnet.rarerush.app/) · [Agent Play](https://rarerush.app/agent-play/) · [Runs Feed](https://rarerush.app/runs-feed/) · [Game Guide](https://rarerush.app/docs/) · [Pitch](https://rarerush.app/pitch/)
 
 Rare Rush is a browser-based arcade runner built for the Rare Friends ecosystem. Bring your Friend, collect coins, dodge obstacles, and race the timer through a world that can change direction beneath your feet.
 
@@ -27,6 +27,14 @@ Created by **XIBOT** for the [Rare Friends Vibeathon](https://github.com/spokesz
 Test assets have no monetary value and are separate from real Rare Friends holdings. Testnet economics are provisional; a mainnet RARERUSH token, liquidity pools, and final launch tokenomics are still in development.
 
 On mobile, open the game in a supported wallet's built-in browser.
+
+## Agent Play and Runs Feed
+
+[Agent Play](https://rarerush.app/agent-play/) has two modes: **Autopilot** plays in your browser with the Friend you choose; **Agentic** provides a provider-neutral skill and CLI for an agent with its own wallet and schedule. Preview needs no wallet. Arcade checks real NFT ownership; Testnet uses the same entry and claim rules as human play.
+
+**SAVE RUN** shares a completed Arcade or Testnet replay in the public [Runs Feed](https://rarerush.app/runs-feed/). Your wallet signs a publication message, with no transaction or gas fee. The server recomputes the score from recorded inputs before saving. Replays include the wallet address and selected Friend; sharing is optional. Hearts are private favorites stored in each visitor’s browser.
+
+See the [agent skill](drafts/agent-play/skills/rarerushgame/SKILL.md) and [community setup](docs/COMMUNITY.md) for wallet integration, publishing, and storage details.
 
 ## The rare twist
 
@@ -67,24 +75,27 @@ npm run build
 
 The production build is written to `dist/`. Additional browser checks are documented in the [developer game guide](games/rare-rush/README.md#build-and-verify). FriendSDK v0.1.2 is bundled in the repository for reproducible installation.
 
-For Testnet development, use the separate [Testnet branch and setup guide](https://github.com/xibot/rare-rush/blob/codex/testnet-infrastructure/testnet-app/README.md).
+For Testnet development, use the [Testnet setup guide](testnet-app/README.md).
 
 ## Explore the code
 
 Rare Rush uses **TypeScript, React, SVG rendering, and FriendSDK**. Testnet adds Solidity contracts and a server-side replay verifier.
 
-The `main` branch contains the Arcade site and its supporting tools:
+The repository contains the Arcade site, community pages, separately deployed Testnet app, and supporting tools:
 
 | Path | Purpose |
 | --- | --- |
 | [`games/rare-rush/`](games/rare-rush/) | Game, artwork rendering, economy, and site pages |
 | [`games/rare-rush/twist/`](games/rare-rush/twist/) | Directional gameplay and scene rendering |
-| [`tests/`](tests/) | Gameplay, economy, identity, and analytics checks |
+| [`drafts/agent-play/`](drafts/agent-play/) | Shared Agent Play UI, replay viewer, and headless job runner |
+| [`server/`](server/) | Public replay API and private analytics services |
+| [`testnet-app/`](testnet-app/) | Testnet UI and replay verifier |
+| [`tests/`](tests/) | Gameplay, economy, identity, publication, and analytics checks |
 | [`scripts/`](scripts/) | Build tools and browser checks |
 | [`docs/`](docs/) | Design notes, validation, and submission record |
 | [`tools/arcade-stats/`](tools/arcade-stats/) | Private local Arcade/Testnet statistics dashboard |
 
-The [`codex/testnet-infrastructure` branch](https://github.com/xibot/rare-rush/tree/codex/testnet-infrastructure) contains the separately deployed Testnet app, contracts, verifier, and deployment records. Arcade and Testnet use separate hosting projects.
+Arcade/community and Testnet use separate hosting projects. Contract source and deployment records live in `infra/testnet/` and `testnet-app/`; this release does not change the deployed gameplay contracts.
 
 ## Documentation
 

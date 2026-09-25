@@ -1,5 +1,6 @@
 #!/usr/bin/env node
 import { build } from 'esbuild';
+import { publicTestnetSources } from '../../scripts/public-testnet-sources.mjs';
 import { mkdtemp, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
@@ -13,7 +14,7 @@ try {
   const bundle = join(output, 'cli.mjs');
   await build({ entryPoints: [resolve(here, 'cli.ts')], outfile: bundle, bundle: true,
     platform: 'node', format: 'esm', target: 'node22', logLevel: 'silent',
-    nodePaths: [resolve(repository, 'testnet-app/node_modules')],
+    plugins: [publicTestnetSources(repository)],
     banner: { js: "import { createRequire as agentCreateRequire } from 'node:module'; const require = agentCreateRequire(import.meta.url);" } });
   const { runCli } = await import(pathToFileURL(bundle).href);
   process.exitCode = await runCli(process.argv.slice(2), { directory: resolve(here, 'data/jobs') });

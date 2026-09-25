@@ -15,6 +15,7 @@ export type RunsFeedProps = {
   error?: string;
   onRetry: () => void;
   previewsPaused?: boolean;
+  publicFeed?: boolean;
 };
 
 type EnvironmentFilter = 'all' | RunRecord['source'];
@@ -76,7 +77,7 @@ const RunCard = memo(function RunCard({ record, liked, animate, candidateKey, on
   );
 });
 
-export function RunsFeed({ records, likes, onToggleLike, onOpen, onBack, loading, error, onRetry, previewsPaused = false }: RunsFeedProps) {
+export function RunsFeed({ records, likes, onToggleLike, onOpen, onBack, loading, error, onRetry, previewsPaused = false, publicFeed = false }: RunsFeedProps) {
   const id = useId();
   const [environment, setEnvironment] = useState<EnvironmentFilter>('all');
   const [likedOnly, setLikedOnly] = useState(false);
@@ -160,14 +161,14 @@ export function RunsFeed({ records, likes, onToggleLike, onOpen, onBack, loading
     <section className="runs-feed" aria-labelledby={`${id}-title`}>
       <button type="button" className="runs-feed-back" onClick={onBack}><span aria-hidden="true">←</span> AGENT PLAY</button>
       <div className="runs-feed-heading">
-        <div><p>SAVED RUNS · LIKES ON THIS BROWSER</p><h1 id={`${id}-title`}>RUNS <span>FEED.</span></h1></div>
+        <div><p>{publicFeed?'COMMUNITY RUNS · SAVED BY PLAYERS':'SAVED RUNS · LIKES ON THIS BROWSER'}</p><h1 id={`${id}-title`}>RUNS <span>FEED.</span></h1></div>
         <span className="runs-feed-total">{count(records.length)} SAVED</span>
       </div>
-      <p className="runs-feed-intro">Every locally saved run, wins and losses. Open one to watch its replay.</p>
+      <p className="runs-feed-intro">{publicFeed?'Real runs from people and agents. Wins, losses and every rare twist. Open one to watch.':'Every locally saved run, wins and losses. Open one to watch its replay.'}</p>
 
       <div className="runs-feed-toolbar">
         <div className="runs-feed-filters" role="group" aria-label="Filter runs by environment">
-          {ENVIRONMENTS.map(([value, label]) => <button key={value} type="button" aria-pressed={environment === value} onClick={() => { setEnvironment(value); setVisible(PAGE_SIZE); }}>{label}</button>)}
+          {ENVIRONMENTS.filter(([value])=>!publicFeed||value!=='local').map(([value, label]) => <button key={value} type="button" aria-pressed={environment === value} onClick={() => { setEnvironment(value); setVisible(PAGE_SIZE); }}>{label}</button>)}
         </div>
         <button type="button" className="runs-feed-liked-filter" aria-pressed={likedOnly} onClick={() => { setLikedOnly(value => !value); setVisible(PAGE_SIZE); }}><span aria-hidden="true">♥</span> LIKED</button>
         <div className="runs-feed-search-sort">
@@ -197,7 +198,7 @@ export function RunsFeed({ records, likes, onToggleLike, onOpen, onBack, loading
       {!loading && !error && !filtered.length && <div className="runs-feed-empty">
         <span aria-hidden="true">{records.length ? '◇' : '↗'}</span>
         <h2>{!records.length ? 'YOUR NEXT RUN STARTS HERE.' : likedOnly ? 'NO LIKED RUNS HERE YET.' : 'NO MATCHING RUNS.'}</h2>
-        <p>{!records.length ? 'Complete a run in Agent Play to save a score and watchable replay.' : likedOnly ? 'Like a run with its heart button, or adjust your filters.' : 'Try another collection, token ID, or environment.'}</p>
+        <p>{!records.length ? 'Complete a run in Arcade, Testnet or Agent Play, then choose SAVE RUN.' : likedOnly ? 'Like a run with its heart button, or adjust your filters.' : 'Try another collection, token ID, or environment.'}</p>
         <div>{!!records.length && <button type="button" onClick={resetFilters}>CLEAR FILTERS</button>}<button type="button" onClick={onBack}>BACK TO AGENT PLAY <span aria-hidden="true">↗</span></button></div>
       </div>}
       <p className="runs-feed-note">Short gameplay previews · full saved replays. Likes stay on this browser.</p>

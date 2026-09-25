@@ -64,7 +64,7 @@ export function ArcadeCabinet(props: ArcadeCabinetProps) {
         <div className="life-hud"><span>KEEP IT RARE</span><strong aria-label={`${run.hearts} hearts remaining`}>{[0, 1, 2].map(index => <b key={index} className={index >= run.hearts ? 'lost' : ''}>♥</b>)}</strong></div>
       </div>
       <div className="playfield">
-        {props.world ?? <svg className="world-svg" viewBox={`0 0 ${viewWidth} 500`} preserveAspectRatio="none" role="img" aria-label={`${art.label} in the Rare Friends world`}>
+        {props.world ?? <svg className="world-svg" viewBox={`0 0 ${viewWidth} 500`} preserveAspectRatio="xMidYMid meet" role="img" aria-label={`${art.label} in the Rare Friends world`}>
           <WorldArt distance={run.distance} elapsed={run.elapsed * 1000} reducedMotion biome={biome}/>
           {!props.snapshot && <g>{[0, 1, 2, 3, 4].map(index => <TokenCoin key={index} x={370 + index * 52} y={295 - Math.sin(index / 4 * Math.PI) * 65} size={30}/>)}<EntityArt entity={{id:999,kind:'crystal',x:730,y:339,w:44,h:61} as RunSnapshot['entities'][number]} elapsed={0} reduced/></g>}
           {run.entities.map(entity => <EntityArt key={entity.id} entity={entity} elapsed={run.elapsed} reduced/>)}

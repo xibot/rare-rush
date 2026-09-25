@@ -1,0 +1,6 @@
+/* Community pages share the site header while keeping the tested play/feed layout. */
+.public-community > .site-header-shell { padding: 0; max-width: none; }
+.public-community .site-header nav { flex-wrap: wrap; }
+.public-community .community-publish-note { font-size: 11px; color: #aaa; margin-top: 12px; }
+.public-community .result-card .community-publish-note { color: #444; }
+.public-community .feed-load-page { display: flex; justify-content: center; padding: 0 0 30px; }

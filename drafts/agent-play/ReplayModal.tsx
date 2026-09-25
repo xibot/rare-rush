@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
+import { testRunArt } from '../../testnet-app/src/play/art.ts';
 import { AgentStage } from './Stage.tsx';
 import { decodeRunArt, type RunRecord } from './feed-types.ts';
 import { advanceReplay, checkAgentReplay, createReplaySession, FIXED_STEP, type RunSession } from './runner.ts';
@@ -191,7 +192,7 @@ export function ReplayModal({ record, liked, onToggleLike, onClose }: ReplayModa
         : <>
           <div className="replay-modal-stage">
             {visible ? <AgentStage run={current.session.run} collection={current.record.collection} tokenId={current.record.tokenId}
-              running={running && visible} reducedMotion={reduced} label="REPLAY" art={current.art}
+              running={running && visible} reducedMotion={reduced} label="REPLAY" art={current.art ?? (record.actor === 'human' && record.source === 'testnet' ? testRunArt(record.collection, record.tokenId, record.runId!) : undefined)}
               fieldOverlay={finished && <div className="replay-modal-ended" role="status">
                 <span>REPLAY ENDED</span><strong>{metrics!.score.toLocaleString()}<small>POINTS</small></strong>
                 <p>{metrics!.outcome === 'survived' ? 'TIMER SURVIVED' : 'OUT OF HEARTS'}</p>

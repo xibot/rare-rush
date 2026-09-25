@@ -1,4 +1,6 @@
 import { context } from 'esbuild';
+import { publicTestnetSources } from './public-testnet-sources.mjs';
+import { ENGINE_SOURCE_PATHS, engineVersionFromSources } from '../infra/testnet/src/protocol.ts';
 import { buildGame } from '@rarefriends/friendsdk/build';
 import { createGameServer } from '@rarefriends/friendsdk/serve';
 import { createServer } from 'node:http';
@@ -13,6 +15,9 @@ export async function buildRushSite({ outdir = path.join(project, 'dist'), watch
   outdir = path.resolve(outdir);
   if (outdir === project || project.startsWith(outdir + path.sep)) throw new Error('Choose a dedicated build output directory.');
   await mkdir(outdir, { recursive: true });
+  const deployment = JSON.parse(await readFile(path.join(project,'testnet-app/src/shared/deployment.json'),'utf8'));
+  const physics = Object.fromEntries(await Promise.all(ENGINE_SOURCE_PATHS.map(async name=>[name,await readFile(path.join(project,'games/rare-rush',name),'utf8')])));
+  if(engineVersionFromSources(physics)!==deployment.engineVersion)throw new Error('Public replays require the approved Testnet engine.');
   // Retired public showcase: also remove output left by a previous build/cache.
   await rm(path.join(outdir, 'genesis-lab'), { recursive: true, force: true });
   const game = await buildGame(path.join(project, 'games/rare-rush'), { outdir: path.join(outdir, 'play'), watch });
@@ -30,15 +35,21 @@ export async function buildRushSite({ outdir = path.join(project, 'dist'), watch
     if (!gameHostHTML.includes('</head>')) throw new Error('The SDK host HTML has no head for site chrome.');
     await writeFile(gameHostPath, gameHostHTML.replace('</head>', '<link rel="icon" type="image/svg+xml" sizes="any" href="/favicon.svg"><script type="module" src="/host-navigation.js"></script></head>'));
     page = await context({
-      absWorkingDir: project, entryPoints: { landing: path.join(landing, 'index.tsx'), 'host-navigation': path.join(landing, '../host-navigation.ts'), 'docs/index': path.join(landing, '../docs/index.tsx'), 'pitch/index': path.join(landing, '../pitch/index.tsx'), 'genesis/index': path.join(landing, '../genesis/index.tsx'), 'genesis/child': path.join(landing, '../genesis/child.tsx') }, outdir,
+      absWorkingDir: project, entryPoints: { landing: path.join(landing, 'index.tsx'), 'host-navigation': path.join(landing, '../host-navigation.ts'), 'docs/index': path.join(landing, '../docs/index.tsx'), 'pitch/index': path.join(landing, '../pitch/index.tsx'), 'genesis/index': path.join(landing, '../genesis/index.tsx'), 'genesis/child': path.join(landing, '../genesis/child.tsx'), 'community/index': path.join(landing, '../community/index.tsx') }, outdir,
       bundle: true, platform: 'browser', format: 'esm', target: 'es2022', jsx: 'automatic', minify: true,
       loader: { '.woff2': 'file' }, assetNames: 'assets/[name]-[hash]', metafile: true,
-      define: { 'process.env.NODE_ENV': '"production"' }, logLevel: 'warning',
-      plugins: [{ name: 'landing-html', setup(build) {
+      define: { 'process.env.NODE_ENV': '"production"', '__RUSH_PUBLIC_SITE__': 'true' }, logLevel: 'warning',
+      plugins: [publicTestnetSources(project),{ name: 'landing-html', setup(build) {
         build.onEnd(async result => {
           if (result.errors.length) return;
           await writeFile(path.join(outdir, 'favicon.svg'), await readFile(path.join(landing, '../assets/favicon.svg')));
           await writeFile(path.join(outdir, 'index.html'), await readFile(path.join(landing, 'index.html')));
+          for(const [route,title] of [['agent-play','Agent Play'],['runs-feed','Runs Feed']]){
+            await mkdir(path.join(outdir,route),{recursive:true});
+            await writeFile(path.join(outdir,route,'index.html'),`<!doctype html><html lang="en"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="theme-color" content="#000000"><title>Rare Rush | ${title}</title><link rel="icon" href="/favicon.svg"><link rel="stylesheet" href="/community/index.css"></head><body><div id="app"></div><script type="module" src="/community/index.js"></script></body></html>`);
+          }
+          await mkdir(path.join(outdir,'agent-skill/references'),{recursive:true});
+          for(const name of ['SKILL.md','references/jobs.md'])await copyFile(path.join(project,'drafts/agent-play/skills/rarerushgame',name),path.join(outdir,'agent-skill',name));
           await mkdir(path.join(outdir, 'docs'), { recursive: true });
           await writeFile(path.join(outdir, 'docs/index.html'), await readFile(path.join(landing, '../docs/index.html')));
           await mkdir(path.join(outdir, 'pitch'), { recursive: true });
@@ -76,6 +87,12 @@ export function createRushSiteServer(outdir) {
   const directory = path.resolve(outdir);
   const gameServer = createGameServer(path.join(directory, 'play'));
   const publicFiles = new Map([
+    ['/agent-play/', ['agent-play/index.html','text/html; charset=utf-8']],
+    ['/runs-feed/', ['runs-feed/index.html','text/html; charset=utf-8']],
+    ['/community/index.js', ['community/index.js','text/javascript; charset=utf-8']],
+    ['/community/index.css', ['community/index.css','text/css; charset=utf-8']],
+    ['/agent-skill/SKILL.md', ['agent-skill/SKILL.md','text/plain; charset=utf-8']],
+    ['/agent-skill/references/jobs.md', ['agent-skill/references/jobs.md','text/plain; charset=utf-8']],
     ['/', ['index.html', 'text/html; charset=utf-8']],
     ['/index.html', ['index.html', 'text/html; charset=utf-8']],
     ['/favicon.svg', ['favicon.svg', 'image/svg+xml']],
@@ -105,6 +122,7 @@ export function createRushSiteServer(outdir) {
     if (!['GET', 'HEAD'].includes(request.method)) { response.writeHead(405).end(); return; }
     try {
       const url = new URL(request.url, 'http://localhost');
+      if (url.pathname === '/agent-play' || url.pathname === '/runs-feed') { response.writeHead(308,{Location:url.pathname+'/'}).end(); return; }
       if (url.pathname === '/play') { response.writeHead(308, { Location: '/play/' }).end(); return; }
       if (url.pathname === '/docs') { response.writeHead(308, { Location: '/docs/' }).end(); return; }
       if (url.pathname === '/pitch') { response.writeHead(308, { Location: '/pitch/' }).end(); return; }
@@ -160,7 +178,7 @@ async function main() {
   const command = process.argv[2] ?? 'dev';
   if (!['dev', 'build'].includes(command)) throw new Error('Usage: node scripts/rush-site.mjs dev|build');
   const built = await buildRushSite({ watch: command === 'dev' });
-  if (command === 'build') { console.log(`Built landing, pitch, docs, collection picker, Genesis tester, and SDK game in ${built.outdir}`); return; }
+  if (command === 'build') { console.log(`Built main site, community pages, and Arcade games in ${built.outdir}`); return; }
   const server = createRushSiteServer(built.outdir);
   server.listen(4173, '0.0.0.0', () => console.log('Rare Rush: http://localhost:4173/ · arcade: http://localhost:4173/arcade/'));
   const stop = () => { server.close(); void built.close().finally(() => process.exit(0)); };

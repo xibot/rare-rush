@@ -14,6 +14,7 @@ if (process.env.VERCEL === '1') {
   }
 }
 const files = [
+  'games/rare-rush/public-runs.ts', 'shared/replay-publication.ts',
   'games/rare-rush/engine.ts', 'games/rare-rush/difficulty.ts',
   ...['engine.ts', 'DirectionScene.tsx', 'presentation.ts', 'VerticalWorld.tsx', 'TrackGate.tsx', 'transition-motion.ts'].map(name => `games/rare-rush/twist/${name}`),
   'games/rare-rush/WorldArt.tsx', 'games/rare-rush/RunnerArt.tsx', 'games/rare-rush/CanonicalArt.tsx',
