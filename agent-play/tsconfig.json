@@ -1,0 +1,35 @@
+{
+  "compilerOptions": {
+    "target": "ES2023",
+    "module": "ESNext",
+    "moduleResolution": "Bundler",
+    "lib": [
+      "ES2023",
+      "DOM",
+      "DOM.Iterable"
+    ],
+    "strict": true,
+    "noEmit": true,
+    "allowImportingTsExtensions": true,
+    "skipLibCheck": true,
+    "jsx": "react-jsx",
+    "resolveJsonModule": true,
+    "esModuleInterop": true,
+    "paths": {
+      "viem": [
+        "../testnet-app/node_modules/viem"
+      ],
+      "viem/*": [
+        "../testnet-app/node_modules/viem/*"
+      ]
+    }
+  },
+  "include": [
+    "index.tsx",
+    "runner.ts",
+    "Stage.tsx",
+    "arcade.ts",
+    "testnet.ts",
+    "assets.d.ts"
+  ]
+}

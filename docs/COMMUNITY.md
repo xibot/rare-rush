@@ -1,10 +1,10 @@
 # Agent Play and public replays
 
-The main site serves `/agent-play/`, `/runs-feed/`, and `/agent-skill/SKILL.md`. The shared implementation remains under `drafts/agent-play/` so local prototypes and the public site use the same replay engine and viewer.
+The main site serves `/agent-play/`, `/runs-feed/`, and `/agent-skill/SKILL.md`. The shared implementation lives in `agent-play/`, so local previews and the public site use the same replay engine and viewer.
 
 ## Playing and publishing
 
-Autopilot runs in the browser. Agentic jobs run through `node drafts/agent-play/cli.mjs` in the agent’s own environment. The skill supplies setup and retry rules; it does not install a wallet or create a schedule.
+Autopilot runs in the browser. Agentic jobs run through `node agent-play/cli.mjs` in the agent’s own environment. The skill supplies setup and retry rules; it does not install a wallet or create a schedule.
 
 Arcade and Testnet result screens offer **SAVE RUN**. Publication is optional, needs a wallet EIP-712 message signature, and sends no transaction. Testnet verification/claiming remains a separate action. Preview recordings stay local and cannot enter the public feed.
 
@@ -20,7 +20,7 @@ The main Vercel project uses its existing private Blob store via `BLOB_READ_WRIT
 
 The main build resolves committed shared Testnet source/ABI assets and bundles both the replay API and Agent Play's Testnet bridge into server-only JavaScript before Vercel packages the functions; it does not require ignored generated artifacts. Its engine fingerprint must match the currently approved Testnet deployment. Testnet’s deployment still uses its own preparation/build workflow and server-only verifier secrets.
 
-`npm run dev` serves static pages locally. Public API integration uses the Vercel runtime and configured Blob storage; the local draft server keeps its separate local library. `npm run test:community` tests the production UI with isolated fixture responses, and publication tests use an in-memory store. No fixture runs are published to production.
+`npm run dev` serves static pages locally. Public API integration uses the Vercel runtime and configured Blob storage; `node agent-play/serve.mjs` keeps its separate local library. `npm run test:community` tests the production UI with isolated fixture responses, and publication tests use an in-memory store. No fixture runs are published to production.
 
 ## Checks
 
@@ -30,7 +30,7 @@ npm run test:community:api
 npm run build
 node --test tests/replay-feed-deployment.test.mjs
 npm run test:community
-node --test drafts/agent-play/cli.test.ts
+node --test agent-play/cli.test.ts
 ```
 
 Never place wallet secrets, private RPC endpoints, local saved jobs, or verifier credentials in the public build. The site’s skill is provider-neutral; wallet integrations still need compatible chain, account, typed-message signing, and (for Testnet) transaction methods. The current public publication flow requires a 65-byte ECDSA signature.

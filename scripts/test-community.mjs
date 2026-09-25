@@ -3,7 +3,7 @@ import { mkdir, readFile } from 'node:fs/promises';
 import { chromium } from 'playwright';
 import { fileURLToPath } from 'node:url';
 import { createRushSiteServer } from './rush-site.mjs';
-import { createAgentSession, runSessionToEnd, exportAgentReplay, checkAgentReplay } from '../drafts/agent-play/runner.ts';
+import { createAgentSession, runSessionToEnd, exportAgentReplay, checkAgentReplay } from '../agent-play/runner.ts';
 
 // Only this browser test supplies fixture replays; none enters the public build/store.
 const seed = '0x' + '51'.repeat(32);

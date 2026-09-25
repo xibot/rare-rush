@@ -60,7 +60,7 @@ export async function buildRushSite({ outdir = path.join(project, 'dist'), watch
             await writeFile(path.join(outdir,route,'index.html'),`<!doctype html><html lang="en"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="theme-color" content="#000000"><title>Rare Rush | ${title}</title><link rel="icon" href="/favicon.svg"><link rel="stylesheet" href="/community/index.css"></head><body><div id="app"></div><script type="module" src="/community/index.js"></script></body></html>`);
           }
           await mkdir(path.join(outdir,'agent-skill/references'),{recursive:true});
-          for(const name of ['SKILL.md','references/jobs.md'])await copyFile(path.join(project,'drafts/agent-play/skills/rarerushgame',name),path.join(outdir,'agent-skill',name));
+          for(const name of ['SKILL.md','references/jobs.md'])await copyFile(path.join(project,'agent-play/skills/rarerushgame',name),path.join(outdir,'agent-skill',name));
           await mkdir(path.join(outdir, 'docs'), { recursive: true });
           await writeFile(path.join(outdir, 'docs/index.html'), await readFile(path.join(landing, '../docs/index.html')));
           await mkdir(path.join(outdir, 'pitch'), { recursive: true });

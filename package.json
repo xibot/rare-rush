@@ -25,7 +25,7 @@
     "test:analytics:browser": "node scripts/test-arcade-analytics.mjs && node scripts/test-arcade-analytics-hosts.mjs",
     "test:community": "node scripts/test-community.mjs",
     "test:community:api": "node --test tests/replay-feed.test.mjs tests/agent-testnet-proxy.test.ts",
-    "test:community:save": "node --test tests/human-replay.test.ts tests/public-runs.test.mjs drafts/agent-play/publish-job.test.ts",
+    "test:community:save": "node --test tests/human-replay.test.ts tests/public-runs.test.mjs agent-play/publish-job.test.ts",
     "test:community:wallet": "node scripts/test-human-run-save.mjs"
   },
   "dependencies": {

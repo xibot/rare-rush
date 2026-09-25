@@ -1,6 +1,6 @@
 import { createHash } from 'node:crypto';
 import { recoverTypedDataAddress } from 'viem';
-import { checkAgentReplay } from '../drafts/agent-play/runner.ts';
+import { checkAgentReplay } from '../agent-play/runner.ts';
 import { PUBLICATION_TTL_SECONDS, publicationPayloadHash, publicationTypedData } from '../shared/replay-publication.ts';
 
 export const REPLAY_FEED_PREFIX = 'public-runs/v1';

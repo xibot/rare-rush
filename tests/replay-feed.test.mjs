@@ -6,7 +6,7 @@ import { createReplayBlobStore } from '../server/replay-feed-store.mjs';
 import { createTestnetReplayBinding, PUBLIC_TESTNET_ENGINE_VERSION, PUBLIC_TESTNET_GAME } from '../server/replay-testnet.mjs';
 import { createArcadeReplayBinding } from '../server/replay-arcade.mjs';
 import { prepareReplayPublication, publicationPayloadHash, publicationTypedData } from '../shared/replay-publication.ts';
-import { createAgentSession, runSessionToEnd, exportAgentReplay, checkAgentReplay } from '../drafts/agent-play/runner.ts';
+import { createAgentSession, runSessionToEnd, exportAgentReplay, checkAgentReplay } from '../agent-play/runner.ts';
 
 const site = 'https://rarerush.app', testnet = 'https://testnet.rarerush.app';
 const account = privateKeyToAccount(`0x${'1'.padStart(64, '0')}`);

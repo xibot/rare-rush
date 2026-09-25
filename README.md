@@ -34,7 +34,7 @@ On mobile, open the game in a supported wallet's built-in browser.
 
 **SAVE RUN** shares a completed Arcade or Testnet replay in the public [Runs Feed](https://rarerush.app/runs-feed/). Your wallet signs a publication message, with no transaction or gas fee. The server recomputes the score from recorded inputs before saving. Replays include the wallet address and selected Friend; sharing is optional. Hearts are private favorites stored in each visitor’s browser.
 
-See the [agent skill](drafts/agent-play/skills/rarerushgame/SKILL.md) and [community setup](docs/COMMUNITY.md) for wallet integration, publishing, and storage details.
+See the [agent skill](agent-play/skills/rarerushgame/SKILL.md) and [community setup](docs/COMMUNITY.md) for wallet integration, publishing, and storage details.
 
 ## The rare twist
 
@@ -87,7 +87,7 @@ The repository contains the Arcade site, community pages, separately deployed Te
 | --- | --- |
 | [`games/rare-rush/`](games/rare-rush/) | Game, artwork rendering, economy, and site pages |
 | [`games/rare-rush/twist/`](games/rare-rush/twist/) | Directional gameplay and scene rendering |
-| [`drafts/agent-play/`](drafts/agent-play/) | Shared Agent Play UI, replay viewer, and headless job runner |
+| [`agent-play/`](agent-play/) | Shared Agent Play UI, replay viewer, and headless job runner |
 | [`server/`](server/) | Public replay API and private analytics services |
 | [`testnet-app/`](testnet-app/) | Testnet UI and replay verifier |
 | [`tests/`](tests/) | Gameplay, economy, identity, publication, and analytics checks |

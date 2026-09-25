@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { advanceHumanRecording, createHumanRecording, exportHumanReplay, queueHumanJump, releaseHumanControls } from '../games/rare-rush/replay-recorder.ts';
 import { demoControls } from '../games/rare-rush/twist/engine.ts';
 import { canonicalAxis, headingFor } from '../games/rare-rush/twist/presentation.ts';
-import { advanceReplay, checkAgentReplay, createReplaySession } from '../drafts/agent-play/runner.ts';
+import { advanceReplay, checkAgentReplay, createReplaySession } from '../agent-play/runner.ts';
 
 const seed = `0x${'1'.padStart(64,'0')}`;
 for (const mode of ['easy', 'normal', 'degen'] as const) {
