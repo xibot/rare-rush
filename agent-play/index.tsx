@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import { createRoot } from 'react-dom/client';
 import { formatUnits } from 'viem';
 import { SiteHeader } from '../games/rare-rush/SiteHeader.tsx';
+import { SiteFooter } from '../games/rare-rush/SiteFooter.tsx';
 import { PUBLIC_SITE, AGENT_PATH, FEED_PATH, LEADERBOARD_PATH, getCommunityPage, type CommunityPage } from './site-mode.ts';
 import { publishRun, readRunServiceResponse } from '../games/rare-rush/public-runs.ts';
 import type { ReplayPublication } from '../shared/replay-publication.ts';
@@ -346,7 +347,7 @@ function App() {
   const displayCollection=current?.collection??collection, displayToken=current?.tokenId??tokenId;
   const isTestnetRun=current?.source==='testnet' && session.kind==='agent';
   const matchesSaved=isTestnetRun && stateRun?.run.runId===current?.runId;
-  return <div className={`agent-app ${PUBLIC_SITE?'public-community':''}`} onClick={event=>{
+  return <><div className={`agent-app ${PUBLIC_SITE?'public-community':''}`} onClick={event=>{
     if(!PUBLIC_SITE||event.defaultPrevented||event.button!==0||event.metaKey||event.ctrlKey||event.shiftKey||event.altKey)return;
     const link=(event.target as Element).closest<HTMLAnchorElement>('.site-header a');
     const href=link?.getAttribute('href');
@@ -411,7 +412,6 @@ function App() {
       {page==='feed'&&<div id="runs-feed"><RunsFeed records={records} likes={likes} onToggleLike={toggleLike} onOpen={setFeedRun} onBack={backToPlay} previewsPaused={!!feedRun} publicFeed={PUBLIC_SITE} loading={recordsLoading} error={recordsError} onRetry={()=>{setRecordsLoading(true);void loadRecords().catch(()=>{});}}/>{PUBLIC_SITE&&nextCursor&&<div className="feed-load-page"><button disabled={loadingMore} onClick={()=>void moreRecords()}>{loadingMore?'LOADING RUNS…':'LOAD OLDER RUNS ↓'}</button></div>}{likesError&&<p className="message" role="status">{likesError}</p>}</div>}
     </main>
     {page!=='play'&&feedRun&&<ReplayModal record={feedRun} liked={likes.has(feedRun.id)} onToggleLike={()=>toggleLike(feedRun.id)} onClose={()=>setFeedRun(null)}/>}
-    <footer><BrandMark attribution/><p>SMALL FRIEND. NEW PLAYER. SAME BIG RUSH.</p><span>{PUBLIC_SITE?'RUNS FEED · LEADERBOARD · AGENT PLAY':'AGENT PLAY · LOCAL PREVIEW'}</span></footer>
-  </div>;
+  </div><SiteFooter/></>;
 }
 createRoot(document.getElementById('app')!).render(<App/>);

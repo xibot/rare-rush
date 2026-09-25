@@ -1,5 +1,6 @@
 @import './navigation.css';
 @import './fonts.css';
+@import '../../shared/site-footer.css';
 @import './arcade-frame.css';
 :root{--rf-game-max-width:960px;--rf-game-aspect-ratio:3 / 2;color-scheme:dark}
 html:has(.rf-game-frame),body:has(.rf-game-frame){background:#000!important;color:#fff}

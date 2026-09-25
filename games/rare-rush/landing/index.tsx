@@ -1,6 +1,7 @@
 import { createRoot } from 'react-dom/client';
 import { TokenCoin } from '../CanonicalArt';
 import { SiteHeader } from '../SiteHeader';
+import { SiteFooter } from '../SiteFooter';
 import PreviewRun from './PreviewRun';
 import { DIFFICULTIES, DIFFICULTY_ORDER } from '../difficulty';
 import './landing.css';
@@ -35,8 +36,8 @@ function Landing() {
       <div className="landing-play-note"><span>BUILT FOR YOUR PHONE. READY FOR YOUR DESKTOP.</span><a href="./arcade/">YOUR TURN <span>↗</span></a></div>
     </main>
 
-    <footer className="landing-footer"><div><b>RARE RUSH / VIBEATHON BUILD</b><p>Gameplay rewards are simulated. Nothing is minted or charged.<br/>Play with your Genesis or eligible Generations NFT on Robinhood Chain.</p></div><div><a href="./pitch/">THE RARE RUSH PITCH ↗</a><a href="./docs/">RARE RUSH 101 / DOCS ↗</a><a href="https://github.com/spokesz/friendsdk">BUILT WITH FRIENDSDK ↗</a><a href="https://rarefriends.com/">ART & WORLD BY RARE FRIENDS ↗</a></div></footer>
-  </div></>;
+  </div>
+  <SiteFooter/></>;
 }
 
 createRoot(document.getElementById('root')!).render(<Landing/>);

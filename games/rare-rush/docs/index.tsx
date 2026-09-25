@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { createRoot } from 'react-dom/client';
 import { decodeGenerationSprites, type GenerationSpriteManifest } from '@rarefriends/friendsdk/sprites';
 import { SiteHeader } from '../SiteHeader';
+import { SiteFooter } from '../SiteFooter';
 import { CanonicalProp, TokenCoin } from '../CanonicalArt';
 import { FriendSprite } from '../RunnerArt';
 import { WorldArt } from '../WorldArt';
@@ -150,8 +151,8 @@ function Docs() {
       </div>
       <section className="docs-endcap"><span className="section-kicker">YOU KNOW THE WORLD. NOW GO RUN IT.</span><h2>Less reading.<br/>More rushing.</h2><p>Your next best run is one jump away.</p><a className="docs-cta" href="/arcade/">LET’S RUSH ↗</a></section>
     </main>
-    <footer className="docs-footer"><span>RARE RUSH 101 / BY XIBOT</span><span>ART & WORLD BY <a href="https://rarefriends.com/">RARE FRIENDS ↗</a> · <a href="https://github.com/spokesz/friendsdk">FRIENDSDK ↗</a></span><a href="#top">BACK TO TOP ↑</a></footer>
-  </div></>;
+  </div>
+  <SiteFooter/></>;
 }
 
 createRoot(document.getElementById('root')!).render(<Docs/>);

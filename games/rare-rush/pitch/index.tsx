@@ -2,6 +2,7 @@ import { createRoot } from 'react-dom/client';
 import { useEffect, useRef } from 'react';
 import { decodeGenerationSprites, type GenerationSpriteManifest } from '@rarefriends/friendsdk/sprites';
 import { SiteHeader } from '../SiteHeader';
+import { SiteFooter } from '../SiteFooter';
 import { CanonicalProp, TokenCoin } from '../CanonicalArt';
 import { FriendSprite } from '../RunnerArt';
 import { DIFFICULTIES, DIFFICULTY_ORDER } from '../difficulty';
@@ -133,8 +134,8 @@ function Pitch() {
       <section className="pitch-endcap" aria-labelledby="endcap-title"><span className="pitch-kicker">06 / LESS PITCH. MORE PLAY.</span><Coin size={90}/><h2 id="endcap-title">ONE FRIEND.<br/><em>ONE MORE RUN.</em></h2><p>Play it. Send an agent. Share the rush.<br/>See how far the twist takes your Friend.</p><div className="pitch-final-actions"><a className="pitch-button" href="/arcade/">PLAY ARCADE <span aria-hidden="true">↗</span></a><a className="pitch-text-link" href="https://testnet.rarerush.app">TRY TESTNET ↗</a><a className="pitch-text-link" href="/docs/">EXPLORE THE DOCS ↗</a></div><small>Choose Genesis or Generations. Real NFT holders can play Arcade; faucet NFTs get you started on Testnet. On mobile, use your wallet’s browser.</small></section>
     </main>
 
-    <footer className="pitch-footer"><div><b>RARE RUSH / BY XIBOT</b><span>A PLAYABLE VIBEATHON BUILD</span></div><div><a href="https://github.com/xibot/rare-rush">EXPLORE THE SOURCE ↗</a><a href="https://github.com/spokesz/friendsdk">BUILT WITH FRIENDSDK ↗</a><a href="https://rarefriends.com/">ART & WORLD BY RARE FRIENDS ↗</a><a href="#top">BACK TO TOP ↑</a></div></footer>
-  </div></>;
+  </div>
+  <SiteFooter/></>;
 }
 
 createRoot(document.getElementById('root')!).render(<Pitch/>);

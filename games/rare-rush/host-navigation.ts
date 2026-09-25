@@ -3,6 +3,7 @@ import { syncFriendPortraits, cleanupFriendPortraits } from './host-portraits';
 import { bindGenerationsAnalytics } from './host-analytics';
 import { bindGenerationsRunSaves } from './host-run-saves';
 import { createSdkSiteHeader } from './site-navigation';
+import { siteFooterMarkup } from '../../shared/site-footer';
 
 /** Site chrome for the outer SDK host. Wallet, ownership and gameplay stay in FriendSDK. */
 function enhanceGenerationsEntry(): void {
@@ -21,7 +22,7 @@ function enhanceGenerationsEntry(): void {
         const isPicker = menu.querySelector('.rf-frame-menu-heading h2')?.textContent?.trim() === 'Choose your Friend';
         menu.classList.toggle('rush-generations-menu', isPicker);
         if (!isPicker) {
-          menu.querySelectorAll('.rush-generations-chrome, .rush-generations-caption').forEach(node => node.remove());
+          menu.querySelectorAll('.rush-generations-chrome, .rush-generations-caption, .rush-site-footer-shell').forEach(node => node.remove());
           continue;
         }
         pickerOpen = framePickerOpen = true;
@@ -38,6 +39,9 @@ function enhanceGenerationsEntry(): void {
           caption.className = 'rush-generations-caption';
           caption.textContent = 'FriendSDK verifies your Generations NFT on Robinhood Chain. Generation 1 or later is required. Runs cost 1 demo RF; all fees and rewards are simulated. Playing needs no transaction or signature. Publishing a replay requires a wallet signature.';
           menu.append(caption);
+        }
+        if (!menu.querySelector('.rush-site-footer-shell')) {
+          menu.insertAdjacentHTML('beforeend', siteFooterMarkup());
         }
         syncFriendPortraits(menu);
       }

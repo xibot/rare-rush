@@ -5,6 +5,7 @@ import { RunCanvas, TestFriendAvatar } from './RunCanvas.tsx';
 import { ArcadeCabinet } from './ArcadeCabinet.tsx';
 import { CollectionChoice, CollectionFriends } from './CollectionEntry.tsx';
 import { SiteHeader } from '../SiteHeader.tsx';
+import { SiteFooter } from '../SiteFooter.tsx';
 import { createRecorder, type Replay, type RunSnapshot as EngineSnapshot } from './recorder.ts';
 import { TESTNET_CHAIN, PLAY_GAME_ABI, verifyPlayContracts, readRun, readOwnedFriend, discoverFriends, entryAllowance, approveEntry, startRun, claimRun, abandonRun, recoverPending, retryHashlessPending, cancelHashlessPending } from './chain.ts';
 import { PLAY_CONTRACTS, ENGINE_VERSION, type Collection, type Difficulty, type PlayState, type FriendSelection, type SavedRun } from './types.ts';
@@ -425,7 +426,6 @@ export function App() {
     {dashboard ? <a className="outline-link view-run-link" href={`/play/?run=${run.run.runId}`}>VIEW RUN ↗</a> : <button className="text-button" onClick={()=>navigatePlay()}>Back to collections</button>}
   </>;
   const runHeading = run && <div className="play-section-heading"><span className="eyebrow">RUN #{run.run.runId} / {MODES[run.run.difficulty].toUpperCase()} / TEST {run.run.collection===1?'GENESIS':'GENERATIONS'} #{run.run.tokenId}</span><button className="text-button" onClick={exportReplay}>SAVE REPLAY ↓</button></div>;
-  const footer = <footer><span>RARE RUSH <b>BY XIBOT</b></span><span>TEST IDEAS. KEEP IT RARE.</span><a href="/#test-kit">BACK TO TEST KIT ↗</a></footer>;
   return <>
     {!arcade&&<SiteHeader page={dashboard?'dashboard':'play'}/>}
     <div className={`lab-shell play-shell ${dashboard?'dashboard-shell':arcade?'arcade-page':'entry-shell'}`}>
@@ -482,6 +482,7 @@ export function App() {
       {pendingPanel}
       {route.runId&&(!run||route.runId!==run.run.runId)&&<p className="entry-notices">{account?'This run is not saved in this browser. Recover it from your Dashboard.':'Connect your wallet to load your saved run.'} <a href="/dashboard/">DASHBOARD ↗</a></p>}
     </>}
-    {dashboard&&footer}
-  </div></>;
+  </div>
+  {(dashboard||!arcade)&&<SiteFooter/>}
+  </>;
 }
