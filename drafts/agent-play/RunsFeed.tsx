@@ -1,6 +1,8 @@
 import { memo, useCallback, useEffect, useId, useMemo, useRef, useState } from 'react';
 import type { RunRecord } from './feed-types.ts';
 import { RunPreview } from './RunPreview.tsx';
+import { planReplayPreviews } from './preview-plan.ts';
+import type { ReplayPreviewCandidate } from './replay-preview.ts';
 import './runs-feed.css';
 
 export type RunsFeedProps = {
@@ -37,10 +39,12 @@ function savedTime(value: string) {
   });
 }
 
-const RunCard = memo(function RunCard({ record, liked, animate, onToggleLike, onOpen }: {
+const RunCard = memo(function RunCard({ record, liked, animate, candidateKey, onCandidates, onToggleLike, onOpen }: {
   record: RunRecord;
   liked: boolean;
   animate: boolean;
+  candidateKey?: string;
+  onCandidates: (id: string, candidates: readonly ReplayPreviewCandidate[]) => void;
   onToggleLike: RunsFeedProps['onToggleLike'];
   onOpen: RunsFeedProps['onOpen'];
 }) {
@@ -51,7 +55,7 @@ const RunCard = memo(function RunCard({ record, liked, animate, onToggleLike, on
   return (
     <article className="runs-feed-card" aria-label={`${title}, ${environment}, score ${count(record.metrics.score)}`} data-run-id={record.id}>
       <button type="button" className="runs-feed-cover" onClick={() => onOpen(record)} aria-label={`Watch ${title}, ${environment} run`} aria-haspopup="dialog" data-preview-id={record.id} data-preview-animated={animate}>
-        <RunPreview record={record} animate={animate} />
+        <RunPreview record={record} animate={animate} candidateKey={candidateKey} onCandidates={onCandidates} />
         <span className="runs-feed-cover-top"><span>{environment.toUpperCase()}</span><span>{durationLabel(record.metrics.elapsed)}</span></span>
         <span className="runs-feed-preview-label">GAMEPLAY PREVIEW</span>
         <span className="runs-feed-watch"><svg viewBox="0 0 16 16" aria-hidden="true"><path d="M5 3 13 8 5 13Z" fill="currentColor" /></svg> WATCH REPLAY</span>
@@ -83,11 +87,15 @@ export function RunsFeed({ records, likes, onToggleLike, onOpen, onBack, loading
   const [reducedMotion, setReducedMotion] = useState(() => window.matchMedia('(prefers-reduced-motion: reduce)').matches);
   const [pageVisible, setPageVisible] = useState(() => !document.hidden);
   const [visibleCovers, setVisibleCovers] = useState<ReadonlySet<string>>(() => new Set());
+  const [catalogues, setCatalogues] = useState<ReadonlyMap<string, readonly ReplayPreviewCandidate[]>>(() => new Map());
   const grid = useRef<HTMLDivElement>(null);
   const actions = useRef({ onOpen, onToggleLike });
   actions.current = { onOpen, onToggleLike };
   const openRun = useCallback((record: RunRecord) => actions.current.onOpen(record), []);
   const toggleLike = useCallback((runId: string) => actions.current.onToggleLike(runId), []);
+  const receiveCandidates = useCallback((runId: string, candidates: readonly ReplayPreviewCandidate[]) => {
+    setCatalogues(previous => previous.get(runId) === candidates ? previous : new Map(previous).set(runId, candidates));
+  }, []);
   const filtered = useMemo(() => {
     const terms = query.toLowerCase().replace(/#/g, '').trim().split(/\s+/).filter(Boolean);
     return records.filter(record => {
@@ -102,6 +110,7 @@ export function RunsFeed({ records, likes, onToggleLike, onOpen, onBack, loading
   }, [records, environment, likedOnly, likes, query, sort]);
   const shownRecords = filtered.slice(0, visible);
   const shownIds = shownRecords.map(record => record.id).join(',');
+  const previewPlan = useMemo(() => planReplayPreviews(shownRecords, catalogues), [shownIds, catalogues]);
   const motionEnabled = previewsEnabled && !reducedMotion;
   const animatedIds = new Set(shownRecords.filter(record => visibleCovers.has(record.id))
     .slice(0, MAX_ANIMATED_PREVIEWS).map(record => record.id));
@@ -181,7 +190,8 @@ export function RunsFeed({ records, likes, onToggleLike, onOpen, onBack, loading
       {!!filtered.length && <>
         <p className="runs-feed-showing" role="status">SHOWING {Math.min(visible, filtered.length)} OF {filtered.length} {filtered.length === 1 ? 'RUN' : 'RUNS'}</p>
         <div ref={grid} className="runs-feed-grid">{shownRecords.map(record => <RunCard key={record.id} record={record} liked={likes.has(record.id)}
-          animate={motionEnabled && !previewsPaused && pageVisible && animatedIds.has(record.id)} onToggleLike={toggleLike} onOpen={openRun} />)}</div>
+          animate={motionEnabled && !previewsPaused && pageVisible && animatedIds.has(record.id)}
+          candidateKey={previewPlan.get(record.id)} onCandidates={receiveCandidates} onToggleLike={toggleLike} onOpen={openRun} />)}</div>
         {visible < filtered.length && <div className="runs-feed-more"><button type="button" onClick={() => setVisible(value => value + PAGE_SIZE)}>LOAD MORE RUNS <span aria-hidden="true">↓</span></button></div>}
       </>}
       {!loading && !error && !filtered.length && <div className="runs-feed-empty">

@@ -6,8 +6,8 @@ import { tmpdir } from 'node:os';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { chromium } from 'playwright';
-import { createAgentSession, runSessionToEnd, exportAgentReplay } from './runner.ts';
-import { createReplayPreview } from './replay-preview.ts';
+import { advanceReplay, createAgentSession, createReplaySession, runSessionToEnd, exportAgentReplay, FIXED_STEP } from './runner.ts';
+import { analyzeReplayPreview } from './replay-preview.ts';
 
 const here = dirname(fileURLToPath(import.meta.url)), repo = resolve(here, '../..');
 const temporary = await mkdtemp(resolve(tmpdir(), 'rare-rush-thumbnail-qa-'));
@@ -20,6 +20,21 @@ const seed = number => '0x' + number.toString(16).padStart(64, '0');
 const previewFor = (targetPage, id) => targetPage.locator(`.runs-feed-card[data-run-id="${id}"] .runs-feed-preview`);
 const tick = async preview => Number(await preview.getAttribute('data-preview-tick'));
 const loop = async preview => Number(await preview.getAttribute('data-preview-loop'));
+const assignments = targetPage => targetPage.locator('.runs-feed-card').evaluateAll(cards => cards.map(card => {
+  const preview = card.querySelector('.runs-feed-preview');
+  return { id: card.getAttribute('data-run-id'), kind: preview?.getAttribute('data-preview-kind'),
+    start: Number(preview?.getAttribute('data-preview-start')), end: Number(preview?.getAttribute('data-preview-end')) };
+}));
+
+function possibleDiversity(records) {
+  const kinds = [...new Set(records.flatMap(record => record.catalogue.candidates.map(candidate => candidate.kind)))];
+  let choices = new Set([0]);
+  for (const record of records) {
+    const bits = [...new Set(record.catalogue.candidates.map(candidate => 1 << kinds.indexOf(candidate.kind)))];
+    choices = new Set([...choices].flatMap(mask => bits.map(bit => mask | bit)));
+  }
+  return Math.max(...[...choices].map(mask => mask.toString(2).replaceAll('0', '').length));
+}
 
 async function save(number) {
   const value = seed(number), session = runSessionToEnd(createAgentSession(value, 'degen'));
@@ -27,7 +42,7 @@ async function save(number) {
   const response = await fetch(origin + '/api/runs', { method: 'POST', headers: { Origin: origin, 'Content-Type': 'application/json' }, body: JSON.stringify(input) });
   const saved = await response.json();
   assert.equal(response.status, 200, saved.error);
-  return { ...saved, replay: input.replay, clip: createReplayPreview(input, input.replay) };
+  return { ...saved, replay: input.replay, catalogue: analyzeReplayPreview(input, input.replay) };
 }
 
 async function contextFor(reducedMotion, viewport) {
@@ -89,6 +104,30 @@ try {
   assert.equal(await cards.locator('[data-scene="connected-track"]').count(), 8, 'Ready previews use DirectionScene');
   check('Eight genuine saved replays render connected-track scenes; four visible covers animate');
 
+  const selected = await assignments(page);
+  assert.ok(new Set(selected.map(item => item.kind)).size >= Math.min(4, possibleDiversity(saved)), 'Assignments use at least four distinct excerpt kinds when the fixture catalogues support it');
+  for (let index = 0; index < selected.length; index++) {
+    const selection = selected[index], record = saved.find(item => item.id === selection.id);
+    assert.ok(Number.isInteger(selection.start) && Number.isInteger(selection.end) && selection.end > selection.start, 'Selected excerpt has valid tick boundaries');
+    assert.ok(record.catalogue.candidates.some(candidate => candidate.kind === selection.kind && candidate.startTick === selection.start && candidate.endTick === selection.end), 'Displayed excerpt is an actual candidate from that recording');
+    const previous = selected[index - 1];
+    if (previous && record.catalogue.candidates.some(candidate => candidate.kind !== previous.kind)) {
+      assert.notEqual(selection.kind, previous.kind, `Adjacent excerpts should differ when ${selection.id} has alternatives`);
+    }
+    if (selection.kind === 'side') {
+      const canonical = createReplaySession(record.seed, record.difficulty, record.replay);
+      while (canonical.run._tick < selection.start) advanceReplay(canonical);
+      const through = Math.min(selection.end - 1, selection.start + Math.round(1 / FIXED_STEP));
+      while (canonical.run._tick <= through) {
+        assert.equal(canonical.run.phase, 'side', 'Side excerpt stays on the horizontal track for its opening second');
+        assert.equal(!!canonical.run.transition, false, 'Side excerpt does not immediately enter a transition');
+        if (canonical.run._tick === through) break;
+        advanceReplay(canonical);
+      }
+    }
+  }
+  check(`Adjacent covers use varied actual excerpts (${[...new Set(selected.map(item => item.kind))].join(', ')}); side excerpts remain horizontal`);
+
   await page.setViewportSize({ width: 1440, height: 850 });
   const targetId = await cards.first().getAttribute('data-run-id');
   const target = page.locator(`.runs-feed-card[data-run-id="${targetId}"]`);
@@ -99,14 +138,18 @@ try {
   const before = await tick(preview), beforeLoop = await loop(preview);
   await page.clock.runFor(1000);
   const after = await tick(preview), afterLoop = await loop(preview);
-  const clip = saved.find(record => record.id === targetId).clip;
-  const advanced = after - before + (afterLoop - beforeLoop) * (clip.endTick - clip.startTick);
+  const chosen = selected.find(record => record.id === targetId), clipTicks = chosen.end - chosen.start;
+  const advanced = after - before + (afterLoop - beforeLoop) * clipTicks;
   assert.ok(advanced >= 100 && advanced <= 140, `One second should advance about 120 physics ticks, got ${advanced}`);
   const firstLoop = await loop(preview);
-  await page.clock.runFor(6500);
+  const clipMs = clipTicks * FIXED_STEP * 1000, loopMs = Math.max(6500, Math.ceil(clipMs + 500));
+  const polled = page.waitForResponse(response => response.url() === origin + '/api/runs' && response.status() === 200, { timeout: 10_000 });
+  await page.clock.runFor(loopMs);
+  await polled;
   const loops = await loop(preview) - firstLoop;
-  assert.ok(loops >= 1 && loops <= 2, `A six-second excerpt should loop once or twice in 6.5 seconds, got ${loops}`);
-  check('Saved input previews advance at approximately 1× and loop their six-second excerpt');
+  assert.ok(loops >= 1 && loops <= Math.ceil(loopMs / clipMs), `The selected ${clipMs}ms excerpt should loop in ${loopMs}ms, got ${loops}`);
+  assert.deepEqual(await assignments(page), selected, 'Polling and looping preserve the selected excerpts');
+  check('Saved input previews advance at approximately 1× and loop their selected excerpt without changing assignments after polling');
 
   await cards.last().scrollIntoViewIfNeeded();
   await expectAttribute(preview, 'data-preview-animating', 'false');
@@ -135,6 +178,7 @@ try {
   await heart.click();
   assert.equal(await heart.getAttribute('aria-pressed'), 'true');
   assert.equal(await page.getByRole('dialog').count(), 0, 'Heart does not open the run');
+  assert.deepEqual(await assignments(page), selected, 'Heart rerender preserves every excerpt assignment');
   await target.locator('.runs-feed-cover').click();
   const dialog = page.getByRole('dialog', { name: 'Watch saved run' });
   await dialog.locator('.agent-stage').waitFor();
@@ -160,6 +204,7 @@ try {
     await page.screenshot({ path: resolve(artifacts, `thumbnails-${width}.png`), fullPage: true });
   }
   check('1440px and 320px thumbnail layouts have no horizontal overflow');
+  assert.deepEqual(await assignments(page), selected, 'Responsive layout and popup rerenders preserve excerpt assignments');
 
   const reducedContext = await contextFor('reduce', { width: 1440, height: 1000 });
   const reducedPage = await reducedContext.newPage();
@@ -170,7 +215,10 @@ try {
   await expectAttribute(reducedPreview, 'data-preview-state', 'ready');
   await expectAttribute(reducedPreview, 'data-preview-animating', 'false');
   assert.equal(await reducedPreview.locator('[data-scene="connected-track"]').count(), 1, 'Reduced motion shows a real replay frame');
-  assert.equal(await tick(reducedPreview), saved.find(record => record.id === reducedId).clip.startTick, 'Static cover is the saved excerpt start');
+  const reducedSelection = (await assignments(reducedPage)).find(record => record.id === reducedId);
+  const reducedRecord = saved.find(record => record.id === reducedId);
+  assert.ok(reducedRecord.catalogue.candidates.some(candidate => candidate.kind === reducedSelection.kind && candidate.startTick === reducedSelection.start && candidate.endTick === reducedSelection.end), 'Reduced motion still selects an actual recorded candidate');
+  assert.equal(await tick(reducedPreview), reducedSelection.start, 'Static cover is the selected saved excerpt start');
   await pauseClock(reducedPage);
   const staticTick = await tick(reducedPreview), staticLoop = await loop(reducedPreview);
   await reducedPage.clock.runFor(6500);

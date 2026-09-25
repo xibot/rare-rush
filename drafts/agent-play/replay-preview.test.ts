@@ -1,37 +1,67 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { createReplayPreview, resetReplayPreview } from './replay-preview.ts';
+import { analyzeReplayPreview, createReplayPreviewFromCandidate, createReplayPreview, resetReplayPreview } from './replay-preview.ts';
 import { createAgentSession, createReplaySession, advanceReplay, runSessionToEnd, exportAgentReplay,
   getSessionMetrics, AGENT_REPLAY_VERSION, PROTOCOL_VERSION, FIXED_STEP, type AgentReplay,
   type InputFrame } from './runner.ts';
 import { createRun, setPace, stepRun } from '../../games/rare-rush/twist/engine.ts';
+import { headingFor } from '../../games/rare-rush/twist/presentation.ts';
 
 const seed = `0x${'1a'.repeat(32)}`;
 
 for (const difficulty of ['easy', 'normal', 'degen'] as const) {
-  test(`${difficulty}: excerpt includes the actual first twist and preserves every engine state`, () => {
+  test(`${difficulty}: catalogue kinds describe real stable gameplay and selected clips preserve engine state`, () => {
     const original = runSessionToEnd(createAgentSession(seed, difficulty));
     const replay = exportAgentReplay(original);
     const record = { seed, difficulty, metrics: { score: 999_999_999 } };
-    const clip = createReplayPreview(record, replay);
-    assert.deepEqual(clip.metrics, getSessionMetrics(original));
-    assert.ok(clip.transitionTick !== null);
-    assert.equal(clip.startTick, clip.transitionTick - 120);
-    assert.equal(clip.endTick - clip.startTick, 720);
-    assert.equal(clip.start.run._tick, clip.startTick);
-
+    const catalogue = analyzeReplayPreview(record, replay);
+    assert.deepEqual(catalogue.metrics, getSessionMetrics(original));
+    assert.deepEqual([...new Set(catalogue.candidates.map(item => item.kind))].sort(), ['coins', 'down', 'jump', 'left', 'side', 'up']);
+    assert.ok(catalogue.candidates.length <= 24);
+    assert.equal(new Set(catalogue.candidates.map(item => `${item.startTick}:${item.endTick}`)).size, catalogue.candidates.length,
+      'The same timestamp window must not be relabeled as different actions');
+    const representatives = [...new Map(catalogue.candidates.map(candidate => [candidate.kind, candidate])).values()];
+    const boundaries = new Set(representatives.flatMap(candidate => [candidate.startTick, candidate.endTick]));
+    const snapshots = new Map<number, typeof original.run>();
     const expected = createReplaySession(seed, difficulty, replay);
-    while (expected.run._tick < clip.startTick) advanceReplay(expected);
-    assert.deepEqual(clip.start, expected, 'The baseline is reached only through the saved controls');
-    const preview = resetReplayPreview(clip);
-    let firstTwist: number | null = null;
-    while (preview.run._tick < clip.endTick) {
-      advanceReplay(preview); advanceReplay(expected);
-      assert.deepEqual(preview.run, expected.run);
-      if (preview.run.transition && firstTwist === null) firstTwist = preview.run._tick;
+    const describe = () => ({ phase: expected.run.phase, heading: headingFor(expected.run),
+      transition: !!expected.run.transition, grounded: expected.run.player.grounded,
+      jumping: !expected.run.player.grounded && expected.run.player.jumps > 0, coins: expected.run.coins });
+    const samples = [describe()];
+    while (expected.run.status === 'running') {
+      advanceReplay(expected); samples.push(describe());
+      if (boundaries.has(expected.run._tick)) snapshots.set(expected.run._tick, structuredClone(expected.run));
     }
-    assert.equal(firstTwist, clip.transitionTick);
-    assert.deepEqual(resetReplayPreview(clip), clip.start, 'Every loop restarts at the same recorded state');
+    for (const candidate of catalogue.candidates) {
+      assert.ok(candidate.endTick - candidate.startTick <= 720);
+      const samplesInWindow = samples.slice(candidate.startTick, candidate.endTick + 1);
+      assert.ok(samplesInWindow.every(sample => !sample.transition));
+      const phase = candidate.kind === 'up' || candidate.kind === 'down' ? candidate.kind : 'side';
+      assert.ok(samplesInWindow.every(sample => sample.phase === phase));
+      if (phase === 'side') assert.ok(samplesInWindow.every(sample => sample.heading === (candidate.kind === 'left' ? -1 : 1)));
+      if (candidate.kind === 'side') {
+        assert.equal(candidate.endTick - candidate.startTick, 720);
+        assert.ok(candidate.jumpingTicks <= candidate.stableTicks / 2);
+      }
+      if (candidate.kind === 'coins') assert.ok(candidate.coinsCollected > 0);
+      if (candidate.kind === 'jump') {
+        const takeoff = samplesInWindow.findIndex((sample, index) => index > 0 && sample.jumping && samplesInWindow[index - 1].grounded);
+        assert.ok(takeoff > 0, 'Jump previews contain a real takeoff');
+        assert.ok(samplesInWindow.slice(takeoff + 1).some(sample => sample.grounded), 'Jump previews contain its landing');
+      }
+    }
+    for (const candidate of representatives) {
+      const clip = createReplayPreviewFromCandidate(catalogue, candidate.key);
+      assert.equal(clip.kind, candidate.kind);
+      assert.equal(clip.candidateKey, candidate.key);
+      assert.equal(clip.transitionTick, null);
+      assert.equal(clip.start.replay, catalogue.replay, 'Selecting a candidate shares the validated envelope');
+      assert.deepEqual(clip.start.run, snapshots.get(clip.startTick));
+      const preview = resetReplayPreview(clip);
+      while (preview.run._tick < clip.endTick) advanceReplay(preview);
+      assert.deepEqual(preview.run, snapshots.get(clip.endTick));
+      assert.deepEqual(resetReplayPreview(clip), clip.start);
+    }
   });
 }
 
@@ -46,6 +76,8 @@ test('a legal loss shorter than six seconds uses its opening and stops exactly a
   assert.equal(run.finishReason, 'hearts');
   assert.ok(run._tick < 720);
   const replay: AgentReplay = { version: AGENT_REPLAY_VERSION, finalTick: run._tick, inputs: { version: PROTOCOL_VERSION, frames } };
+  const catalogue = analyzeReplayPreview({ seed: shortSeed, difficulty: 'degen' }, replay);
+  assert.deepEqual(catalogue.candidates.map(candidate => candidate.kind), ['side'], 'Do not invent jumps or unvisited directions');
   const clip = createReplayPreview({ seed: shortSeed, difficulty: 'degen' }, replay);
   assert.equal(clip.transitionTick, null);
   assert.equal(clip.startTick, 0);
@@ -55,6 +87,26 @@ test('a legal loss shorter than six seconds uses its opening and stops exactly a
   while (preview.run._tick < clip.endTick) advanceReplay(preview);
   assert.equal(preview.run.status, 'finished');
   assert.deepEqual(preview.run, run);
+});
+
+test('default choices vary deterministically, explicit candidates work, and nonexistent directions are not invented', () => {
+  const selected = new Set<string>();
+  for (let number = 41; number <= 48; number++) {
+    const seed = `0x${number.toString(16).padStart(64, '0')}`, difficulty = 'degen' as const;
+    const replay = exportAgentReplay(runSessionToEnd(createAgentSession(seed, difficulty)));
+    const catalogue = analyzeReplayPreview({ seed, difficulty }, replay);
+    const clip = createReplayPreview({ seed, difficulty }, replay);
+    selected.add(clip.kind);
+    assert.equal(createReplayPreview({ seed, difficulty }, replay).candidateKey, clip.candidateKey);
+    assert.equal(createReplayPreview({ seed, difficulty }, replay, clip.candidateKey).candidateKey, clip.candidateKey);
+    if (number === 42) {
+      assert.equal(catalogue.candidates.some(candidate => candidate.kind === 'left'), false);
+      assert.throws(() => createReplayPreview({ seed, difficulty }, replay, 'left'), /no preview/);
+    }
+    assert.throws(() => createReplayPreviewFromCandidate(catalogue, 'side:999999:1000719'), /does not belong/);
+    assert.throws(() => createReplayPreviewFromCandidate(structuredClone(catalogue), clip.candidateKey), /Analyze/);
+  }
+  assert.ok(selected.size >= 4);
 });
 
 test('loops share frozen inputs while mutable state and writable arrays remain independent', () => {

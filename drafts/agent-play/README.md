@@ -24,7 +24,7 @@ The run library is shared between both views. Selecting Agentic does not connect
 
 ## Runs Feed
 
-Open **http://127.0.0.1:4220/#runs-feed**, or select **RUNS FEED** in the header, to browse every saved local run as a card. The feed includes multiple runs per Friend and losses; the best-run library remains a separate summary. Each card plays a short excerpt of that run's actual recorded gameplay, beginning just before its first direction change when available. Excerpts loop for up to six seconds. Clicking opens the full saved replay in a popup with playback controls. These are watchable deterministic replays, not exported video files.
+Open **http://127.0.0.1:4220/#runs-feed**, or select **RUNS FEED** in the header, to browse every saved local run as a card. The feed includes multiple runs per Friend and losses; the best-run library remains a separate summary. Each card plays a short excerpt chosen from its full saved recording: side-running, jumps, coin pickups, upward sections, leftward sections or free falls. The feed balances these moments across neighboring cards, using only footage available in each run. Side previews favor sustained side-running instead of opening immediately into a turn. Excerpts loop for up to six seconds. Clicking opens the full saved replay in a popup with playback controls. These are watchable deterministic replays, not exported video files.
 
 Previews load as their cards enter the screen. Up to four visible thumbnails animate at 12 frames per second; offscreen cards, background tabs and cards behind an open replay popup pause. **ANIMATED PREVIEWS** can turn motion off. The system's reduced-motion preference displays a still from the actual replay instead. A small in-memory cache reuses recordings, and preview playback never changes saved scores or starts a game.
 
@@ -82,11 +82,12 @@ node drafts/agent-play/serve.mjs --build-only
 node drafts/agent-play/browser-check.mjs
 node drafts/agent-play/feed-browser-check.mjs
 node --test drafts/agent-play/replay-preview.test.ts
+node --test drafts/agent-play/preview-plan.test.ts
 node drafts/agent-play/thumbnail-browser-check.mjs
 ```
 
 The feed check uses a separate temporary library of legal saved replays, including a loss and repeated runs with the same Friend. It checks responsive cards and popup playback, filters/search/sort, persistent shared hearts, retry handling, keyboard focus restoration and pausing/resuming Autopilot while browsing. It blocks external network access and confirms watching/liking only reads local data.
 
-Preview tests compare excerpt playback against the original recording across all modes, including short losses and invalid recordings. The isolated thumbnail browser check covers actual animation and looping, visible-card limits, offscreen/modal pauses, reduced motion, the motion toggle and responsive layouts.
+Preview tests compare varied excerpts against the original recording across all modes, including short losses and invalid recordings. Planning tests cover neighboring variety, constrained footage and stable selection. The isolated thumbnail browser check covers actual clip diversity, animation and looping, visible-card limits, offscreen/modal pauses, reduced motion, the motion toggle and responsive layouts.
 
 The browser check uses installed Chrome, an isolated local port and temporary data. It checks both mode panels, keyboard navigation, pause/resume across tabs, exact skill loading and download, clipboard fallback, and the result overlay at desktop and mobile widths. Tests also cover deterministic replay, invalid inputs, ownership gates, actual artwork decoding and persistence, wallet changes, responsive layouts and mocked Testnet approval/start/verification/claim recovery. Headless checks cover duplicate and overlapping jobs, durable crash recovery and replay retention before claiming. An isolated end-to-end check ran two CLI jobs for one Friend, retried one without a duplicate, and confirmed automatic library refresh, best-run selection and watchable replay. Live read-only checks confirmed current Testnet contract configuration and verifier readiness during development. A complete transaction sequence using a real wallet has not been broadcast as part of these prototype checks.

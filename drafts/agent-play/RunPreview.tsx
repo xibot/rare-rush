@@ -5,24 +5,29 @@ import { GenesisRunnerSprite } from '../../games/rare-rush/genesis/GenesisRunner
 import { testRunArt } from '../../testnet-app/src/play/art.ts';
 import { advanceReplay, FIXED_STEP } from './runner.ts';
 import { decodeRunArt, type RunRecord } from './feed-types.ts';
-import { createReplayPreview, resetReplayPreview, type ReplayPreviewClip } from './replay-preview.ts';
+import { analyzeReplayPreview, createReplayPreviewFromCandidate, resetReplayPreview,
+  type ReplayPreviewClip, type ReplayPreviewCatalogue, type ReplayPreviewCandidate } from './replay-preview.ts';
 
-type Preview = { clip: ReplayPreviewClip; art: ReturnType<typeof testRunArt> | NonNullable<ReturnType<typeof decodeRunArt>> };
-const cache = new Map<string, Promise<Preview>>();
+type PreviewSource = {
+  catalogue: ReplayPreviewCatalogue;
+  art: ReturnType<typeof testRunArt> | NonNullable<ReturnType<typeof decodeRunArt>>;
+  clips: Map<string, Promise<ReplayPreviewClip>>;
+};
+const cache = new Map<string, Promise<PreviewSource>>();
 const identity = (record: RunRecord) => JSON.stringify([record.id, record.source, record.collection,
   record.tokenId, record.difficulty, record.seed, record.player, record.runId]);
 const MAX_BYTES = 2_500_000;
 let preparation: Promise<unknown> = Promise.resolve();
-function preparePreview(record: RunRecord) {
+function prepare<T>(work: () => T): Promise<T> {
   // Separate validation tasks with a paint opportunity when several covers arrive.
   const next = preparation.catch(() => {}).then(() => new Promise<void>(resolve => window.setTimeout(resolve, 16)))
-    .then(() => createReplayPreview(record, record.replay));
+    .then(work);
   preparation = next;
   return next;
 }
 
 /** Only visible covers request a recording. A small LRU keeps filtering cheap. */
-function loadPreview(record: RunRecord): Promise<Preview> {
+function loadPreview(record: RunRecord): Promise<PreviewSource> {
   const key = identity(record), existing = cache.get(key);
   if (existing) { cache.delete(key); cache.set(key, existing); return existing; }
   const promise = (async () => {
@@ -46,11 +51,11 @@ function loadPreview(record: RunRecord): Promise<Preview> {
       } finally { await reader.cancel().catch(() => {}); reader.releaseLock(); }
       const full = JSON.parse(text) as RunRecord;
       if (!full || identity(full) !== key) throw new Error('Saved run does not match.');
-      const clip = await preparePreview(full);
+      const catalogue = await prepare(() => analyzeReplayPreview(full, full.replay));
       if (controller.signal.aborted) throw new Error('Preview request expired.');
       const savedArt = decodeRunArt(full);
       if (full.source === 'arcade' && !savedArt) throw new Error('Saved Friend artwork is missing.');
-      return { clip, art: savedArt ?? testRunArt(full.collection, full.tokenId, 'agent-play') };
+      return { catalogue, art: savedArt ?? testRunArt(full.collection, full.tokenId, 'agent-play'), clips: new Map<string, Promise<ReplayPreviewClip>>() };
     } finally { window.clearTimeout(timeout); }
   })();
   cache.set(key, promise);
@@ -59,16 +64,33 @@ function loadPreview(record: RunRecord): Promise<Preview> {
   return promise;
 }
 
+function loadClip(source: PreviewSource, candidateKey: string): Promise<ReplayPreviewClip> {
+  const cached = source.clips.get(candidateKey);
+  if (cached) { source.clips.delete(candidateKey); source.clips.set(candidateKey, cached); return cached; }
+  const clip = prepare(() => createReplayPreviewFromCandidate(source.catalogue, candidateKey));
+  source.clips.set(candidateKey, clip);
+  while (source.clips.size > 2) source.clips.delete(source.clips.keys().next().value!);
+  void clip.catch(() => { if (source.clips.get(candidateKey) === clip) source.clips.delete(candidateKey); });
+  return clip;
+}
+
 /** A real six-second excerpt, driven by saved inputs and the original renderer. */
-export function RunPreview({ record, animate }: { record: RunRecord; animate: boolean }) {
+export function RunPreview({ record, animate, candidateKey, onCandidates }: {
+  record: RunRecord;
+  animate: boolean;
+  candidateKey?: string;
+  onCandidates: (id: string, candidates: readonly ReplayPreviewCandidate[]) => void;
+}) {
   const element = useRef<HTMLSpanElement>(null);
   const [inView, setInView] = useState(false);
   const [foreground, setForeground] = useState(() => !document.hidden);
-  const [playback, setPlayback] = useState<{ key: string; preview: Preview; session: ReturnType<typeof resetReplayPreview>; loop: number } | null>(null);
+  const [loaded, setLoaded] = useState<{ key: string; source: PreviewSource } | null>(null);
+  const [playback, setPlayback] = useState<{ key: string; clip: ReplayPreviewClip; session: ReturnType<typeof resetReplayPreview>; loop: number } | null>(null);
   const [, paint] = useState(0);
   const [failed, setFailed] = useState(false);
-  const key = identity(record);
-  const current = playback?.key === key ? playback : null;
+  const key = identity(record), clipKey = `${key}:${candidateKey ?? ''}`;
+  const source = loaded?.key === key ? loaded.source : null;
+  const current = playback?.key === clipKey ? playback : null;
   const active = !!current && animate && inView && foreground;
 
   useEffect(() => {
@@ -87,14 +109,26 @@ export function RunPreview({ record, animate }: { record: RunRecord; animate: bo
     };
   }, []);
   useEffect(() => {
-    if (!inView || !foreground || current) return;
+    if (!inView || !foreground || source) return;
     let alive = true;
     setFailed(false);
-    void loadPreview(record).then(preview => {
-      if (alive) setPlayback({ key, preview, session: resetReplayPreview(preview.clip), loop: 0 });
+    void loadPreview(record).then(next => {
+      if (alive) setLoaded({ key, source: next });
     }).catch(() => { if (alive) setFailed(true); });
     return () => { alive = false; };
-  }, [key, inView, foreground, !!current]);
+  }, [key, inView, foreground, !!source]);
+  useEffect(() => {
+    if (source) onCandidates(record.id, source.catalogue.candidates);
+  }, [source, record.id, onCandidates]);
+  useEffect(() => {
+    if (!source || !candidateKey) return;
+    let alive = true;
+    setFailed(false);
+    void loadClip(source, candidateKey).then(clip => {
+      if (alive) setPlayback({ key: clipKey, clip, session: resetReplayPreview(clip), loop: 0 });
+    }).catch(() => { if (alive) setFailed(true); });
+    return () => { alive = false; };
+  }, [source, candidateKey, clipKey]);
 
   useEffect(() => {
     if (!active || !current) return;
@@ -105,12 +139,12 @@ export function RunPreview({ record, animate }: { record: RunRecord; animate: bo
       // Discard time spent blocked or away instead of catching up in a burst.
       if (delta < .5) accumulator += Math.max(0, delta);
       try {
-        while (accumulator + 1e-10 >= FIXED_STEP && current.session.run._tick < current.preview.clip.endTick) {
+        while (accumulator + 1e-10 >= FIXED_STEP && current.session.run._tick < current.clip.endTick) {
           accumulator = Math.max(0, accumulator - FIXED_STEP);
           advanceReplay(current.session);
         }
-        if (current.session.run._tick >= current.preview.clip.endTick) {
-          setPlayback({ ...current, session: resetReplayPreview(current.preview.clip), loop: current.loop + 1 });
+        if (current.session.run._tick >= current.clip.endTick) {
+          setPlayback({ ...current, session: resetReplayPreview(current.clip), loop: current.loop + 1 });
           return;
         }
         if (now - lastPaint >= 1000 / 12) { lastPaint = now; paint(value => value + 1); }
@@ -121,12 +155,13 @@ export function RunPreview({ record, animate }: { record: RunRecord; animate: bo
     return () => cancelAnimationFrame(raf);
   }, [active, current]);
 
-  const run = current?.session.run, art = current?.preview.art;
+  const run = current?.session.run, art = source?.art;
   return <span ref={element} className="runs-feed-preview" aria-hidden="true"
     data-preview-state={failed ? 'unavailable' : current ? 'ready' : 'loading'}
-    data-preview-animating={active && !failed} data-preview-tick={run?._tick} data-preview-loop={current?.loop}>
+    data-preview-animating={active && !failed} data-preview-tick={run?._tick} data-preview-loop={current?.loop}
+    data-preview-kind={current?.clip.kind} data-preview-start={current?.clip.startTick} data-preview-end={current?.clip.endTick}>
     {run && art && !failed ? <svg className="runs-feed-preview-scene" viewBox="0 0 640 500" focusable="false">
-      <DirectionScene key={`${key}:${current!.loop}`} run={run} running={active}
+      <DirectionScene key={`${clipKey}:${current!.loop}`} run={run} running={active}
         biome={Math.min(2, Math.floor(run.elapsed / run.duration * 3))} growth={run.growth} viewportWidth={640}
         renderCharacter={(frame, walking) => record.collection === 1
           ? art.portraitUrl && <GenesisRunnerSprite portraitUrl={art.portraitUrl} bodyId={art.bodyId} frame={frame} walking={walking}/>
