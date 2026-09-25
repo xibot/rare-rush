@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { resolveRunActor, runningLabel } from './run-actor.ts';
 
 test('explicit saved actor takes precedence over legacy names and job metadata', () => {
-  for (const [actor, label] of [['human', 'HUMAN RUNNING'], ['autopilot', 'AUTO RUNNING'], ['agentic', 'AGENT RUNNING']] as const) {
+  for (const [actor, label] of [['human', 'HUMAN RUN'], ['autopilot', 'AUTOPILOT RUN'], ['agentic', 'AGENT RUN']] as const) {
     assert.equal(runningLabel(resolveRunActor({ actor, agent: 'Rare Rush autopilot', agentJobId: 'old-job' })), label);
   }
 });

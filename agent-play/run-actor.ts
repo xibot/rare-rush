@@ -17,9 +17,9 @@ export function resolveRunActor(record?: ActorMetadata | null): PublicRunActor |
 
 export function runningLabel(actor?: PublicRunActor): string {
   switch (actor) {
-    case 'human': return 'HUMAN RUNNING';
-    case 'autopilot': return 'AUTO RUNNING';
-    case 'agentic': return 'AGENT RUNNING';
+    case 'human': return 'HUMAN RUN';
+    case 'autopilot': return 'AUTOPILOT RUN';
+    case 'agentic': return 'AGENT RUN';
     default: return 'RUNNING';
   }
 }
