@@ -37,7 +37,7 @@ try {
     assert.match(typography.heading, /Silkscreen/);
     assert.match(typography.body, /Sometype Mono/);
     assert(typography.pixelLoaded, 'The real pixel font must load locally');
-    assert.equal(await page.locator('.landing-logo small').innerText(), 'BY XIBOT');
+    assert.equal(await page.locator('.landing-logo small').count(), 0);
     assert.equal(await page.locator('.landing-logo [data-canonical-face="08"]').count(), 1);
     assert.equal(await page.locator('body').evaluate(body => body.scrollWidth > window.innerWidth), false, 'Landing fits the viewport');
     await preview.scrollIntoViewIfNeeded();

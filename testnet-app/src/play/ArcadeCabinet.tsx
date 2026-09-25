@@ -53,7 +53,7 @@ export function ArcadeCabinet(props: ArcadeCabinetProps) {
       <div className="arcade-top">
         <a className="arcade-logo" href="/" aria-label="Rare Rush home" onClick={event => { if (props.onHome) { event.preventDefault(); props.onHome(); } }}>
           <svg className="brand-icon" viewBox="0 0 30 30" aria-hidden="true"><TokenCoin size={30}/></svg>
-          <span className="brand-name">RARE<span>RUSH</span><small>BY XIBOT</small></span>
+          <span className="brand-name">RARE<span>RUSH</span></span>
         </a>
         <div className="top-actions"><span className="preview-tag">TESTNET</span>{props.topActions ?? <button type="button" aria-label="How to play" onClick={() => setShowHelp(true)}>?</button>}</div>
       </div>

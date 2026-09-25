@@ -37,7 +37,7 @@ try {
     assert.match(typography.heading, /Silkscreen/);
     assert(typography.loaded);
     assert.equal(await page.locator('body').evaluate(body => body.scrollWidth > window.innerWidth), false, 'Guide fits viewport');
-    assert.equal(await page.locator('.docs-logo small').innerText(), 'BY XIBOT');
+    assert.equal(await page.locator('.docs-logo small').count(), 0);
     assert.equal(await page.locator('.docs-nav a').count(), 6);
     await page.screenshot({ path: `artifacts/docs-${width}-hero.png` });
     assert.equal(await page.locator('.experience-card').count(), 2, 'Guide offers both live experiences');

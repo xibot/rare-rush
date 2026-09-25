@@ -17,7 +17,7 @@ for (const [width, difficulty] of [[1100, 'normal'], [390, 'normal'], [360, 'nor
         return getComputedStyle(el).fontFamily.includes('Silkscreen') && [...document.fonts].some(font => font.family === 'Silkscreen' && font.weight === '400' && font.status === 'loaded');
       });
       assert(pixelFontLoaded, 'The Rare Friends pixel font loads inside the game sandbox');
-      assert.equal(await game.locator('.arcade-logo small').innerText(), 'BY XIBOT');
+      assert.equal(await game.locator('.arcade-logo small').count(), 0);
       assert.equal(await game.locator('.arcade-logo [data-canonical-face="08"]').count(), 1, 'Arcade uses the same bear-token logo as the landing');
       for (const name of ['Rare Rush home', 'Back to Friend selection']) {
         const control = game.getByRole('button', { name, exact: true });
@@ -31,10 +31,10 @@ for (const [width, difficulty] of [[1100, 'normal'], [390, 'normal'], [360, 'nor
         }), `${name} fits inside the sandbox at this viewport`);
       }
       assert(await game.locator('.arcade-logo').evaluate(logo => {
-        const credit = logo.querySelector('small').getBoundingClientRect();
+        const wordmark = logo.querySelector('.brand-name').getBoundingClientRect();
         const actions = document.querySelector('.top-actions').getBoundingClientRect();
-        return credit.height > 0 && logo.getBoundingClientRect().right + 4 <= actions.left;
-      }), 'Creator credit stays visible and the logo fits beside the controls');
+        return wordmark.height > 0 && logo.getBoundingClientRect().right + 4 <= actions.left;
+      }), 'The wordmark stays visible and the logo fits beside the controls');
       for (const [mode, seconds, rate] of [['easy', 120, '7.5'], ['normal', 90, '10'], ['degen', 60, '20']]) {
         const choice = game.getByRole('button', { name: `${mode} difficulty`, exact: false });
         await choice.click();

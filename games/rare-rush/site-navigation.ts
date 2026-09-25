@@ -14,6 +14,6 @@ export function createSdkSiteHeader(): HTMLElement {
   const shell = document.createElement('div');
   shell.id = 'top';
   shell.className = 'site-header-shell';
-  shell.innerHTML = `<header class="site-header rush-entry-header"><a class="site-logo rush-entry-logo" href="/" aria-label="Rare Rush by Xibot home"><img class="brand-icon" src="/favicon.svg" width="42" height="42" alt=""><span class="brand-name">RARE<span>RUSH</span><small>BY XIBOT</small></span></a><nav aria-label="Main navigation">${SITE_LINKS.map(link => `<a class="${link.className}" href="${link.href}">${link.label}${'arrow' in link ? ' <span aria-hidden="true">↗</span>' : ''}</a>`).join('')}</nav></header>`;
+  shell.innerHTML = `<header class="site-header rush-entry-header"><a class="site-logo rush-entry-logo" href="/" aria-label="Rare Rush home"><img class="brand-icon" src="/favicon.svg" width="42" height="42" alt=""><span class="brand-name">RARE<span>RUSH</span></span></a><nav aria-label="Main navigation">${SITE_LINKS.map(link => `<a class="${link.className}" href="${link.href}">${link.label}${'arrow' in link ? ' <span aria-hidden="true">↗</span>' : ''}</a>`).join('')}</nav></header>`;
   return shell;
 }

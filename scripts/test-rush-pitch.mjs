@@ -42,7 +42,7 @@ try {
     });
     assert.match(fonts.display, /Silkscreen/); assert(fonts.loaded);
     assert.equal(await page.locator('body').evaluate(el => el.scrollWidth > innerWidth), false, 'Pitch fits without horizontal overflow');
-    assert.equal(await page.locator('header small').innerText(), 'BY XIBOT');
+    assert.equal(await page.locator('header small').count(), 0);
     assert.equal(await page.locator('iframe').count(), 0, 'Pitch has no game or wallet session');
     await page.screenshot({ path: `artifacts/pitch-${width}-hero.png` });
     assert.equal(await preview.getAttribute('preload'), 'none', 'Clip waits for the visitor to play');

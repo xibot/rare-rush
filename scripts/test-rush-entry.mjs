@@ -28,7 +28,7 @@ try {
     await back.waitFor(); await connect.waitFor();
     await page.evaluate(() => document.fonts.ready);
     assert.equal((await page.locator('h1').innerText()).toUpperCase(), 'GENERATIONS\nUNLOCKED.');
-    assert.equal(await page.locator('.rush-entry-logo small').innerText(), 'BY XIBOT');
+    assert.equal(await page.locator('.rush-entry-logo small').count(), 0);
     assert.equal(await page.locator('body').evaluate(el => el.scrollWidth > innerWidth), false);
     const [backBox, connectBox] = await Promise.all([back.boundingBox(), connect.boundingBox()]);
     assert(backBox.height >= 44 && connectBox.height >= 44);

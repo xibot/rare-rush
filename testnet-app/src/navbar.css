@@ -35,7 +35,6 @@ header.site-header a:focus-visible { outline: 3px solid #ccff00; outline-offset:
 .site-logo > .brand-icon { display: block; width: 42px; height: 42px; max-width: none; }
 .site-logo > .brand-name { font: 400 20px/1 var(--pixel); letter-spacing: 0; }
 .site-logo > .brand-name > span { color: #ccff00; }
-.site-logo small { display: block; margin-top: 7px; font: 400 8px/1 Sometype, monospace; letter-spacing: 2.2px; }
 .site-header nav { display: flex; gap: 32px; align-items: center; font: 400 11px Sometype, monospace; letter-spacing: .5px; }
 .site-header nav a.arcade-link {
   display: inline-flex;
@@ -78,7 +77,6 @@ header.site-header a:focus-visible { outline: 3px solid #ccff00; outline-offset:
   .site-header .site-logo { gap: 8px; }
   .site-logo > .brand-icon { width: 32px; height: 32px; }
   .site-logo > .brand-name { font-size: 16px; }
-  .site-logo small { font-size: 7px; letter-spacing: 1.6px; }
   .site-header nav { width: 100%; justify-content: space-between; gap: 12px; font-size: 11px; }
   .site-header nav > a { min-height: 44px; display: flex; align-items: center; }
   .site-header nav a.play-link { font-size: 10px; padding: 10px 12px; }

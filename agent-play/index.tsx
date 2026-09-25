@@ -393,7 +393,7 @@ function App() {
       {page==='feed'&&<div id="runs-feed"><RunsFeed records={records} likes={likes} onToggleLike={toggleLike} onOpen={setFeedRun} onBack={backToPlay} previewsPaused={!!feedRun} publicFeed={PUBLIC_SITE} loading={recordsLoading} error={recordsError} onRetry={()=>{setRecordsLoading(true);void loadRecords().catch(()=>{});}}/>{PUBLIC_SITE&&nextCursor&&<div className="feed-load-page"><button disabled={loadingMore} onClick={()=>void moreRecords()}>{loadingMore?'LOADING RUNS…':'LOAD OLDER RUNS ↓'}</button></div>}{likesError&&<p className="message" role="status">{likesError}</p>}</div>}
     </main>
     {page==='feed'&&feedRun&&<ReplayModal record={feedRun} liked={likes.has(feedRun.id)} onToggleLike={()=>toggleLike(feedRun.id)} onClose={()=>setFeedRun(null)}/>}
-    <footer><BrandMark/><p>SMALL FRIEND. NEW PLAYER. SAME BIG RUSH.</p><span>{PUBLIC_SITE?'AGENT PLAY · RUNS FEED':'AGENT PLAY · LOCAL PREVIEW'}</span></footer>
+    <footer><BrandMark attribution/><p>SMALL FRIEND. NEW PLAYER. SAME BIG RUSH.</p><span>{PUBLIC_SITE?'AGENT PLAY · RUNS FEED':'AGENT PLAY · LOCAL PREVIEW'}</span></footer>
   </div>;
 }
 createRoot(document.getElementById('app')!).render(<App/>);

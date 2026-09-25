@@ -22,7 +22,6 @@
 .testnet-arcade .arcade-logo>.brand-icon{width:42px;height:42px}
 .testnet-arcade .arcade-logo>.brand-name{font:400 20px/1 var(--rush-font-display);letter-spacing:0}
 .testnet-arcade .arcade-logo .brand-name>span{color:#ccff00}
-.testnet-arcade .arcade-logo small{display:block;margin-top:7px;font:400 8px/1 var(--rush-font-mono);letter-spacing:2.2px}
 .testnet-arcade .wordmark{display:flex;align-items:center;gap:7px;font-size:20px;font-weight:900;letter-spacing:-1px}
 .testnet-arcade .wordmark>span{color:#ccff00;margin-left:-7px}
 .testnet-arcade .wordmark small{border-left:1px solid #fff;margin-left:9px;padding-left:15px;letter-spacing:1px;font-size:10px;max-width:100px;font-weight:400}
@@ -300,7 +299,6 @@
 .testnet-arcade .arcade-logo{gap:7px}
 .testnet-arcade .arcade-logo>.brand-icon{width:32px;height:32px}
 .testnet-arcade .arcade-logo>.brand-name{font-size:14px}
-.testnet-arcade .arcade-logo small{font-size:7px;letter-spacing:1.6px;margin-top:5px}
 }
 .testnet-arcade .result-card p{margin:6px 0 9px}
 .testnet-arcade .result-actions{display:grid;gap:8px}
