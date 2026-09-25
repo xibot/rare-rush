@@ -330,7 +330,7 @@ try {
   const fixture = { owner: other, account, chain: '0x1237', methods: [], reads: [] };
   const arcade = await newPage(1440, fixture);
   await arcade.getByRole('group', { name: 'Game environment' }).getByRole('button', { name: /^ARCADE / }).click();
-  await arcade.getByRole('button', { name: 'CONNECT ARCADE WALLET', exact: true }).click();
+  await arcade.getByRole('button', { name: 'CONNECT WALLET', exact: true }).click();
   await arcade.getByLabel('YOUR NFT ID').fill('42');
   for (const collection of ['GENESIS', 'GENERATIONS']) {
     const selected = arcade.locator('.collections').getByRole('button', { name: new RegExp(`^${collection} `) });
@@ -375,7 +375,7 @@ try {
   await arcade.getByRole('button', { name: /^(?:SAVE & EXIT|EXIT RUN)$/ }).click();
   fixture.account = account;
   await arcade.evaluate(account => window.__agentWalletEvent('accountsChanged', [account]), account);
-  await arcade.getByRole('button', { name: 'CONNECT ARCADE WALLET', exact: true }).click();
+  await arcade.getByRole('button', { name: 'CONNECT WALLET', exact: true }).click();
   await arcade.locator('.collections').getByRole('button', { name: /^GENERATIONS / }).click();
   await arcade.getByRole('button', { name: /WATCH AGENT PLAY/ }).click();
   await arcade.locator('.agent-stage[data-running="true"]').waitFor();
