@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import { createRoot } from 'react-dom/client';
 import { formatUnits } from 'viem';
 import { SiteHeader } from '../games/rare-rush/SiteHeader.tsx';
-import { PUBLIC_SITE, AGENT_PATH, FEED_PATH, isFeedPage } from './site-mode.ts';
+import { PUBLIC_SITE, AGENT_PATH, FEED_PATH, LEADERBOARD_PATH, getCommunityPage, type CommunityPage } from './site-mode.ts';
 import { publishRun, readRunServiceResponse } from '../games/rare-rush/public-runs.ts';
 import type { ReplayPublication } from '../shared/replay-publication.ts';
 import { BrandMark } from '../games/rare-rush/BrandMark.tsx';
@@ -13,6 +13,7 @@ import { createAgentSession, advanceAgent, createReplaySession, advanceReplay, r
 import { AgentStage } from './Stage.tsx';
 import { AgenticPanel } from './AgenticPanel.tsx';
 import { RunsFeed } from './RunsFeed.tsx';
+import { Leaderboard } from './Leaderboard.tsx';
 import { ReplayModal } from './ReplayModal.tsx';
 import { useFeedLikes } from './feed-likes.ts';
 import type { RunRecord } from './feed-types.ts';
@@ -40,7 +41,7 @@ async function request(path:string, body?:unknown) {
 
 function App() {
   const [view,setView] = useState<'autopilot'|'agentic'>('autopilot');
-  const [page,setPage] = useState<'play'|'feed'>(()=>isFeedPage()?'feed':'play');
+  const [page,setPage] = useState<CommunityPage>(getCommunityPage);
   const [feedRun,setFeedRun] = useState<RunRecord|null>(null);
   const {likes,toggleLike,likesError}=useFeedLikes();
   const [recordsLoading,setRecordsLoading]=useState(true), [recordsError,setRecordsError]=useState('');
@@ -63,7 +64,6 @@ function App() {
   const [error,setError] = useState(''), [notice,setNotice] = useState('');
   const [record,setRecord] = useState<SavedRecord|null>(null), [records,setRecords] = useState<SavedRecord[]>([]);
   const recordsRef=useRef(records);recordsRef.current=records;
-  const [filter,setFilter] = useState<'all'|Difficulty>('all');
   const [tn,setTn] = useState<TestnetState|null>(null), adapter=useRef<Adapter|null>(null);
   const [arcade,setArcade] = useState<any>(null), [arcadeArt,setArcadeArt] = useState<any>(null);
   const artRef=useRef<ArcadeFriend|null>(null);
@@ -166,29 +166,31 @@ function App() {
     try{const result=await request('/api/runs?cursor='+encodeURIComponent(nextCursor));setRecords(previous=>[...previous,...(result.runs as RunRecord[]).filter(r=>!previous.some(p=>p.id===r.id))]);paginationStarted.current=true;setNextCursor(result.nextCursor??result.cursor??null);setRecordsError('');}
     catch(e){setRecordsError(err(e));}finally{pagingRef.current=false;setLoadingMore(false);}
   }
-  function navigateCommunity(feed:boolean) {
-    if(PUBLIC_SITE){history.pushState(null,'',feed?FEED_PATH:AGENT_PATH);window.dispatchEvent(new PopStateEvent('popstate'));}
-    else location.hash=feed?'runs-feed':'agent-play';
+  function navigateCommunity(next:CommunityPage) {
+    if(actionLock.current||tn?.busy)return;
+    const path=next==='feed'?FEED_PATH:next==='leaderboard'?LEADERBOARD_PATH:AGENT_PATH;
+    if(PUBLIC_SITE){history.pushState(null,'',path);window.dispatchEvent(new PopStateEvent('popstate'));}
+    else location.hash=path;
   }
-  function openFeed(){if(actionLock.current||tn?.busy)return;navigateCommunity(true);}
-  function backToPlay(){navigateCommunity(false);}
+  function openFeed(){navigateCommunity('feed');}
+  function backToPlay(){navigateCommunity('play');}
   useEffect(()=>{
     const route=()=>{
-      const next=isFeedPage()?'feed':'play';
-      if(next==='feed'&&runningRef.current){stop();try{checkpoint();}catch(e){setError(err(e));}setNotice('Your Autopilot run is paused. Choose Resume when you return.');}
-      setPage(next);if(PUBLIC_SITE)document.title=`Rare Rush | ${next==='feed'?'Runs Feed':'Agent Play'}`;if(next==='play')setFeedRun(null);
+      const next=getCommunityPage();
+      if(next!=='play'&&runningRef.current){stop();try{checkpoint();}catch(e){setError(err(e));}setNotice('Your Autopilot run is paused. Choose Resume when you return.');}
+      setPage(next);setFeedRun(null);
     };
     window.addEventListener('hashchange',route);window.addEventListener('popstate',route);
     return()=>{window.removeEventListener('hashchange',route);window.removeEventListener('popstate',route);};
   },[]);
   useEffect(()=>{
-    if(!PUBLIC_SITE||page!=='feed')return;
+    if(!PUBLIC_SITE||page==='play')return;
     const id=new URLSearchParams(location.search).get('run');if(!id||!/^[a-f0-9]{64}$/.test(id))return;
     let alive=true;void request('/api/runs/'+id).then(value=>{if(alive)setFeedRun(value);}).catch(e=>{if(alive)setRecordsError(err(e));});
     return()=>{alive=false;};
   },[page]);
   useEffect(()=>{
-    document.title=page==='feed'?'Rare Rush | Runs Feed':'Rare Rush | Agent Play';
+    document.title=`Rare Rush | ${page==='feed'?'Runs Feed':page==='leaderboard'?'Leaderboard':'Agent Play'}`;
     requestAnimationFrame(()=>window.scrollTo({top:0,behavior:'instant'}));
   },[page]);
   useEffect(()=>{
@@ -278,7 +280,7 @@ function App() {
     setView('autopilot');
     live.current=s;setSession(s);identity.current=id;setCurrent(id);setRecord(null);setTick(s.run._tick);completed.current=false;checkpointTick.current=s.run._tick;
     setScreen('watch');setSpeed(1);speedRef.current=1;artRef.current=art??null;setArcadeArt(art??null);
-    if(isFeedPage()){stop();setNotice('Your Autopilot run is paused. Choose Resume when you return.');}
+    if(getCommunityPage()!=='play'){stop();setNotice('Your Autopilot run is paused. Choose Resume when you return.');}
     else {play();requestAnimationFrame(()=>stageAnchor.current?.scrollIntoView({behavior:'smooth',block:'start'}));}
   }
   async function begin() {
@@ -332,12 +334,18 @@ function App() {
     const link=document.createElement('a');link.href=url;link.download=`rare-rush-agent-${current?.runId??'local'}-${Date.now()}.json`;link.click();setTimeout(()=>URL.revokeObjectURL(url),1000);
   }
   async function reset(){stop();setScreen('ready');setCurrent(null);identity.current=null;setRecord(null);setNotice('');requestAnimationFrame(()=>setupAnchor.current?.scrollIntoView({behavior:reduced?'instant':'smooth',block:'start'}));if(source==='testnet'&&tn?.account)await adapter.current!.inspectFriend(collection,tokenId);}
-  const best = [...records].filter(r=>filter==='all'||r.difficulty===filter).sort((a,b)=>b.metrics.score-a.metrics.score).filter((r,i,list)=>list.findIndex(q=>`${q.source}:${q.collection}:${q.tokenId}`===`${r.source}:${r.collection}:${r.tokenId}`)===i);
   const displayCollection=current?.collection??collection, displayToken=current?.tokenId??tokenId;
   const isTestnetRun=current?.source==='testnet' && session.kind==='agent';
   const matchesSaved=isTestnetRun && stateRun?.run.runId===current?.runId;
-  return <div className={`agent-app ${PUBLIC_SITE?'public-community':''}`}>
-    {PUBLIC_SITE?<SiteHeader page={page==='feed'?'runs-feed':'agent-play'}/>:<header className="site-header"><a className="brand" href="/" aria-label="Rare Rush Agent Play"><BrandMark/></a><nav aria-label="Main navigation">{page==='feed'?<a href="#agent-play">AGENT PLAY</a>:<a href="#runs-feed" aria-disabled={!!busy||!!tn?.busy} onClick={event=>{event.preventDefault();openFeed();}}>RUNS FEED</a>}<a href="https://rarerush.app" target="_blank" rel="noreferrer">ARCADE ↗</a><span className="local-label">LOCAL PREVIEW</span></nav></header>}
+  return <div className={`agent-app ${PUBLIC_SITE?'public-community':''}`} onClick={event=>{
+    if(!PUBLIC_SITE||event.defaultPrevented||event.button!==0||event.metaKey||event.ctrlKey||event.shiftKey||event.altKey)return;
+    const link=(event.target as Element).closest<HTMLAnchorElement>('.site-header a');
+    const href=link?.getAttribute('href');
+    const next=href===AGENT_PATH?'play':href===FEED_PATH?'feed':href===LEADERBOARD_PATH?'leaderboard':null;
+    if(!next||link?.target||link?.hasAttribute('download'))return;
+    event.preventDefault();navigateCommunity(next);
+  }}>
+    {PUBLIC_SITE?<SiteHeader page={page==='feed'?'runs-feed':page==='leaderboard'?'leaderboard':'agent-play'}/>:<header className="site-header"><a className="brand" href="/" aria-label="Rare Rush Agent Play"><BrandMark/></a><nav aria-label="Main navigation">{([{id:'leaderboard',label:'LEADERBOARD',path:LEADERBOARD_PATH},{id:'feed',label:'RUNS FEED',path:FEED_PATH},{id:'play',label:'AGENT PLAY',path:AGENT_PATH}] as const).map(item=><a key={item.id} href={item.path} aria-current={page===item.id?'page':undefined} aria-disabled={!!busy||!!tn?.busy} onClick={event=>{event.preventDefault();navigateCommunity(item.id);}}>{item.label}</a>)}<a href="https://rarerush.app" target="_blank" rel="noreferrer">ARCADE ↗</a><span className="local-label">LOCAL PREVIEW</span></nav></header>}
     <main>
       <div id="agent-play" hidden={page!=='play'}>
       <section className="hero"><div><p className="eyebrow">YOUR FRIEND. A NEW PLAYER.</p><h1>AGENT <span>PLAY.</span></h1></div><p>Your Friend. Your agent.<br/>Choose how you want to rush.</p></section>
@@ -386,14 +394,12 @@ function App() {
       </section>
       </div>
       <div id="agentic-panel" role="tabpanel" aria-labelledby="agentic-tab" hidden={view!=='agentic'}><AgenticPanel/></div>
-      <section id="leaderboard" className="library"><div className="section-top"><div><p className="eyebrow">{PUBLIC_SITE?'03 / COMMUNITY RUN LIBRARY':'03 / YOUR LOCAL RUN LIBRARY'}</p><h2>BEST OF THE <span>RUSH.</span></h2></div><span className="count">{records.length} SAVED {records.length===1?'RUN':'RUNS'}</span></div><p className="muted">{PUBLIC_SITE?'Published runs from people and agents. Best per Friend and environment among the loaded runs.':'Best run per Friend and environment. Scheduled agent runs appear automatically. Filter by difficulty to explore more. Community voting comes later.'}</p><a className="feed-library-link" href={FEED_PATH} onClick={event=>{event.preventDefault();openFeed();}}>VIEW ALL SAVED RUNS ↗</a><div className="inline-actions filters" role="group" aria-label="Leaderboard difficulty">{(['all',...MODES] as const).map(m=><button key={m} aria-pressed={filter===m} onClick={()=>setFilter(m)}>{m.toUpperCase()}</button>)}</div>
-        {best.length?<div className="run-list">{best.map((r,i)=><article key={r.id} className="run-row"><span className="rank">{String(i+1).padStart(2,'0')}</span><div><b>{r.collection===1?'GENESIS':'GENERATIONS'} #{r.tokenId}</b><small>{r.source==='local'?'PREVIEW':r.source.toUpperCase()} · {r.difficulty.toUpperCase()} · {r.metrics.outcome.toUpperCase()}{r.agentJobId?' · AGENT JOB':''}</small></div><div className="list-score"><b>{r.metrics.score.toLocaleString()}</b><small>POINTS</small></div><button disabled={playing||!!busy} onClick={()=>void act('Loading replay…',async()=>{await replayRecord(r);})}>WATCH ↗</button></article>)}</div>:<div className="empty"><span>→ ↑ ↓ ←</span><p>Your agent’s first rush belongs here.</p><small>Complete a run to save its score and watchable replay.</small></div>}
-      </section>
       </div>
+      {page==='leaderboard'&&<div id="leaderboard"><Leaderboard records={records} loading={recordsLoading} error={recordsError} onRetry={()=>{setRecordsLoading(true);void loadRecords().catch(()=>{});}} onOpen={setFeedRun} onBrowseFeed={openFeed} publicFeed={PUBLIC_SITE}/>{PUBLIC_SITE&&nextCursor&&<div className="feed-load-page"><button disabled={loadingMore} onClick={()=>void moreRecords()}>{loadingMore?'LOADING RUNS…':'LOAD OLDER RUNS ↓'}</button></div>}{likesError&&<p className="message" role="status">{likesError}</p>}</div>}
       {page==='feed'&&<div id="runs-feed"><RunsFeed records={records} likes={likes} onToggleLike={toggleLike} onOpen={setFeedRun} onBack={backToPlay} previewsPaused={!!feedRun} publicFeed={PUBLIC_SITE} loading={recordsLoading} error={recordsError} onRetry={()=>{setRecordsLoading(true);void loadRecords().catch(()=>{});}}/>{PUBLIC_SITE&&nextCursor&&<div className="feed-load-page"><button disabled={loadingMore} onClick={()=>void moreRecords()}>{loadingMore?'LOADING RUNS…':'LOAD OLDER RUNS ↓'}</button></div>}{likesError&&<p className="message" role="status">{likesError}</p>}</div>}
     </main>
-    {page==='feed'&&feedRun&&<ReplayModal record={feedRun} liked={likes.has(feedRun.id)} onToggleLike={()=>toggleLike(feedRun.id)} onClose={()=>setFeedRun(null)}/>}
-    <footer><BrandMark attribution/><p>SMALL FRIEND. NEW PLAYER. SAME BIG RUSH.</p><span>{PUBLIC_SITE?'AGENT PLAY · RUNS FEED':'AGENT PLAY · LOCAL PREVIEW'}</span></footer>
+    {page!=='play'&&feedRun&&<ReplayModal record={feedRun} liked={likes.has(feedRun.id)} onToggleLike={()=>toggleLike(feedRun.id)} onClose={()=>setFeedRun(null)}/>}
+    <footer><BrandMark attribution/><p>SMALL FRIEND. NEW PLAYER. SAME BIG RUSH.</p><span>{PUBLIC_SITE?'LEADERBOARD · RUNS FEED · AGENT PLAY':'AGENT PLAY · LOCAL PREVIEW'}</span></footer>
   </div>;
 }
 createRoot(document.getElementById('app')!).render(<App/>);

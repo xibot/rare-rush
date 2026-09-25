@@ -35,9 +35,10 @@ try {
     await page.locator('.runs-feed-card').waitFor().catch(async e=>{console.error((await page.locator('body').innerText()).slice(0,1500));throw e;});
     await page.evaluate(() => document.fonts.ready);
     assert.equal(await page.title(), 'Rare Rush | Runs Feed');
-    assert.equal(await page.locator('.site-header nav a').count(), 7);
+    assert.equal(await page.locator('.site-header nav a').count(), 8);
     assert.equal(await page.evaluate(() => document.body.scrollWidth > innerWidth), false, `${width}: feed overflow`);
     assert.equal(await page.getByRole('button', { name: 'PREVIEW', exact: true }).count(), 0, 'Public feed contains only actual Arcade/Testnet runs');
+    assert.equal(await page.locator('.rush-leaderboard').count(), 0, 'Best of the Rush only appears on the Leaderboard page');
     const heart = page.locator('.runs-feed-like').first();
     await heart.click(); assert.equal(await heart.getAttribute('aria-pressed'), 'true');
     await page.getByRole('button', { name: 'LOAD OLDER RUNS ↓', exact: true }).click();
@@ -53,8 +54,37 @@ try {
     await page.goto(`${origin}/runs-feed/?run=${records[1].id}`);
     await page.locator('dialog .agent-stage-world').waitFor();
     await page.keyboard.press('Escape');
+    await page.locator('.site-header a[href="/leaderboard/"]').click();
+    await page.locator('.leaderboard-row').waitFor();
+    await page.evaluate(() => document.fonts.ready);
+    assert.equal(await page.title(), 'Rare Rush | Leaderboard');
+    assert.equal(await page.locator('.site-header a[href="/leaderboard/"]').getAttribute('aria-current'), 'page');
+    assert.equal(await page.evaluate(() => document.body.scrollWidth > innerWidth), false, `${width}: Leaderboard overflow`);
+    assert.equal(await page.locator('.runs-feed-card').count(), 0, 'Leaderboard uses ranked rows instead of the feed grid');
+    await page.getByRole('button', { name: 'LOAD OLDER RUNS ↓', exact: true }).click();
+    await page.waitForFunction(() => document.querySelectorAll('.leaderboard-row').length === 2);
+    const leaderboardRow = page.locator('.leaderboard-row').first();
+    assert.deepEqual(await leaderboardRow.evaluate(row => [...row.children].slice(0, 3).map(child => child.className)),
+      ['leaderboard-rank', 'leaderboard-thumbnail', 'leaderboard-friend'], 'Replay thumbnail sits between rank and Friend');
+    await leaderboardRow.locator('.leaderboard-thumbnail').scrollIntoViewIfNeeded();
+    await leaderboardRow.locator('[data-preview-state="ready"] .runs-feed-preview-scene').waitFor();
+    const watch = leaderboardRow.locator('.leaderboard-watch');
+    await watch.click();
+    const leaderboardReplay = page.getByRole('dialog', { name: 'Watch saved run', exact: true });
+    await leaderboardReplay.locator('.agent-stage-world').waitFor();
+    assert.equal(await leaderboardReplay.getByRole('alert').count(), 0);
+    await leaderboardReplay.getByRole('button', { name: 'Play replay', exact: true }).click();
+    await page.waitForFunction(() => document.querySelector('.replay-modal progress')?.value > 0);
+    await page.keyboard.press('Escape');
+    assert.equal(await watch.evaluate(element => element === document.activeElement), true, 'Closing the popup restores the Watch button');
+    assert.equal(new URL(page.url()).pathname, '/leaderboard/', 'Watching keeps the Leaderboard route');
+    await page.screenshot({ path: `artifacts/community/leaderboard-${width}.png`, fullPage: true });
+    await leaderboardRow.locator('.leaderboard-thumbnail').click();
+    await leaderboardReplay.locator('.agent-stage-world').waitFor();
+    await leaderboardReplay.getByRole('button', { name: 'Close replay', exact: true }).click();
     await page.locator('.site-header a[href="/agent-play/"]').click();
     assert.equal(await page.title(), 'Rare Rush | Agent Play');
+    assert.equal(await page.locator('.rush-leaderboard, .library').count(), 0, 'Agent Play no longer includes the leaderboard');
     assert.equal(await page.evaluate(() => document.body.scrollWidth > innerWidth), false, `${width}: Agent Play overflow`);
     await page.getByRole('tab', { name: /AGENTIC/ }).click();
     await page.locator('[data-agentic-skill]').waitFor();
@@ -75,9 +105,9 @@ try {
     assert.deepEqual(writes, [], 'Viewing/liking/Preview never publishes');
     assert.deepEqual(errors, []);
     await page.close();
-    console.log(`${width}px: public feed, paging, local favorites, deep link, skill and proportions passed`);
+    console.log(`${width}px: public feed, leaderboard thumbnails/popups, paging, local favorites, deep link, skill and proportions passed`);
   }
-  for (const file of ['agent-play/index.html', 'runs-feed/index.html', 'agent-skill/SKILL.md']) {
+  for (const file of ['agent-play/index.html', 'runs-feed/index.html', 'leaderboard/index.html', 'agent-skill/SKILL.md']) {
     assert.ok((await readFile(new URL('../dist/' + file, import.meta.url), 'utf8')).length);
   }
 } finally {

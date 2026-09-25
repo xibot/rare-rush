@@ -68,6 +68,11 @@
       "source": "/runs-feed",
       "destination": "/runs-feed/",
       "permanent": true
+    },
+    {
+      "source": "/leaderboard",
+      "destination": "/leaderboard/",
+      "permanent": true
     }
   ],
   "functions": {

@@ -55,7 +55,7 @@ export async function buildRushSite({ outdir = path.join(project, 'dist'), watch
           if (result.errors.length) return;
           await writeFile(path.join(outdir, 'favicon.svg'), await readFile(path.join(landing, '../assets/favicon.svg')));
           await writeFile(path.join(outdir, 'index.html'), await readFile(path.join(landing, 'index.html')));
-          for(const [route,title] of [['agent-play','Agent Play'],['runs-feed','Runs Feed']]){
+          for(const [route,title] of [['agent-play','Agent Play'],['runs-feed','Runs Feed'],['leaderboard','Leaderboard']]){
             await mkdir(path.join(outdir,route),{recursive:true});
             await writeFile(path.join(outdir,route,'index.html'),`<!doctype html><html lang="en"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="theme-color" content="#000000"><title>Rare Rush | ${title}</title><link rel="icon" href="/favicon.svg"><link rel="stylesheet" href="/community/index.css"></head><body><div id="app"></div><script type="module" src="/community/index.js"></script></body></html>`);
           }
@@ -100,6 +100,7 @@ export function createRushSiteServer(outdir) {
   const publicFiles = new Map([
     ['/agent-play/', ['agent-play/index.html','text/html; charset=utf-8']],
     ['/runs-feed/', ['runs-feed/index.html','text/html; charset=utf-8']],
+    ['/leaderboard/', ['leaderboard/index.html','text/html; charset=utf-8']],
     ['/community/index.js', ['community/index.js','text/javascript; charset=utf-8']],
     ['/community/index.css', ['community/index.css','text/css; charset=utf-8']],
     ['/agent-skill/SKILL.md', ['agent-skill/SKILL.md','text/plain; charset=utf-8']],
@@ -133,7 +134,7 @@ export function createRushSiteServer(outdir) {
     if (!['GET', 'HEAD'].includes(request.method)) { response.writeHead(405).end(); return; }
     try {
       const url = new URL(request.url, 'http://localhost');
-      if (url.pathname === '/agent-play' || url.pathname === '/runs-feed') { response.writeHead(308,{Location:url.pathname+'/'}).end(); return; }
+      if (url.pathname === '/agent-play' || url.pathname === '/runs-feed' || url.pathname === '/leaderboard') { response.writeHead(308,{Location:url.pathname+'/'}).end(); return; }
       if (url.pathname === '/play') { response.writeHead(308, { Location: '/play/' }).end(); return; }
       if (url.pathname === '/docs') { response.writeHead(308, { Location: '/docs/' }).end(); return; }
       if (url.pathname === '/pitch') { response.writeHead(308, { Location: '/pitch/' }).end(); return; }

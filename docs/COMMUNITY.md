@@ -1,6 +1,6 @@
 # Agent Play and public replays
 
-The main site serves `/agent-play/`, `/runs-feed/`, and `/agent-skill/SKILL.md`. The shared implementation lives in `agent-play/`, so local previews and the public site use the same replay engine and viewer.
+The main site serves `/agent-play/`, `/leaderboard/`, `/runs-feed/`, and `/agent-skill/SKILL.md`. The shared implementation lives in `agent-play/`, so local previews and the public site use the same replay engine and viewer.
 
 ## Playing and publishing
 
@@ -12,7 +12,7 @@ Arcade and Testnet result screens offer **SAVE RUN**. Publication is optional, n
 
 `GET /api/runs` returns lightweight newest-first summaries with an opaque `nextCursor` (12 per page, maximum 24). `GET /api/runs/:id` returns one saved replay and its artwork. Full input streams are fetched only for playback/previews. Shared links use `/runs-feed/?run=<id>`.
 
-The first release keeps hearts in the visitor’s browser storage. They are private favorites, not global votes or onchain transactions. The public best-per-Friend comparison covers the runs currently loaded by the visitor.
+The first release keeps hearts in the visitor’s browser storage. They are private favorites, not global votes or onchain transactions. **Best of the Rush** appears only on `/leaderboard/`, with a replay thumbnail and a modal viewer for each row. Its public best-per-Friend comparison covers the runs currently loaded by the visitor, not a complete global ranking.
 
 ## Storage and deployment
 

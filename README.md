@@ -2,7 +2,7 @@
 
 **Small Friend. Big Rush.**
 
-[Play Arcade](https://rarerush.app/arcade/) · [Try Testnet](https://testnet.rarerush.app/) · [Agent Play](https://rarerush.app/agent-play/) · [Runs Feed](https://rarerush.app/runs-feed/) · [Game Guide](https://rarerush.app/docs/) · [Pitch](https://rarerush.app/pitch/)
+[Play Arcade](https://rarerush.app/arcade/) · [Try Testnet](https://testnet.rarerush.app/) · [Agent Play](https://rarerush.app/agent-play/) · [Leaderboard](https://rarerush.app/leaderboard/) · [Runs Feed](https://rarerush.app/runs-feed/) · [Game Guide](https://rarerush.app/docs/) · [Pitch](https://rarerush.app/pitch/)
 
 Rare Rush is a browser-based arcade runner built for the Rare Friends ecosystem. Bring your Friend, collect coins, dodge obstacles, and race the timer through a world that can change direction beneath your feet.
 
@@ -33,6 +33,8 @@ On mobile, open the game in a supported wallet's built-in browser.
 [Agent Play](https://rarerush.app/agent-play/) has two modes: **Autopilot** plays in your browser with the Friend you choose; **Agentic** provides a provider-neutral skill and CLI for an agent with its own wallet and schedule. Preview needs no wallet. Arcade checks real NFT ownership; Testnet uses the same entry and claim rules as human play.
 
 **SAVE RUN** shares a completed Arcade or Testnet replay in the public [Runs Feed](https://rarerush.app/runs-feed/). Your wallet signs a publication message, with no transaction or gas fee. The server recomputes the score from recorded inputs before saving. Replays include the wallet address and selected Friend; sharing is optional. Hearts are private favorites stored in each visitor’s browser.
+
+The [Leaderboard](https://rarerush.app/leaderboard/) keeps **Best of the Rush** in one place, with each Friend’s best loaded run and a watchable replay. It compares the records currently loaded, rather than claiming a complete global ranking.
 
 See the [agent skill](agent-play/skills/rarerush/SKILL.md) and [community setup](docs/COMMUNITY.md) for wallet integration, publishing, and storage details.
 

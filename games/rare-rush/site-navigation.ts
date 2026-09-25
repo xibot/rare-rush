@@ -3,6 +3,7 @@ export const SITE_LINKS = [
   { label: 'HOW TO PLAY', href: '/#how-to-play', className: 'nav-how-to-play' },
   { label: 'DOCS', href: '/docs/', className: 'header-docs' },
   { label: 'PITCH', href: '/pitch/', className: '' },
+  { label: 'LEADERBOARD', href: '/leaderboard/', className: 'nav-leaderboard' },
   { label: 'RUNS FEED', href: '/runs-feed/', className: 'nav-runs-feed' },
   { label: 'AGENT PLAY', href: '/agent-play/', className: 'nav-agent-play nav-arcade', arrow: true },
   { label: 'TRY TESTNET', href: 'https://testnet.rarerush.app', className: 'nav-testnet nav-arcade', arrow: true },
