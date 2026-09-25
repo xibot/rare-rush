@@ -53,6 +53,19 @@ function active(options: PublishOptions) {
   if (options.signal?.aborted) throw new RunPublicationError('Saving was cancelled. Your replay is still here.');
   options.assertActive?.();
 }
+function normalizedPublication(input: ReplayPublication): ReplayPublication {
+  const serialized = JSON.stringify(input, (_, value) => typeof value === 'bigint' ? value.toString() : value);
+  if (new TextEncoder().encode(serialized).length > MAX_PUBLIC_REPLAY_PAYLOAD_BYTES) throw new RunPublicationError('This replay is too large to publish.');
+  return JSON.parse(serialized) as ReplayPublication;
+}
+function checkSavedIdentity(saved: PublishedRun, payload: ReplayPublication) {
+  if (saved.id !== publicationPayloadHash(payload).slice(2) || saved.source !== payload.source || saved.tokenId !== payload.tokenId
+    || saved.collection !== payload.collection || saved.seed !== payload.seed.toLowerCase() || saved.difficulty !== payload.difficulty
+    || typeof saved.player !== 'string' || saved.player.toLowerCase() !== payload.player.toLowerCase()
+    || saved.runId !== payload.runId || saved.actor !== payload.actor) {
+    throw new RunPublicationError('The save service returned a different run. Try again.');
+  }
+}
 async function bounded<T>(promise: Promise<T>, milliseconds: number, signal?: AbortSignal): Promise<T> {
   let timer: ReturnType<typeof setTimeout> | undefined;
   let abort = () => {};
@@ -80,6 +93,34 @@ async function checkWallet(provider: PublicationProvider, payload: ReplayPublica
   active(options);
 }
 
+/** Recover a previously saved replay from its content identity without using a wallet. */
+export async function findPublishedRun(input: ReplayPublication, endpoint = '/api/runs', options: PublishOptions = {}): Promise<PublishedRun | null> {
+  const controller = new AbortController();
+  let networkTimeout: ReturnType<typeof setTimeout> | undefined;
+  const cancel = () => controller.abort();
+  options.signal?.addEventListener('abort', cancel, { once: true });
+  try {
+    active(options);
+    const payload = normalizedPublication(input);
+    networkTimeout = setTimeout(() => controller.abort(new RunPublicationError('Checking saved runs timed out. Your replay is still here; try again.')), 20_000);
+    const response = await bounded((options.fetcher ?? fetch)(`${endpoint.replace(/\/$/, '')}/${publicationPayloadHash(payload).slice(2)}?publication=1`,
+      { method: 'GET', credentials: 'omit', cache: 'no-store', signal: controller.signal }), 20_000, controller.signal);
+    active(options);
+    if (response.status === 404) {
+      void response.body?.cancel().catch(() => {});
+      return null;
+    }
+    // Older services may ignore the query and return full replay/art details.
+    const saved = await bounded(readRunServiceResponse<PublishedRun>(response), 20_000, controller.signal);
+    active(options);
+    checkSavedIdentity(saved, payload);
+    return saved;
+  } catch (error) {
+    if (error instanceof RunPublicationError) throw error;
+    throw new RunPublicationError('Saved runs could not be checked. Your replay is still here; try again.');
+  } finally { clearTimeout(networkTimeout); controller.abort(); options.signal?.removeEventListener('abort', cancel); }
+}
+
 /** Explicit Save Run action only: one publication signature, never a transaction.
  * All JSON fields (including packed artwork) are identical when signed and sent. */
 export async function publishRun(input: ReplayPublication, provider: PublicationProvider, endpoint = '/api/runs', options: PublishOptions = {}): Promise<PublishedRun> {
@@ -89,9 +130,10 @@ export async function publishRun(input: ReplayPublication, provider: Publication
   options.signal?.addEventListener('abort', cancel, { once: true });
   try {
     active(options);
-    const serialized = JSON.stringify(input, (_, value) => typeof value === 'bigint' ? value.toString() : value);
-    if (new TextEncoder().encode(serialized).length > MAX_PUBLIC_REPLAY_PAYLOAD_BYTES) throw new RunPublicationError('This replay is too large to publish.');
-    const payload = JSON.parse(serialized) as ReplayPublication;
+    const payload = normalizedPublication(input);
+    const existing = await findPublishedRun(payload, endpoint, options);
+    active(options);
+    if (existing) return existing;
     await checkWallet(provider, payload, options);
     const authorization = prepareReplayPublication(payload);
     const signature = await bounded(createWalletClient({ account: getAddress(payload.player),
@@ -106,11 +148,7 @@ export async function publishRun(input: ReplayPublication, provider: Publication
       body: JSON.stringify({ ...payload, authorization: { expiresAt: authorization.expiresAt, signature } }) }), 20_000, controller.signal);
     const saved = await bounded(readRunServiceResponse<PublishedRun>(response, { maxBytes: 16_384,
       errorMessage: 'The run could not be published. Your replay is still here; try again.' }), 20_000, controller.signal);
-    if (saved.id !== publicationPayloadHash(payload).slice(2) || saved.source !== payload.source || saved.tokenId !== payload.tokenId
-      || saved.collection !== payload.collection || saved.seed !== payload.seed.toLowerCase() || saved.difficulty !== payload.difficulty
-      || saved.player?.toLowerCase() !== payload.player.toLowerCase() || saved.runId !== payload.runId) {
-      throw new RunPublicationError('The save service returned a different run. Try again.');
-    }
+    checkSavedIdentity(saved, payload);
     active(options); return saved;
   } catch (error) {
     if (error instanceof RunPublicationError) throw error;

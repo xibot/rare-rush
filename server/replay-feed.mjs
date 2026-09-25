@@ -239,6 +239,14 @@ export function createReplayFeed({ store, storageReady = () => true, bindTestnet
           const record = await store.read(recordPath(match[1]));
           requireThat(record, 404, 'Replay not found.');
           requireThat(validStored(record, match[1]) && object(record.replay), 503, 'Stored replay is unavailable.');
+          if (new URL(request.url).searchParams.get('publication') === '1') {
+            // Publication is complete only after its feed index exists. A client
+            // can explicitly retry POST to repair an interrupted index write.
+            const index = await store.read(indexPath(record), 8192);
+            requireThat(index, 404, 'Replay publication is incomplete.');
+            requireThat(validStored(index, match[1]) && index.createdAt === record.createdAt, 503, 'Replay index is unavailable.');
+            return json(request, 200, summary(record));
+          }
           return json(request, 200, record, { 'Cache-Control': 'public, max-age=60, s-maxage=300' });
         }
       }

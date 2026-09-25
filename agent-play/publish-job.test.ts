@@ -34,6 +34,7 @@ function completed(root: string, job: JobSpec) {
 }
 function publicationFixture(chainId = 4663) {
   const methods: string[] = [], publications: unknown[] = [];
+  const records = new Map<string, unknown>();
   const provider = { async request({ method, params }: { method: string; params?: unknown[] }) {
     methods.push(method);
     if (method === 'eth_accounts') return [wallet.address];
@@ -42,13 +43,23 @@ function publicationFixture(chainId = 4663) {
     throw new Error(`Forbidden wallet operation: ${method}`);
   } } as EIP1193Provider;
   const fetcher: typeof fetch = async (url, init) => {
+    if (init?.method === 'GET') {
+      const parsed = new URL(String(url));
+      assert.equal(parsed.origin, 'https://rarerush.app');
+      assert.match(parsed.pathname, /^\/api\/runs\/[a-f0-9]{64}$/);
+      assert.equal(parsed.search, '?publication=1');
+      const record = records.get(parsed.pathname.split('/').at(-1)!);
+      return record ? Response.json(record) : new Response(null, { status: 404 });
+    }
     assert.equal(url, 'https://rarerush.app/api/runs'); assert.equal(init?.method, 'POST');
     const { authorization, ...payload } = JSON.parse(init!.body as string);
     const signer = await recoverTypedDataAddress({ ...publicationTypedData(payload, authorization.expiresAt), signature: authorization.signature });
     assert.equal(signer, wallet.address); publications.push(payload);
     const { replay: _, art: __, ...metadata } = payload;
-    return Response.json({ ...metadata, id: publicationPayloadHash(payload).slice(2), createdAt: new Date().toISOString(),
-      metrics: checkAgentReplay(payload.seed, payload.difficulty, payload.replay), agent: 'Agentic player', verification: 'wallet-authorized-replay' });
+    const record = { ...metadata, id: publicationPayloadHash(payload).slice(2), createdAt: new Date().toISOString(),
+      metrics: checkAgentReplay(payload.seed, payload.difficulty, payload.replay), agent: 'Agentic player', verification: 'wallet-authorized-replay' };
+    records.set(record.id, record);
+    return Response.json(record);
   };
   return { provider, fetcher, methods, publications };
 }
@@ -65,6 +76,9 @@ test('publish reads a completed Arcade job, signs only publication, and preserve
   assert.deepEqual(readdirSync(join(root, '.locks')), []);
   const retry = await publishJob(job, { directory: root, provider: f.provider, fetcher: f.fetcher });
   assert.equal(retry.id, saved.id); assert.equal(readFileSync(join(root, `${job.id}.json`), 'utf8'), before);
+  assert.equal(retry.createdAt, saved.createdAt);
+  assert.equal(f.publications.length, 1);
+  assert.equal(f.methods.filter(method => method === 'eth_signTypedData_v4').length, 1);
 });
 
 test('Testnet publication uses the completed run identity and cannot start or claim a run', async t => {
@@ -118,7 +132,8 @@ test('CLI publish emits only the public receipt, and rejected signer errors do n
   assert.equal(output.status, 'published'); assert.equal(output.jobId, job.id);
   assert.equal(output.url, `https://rarerush.app/runs-feed/?run=${output.id}`);
   const failing = { request: async () => { throw Error('DO_NOT_PRINT private RPC token'); } } as EIP1193Provider;
-  assert.equal(await runCli(['publish', '--job', file], { ...options, publication: { provider: failing } }), 1);
+  const missing = publicationFixture();
+  assert.equal(await runCli(['publish', '--job', file], { ...options, publication: { provider: failing, fetcher: missing.fetcher } }), 1);
   assert.equal(lines.pop()!.includes('DO_NOT_PRINT'), false);
   assert.equal(await runCli(['run', '--job', file, '--provider-module', '/tmp/nope.mjs'], options), 1);
 });

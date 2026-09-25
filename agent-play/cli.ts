@@ -58,7 +58,7 @@ sign public replay publication. It never runs, resumes, mints or transacts.
 Preview cannot be published. An address-only Arcade job needs an explicit
 --provider-module signer; its original job file and fingerprint stay unchanged.
 The replay, wallet address, Friend artwork and run statistics become public.
-Repeated publication is idempotent on the server and signs a fresh message.
+Already published replays return their saved link without another signature.
 
 Arcade adds wallet:{address,providerModule?} and optional rpcUrl. Without a
 provider module, ownership is observed by address, not wallet-authenticated.

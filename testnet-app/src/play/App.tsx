@@ -7,13 +7,13 @@ import { CollectionChoice, CollectionFriends } from './CollectionEntry.tsx';
 import { SiteHeader } from '../SiteHeader.tsx';
 import { createRecorder, type Replay, type RunSnapshot as EngineSnapshot } from './recorder.ts';
 import { TESTNET_CHAIN, PLAY_GAME_ABI, verifyPlayContracts, readRun, readOwnedFriend, discoverFriends, entryAllowance, approveEntry, startRun, claimRun, abandonRun, recoverPending, retryHashlessPending, cancelHashlessPending } from './chain.ts';
-import { PLAY_CONTRACTS, ENGINE_VERSION, type Collection, type Difficulty, type PlayState, type FriendSelection } from './types.ts';
+import { PLAY_CONTRACTS, ENGINE_VERSION, type Collection, type Difficulty, type PlayState, type FriendSelection, type SavedRun } from './types.ts';
 import { loadPlayState, savePlayState, validateVerifiedClaim } from './storage.ts';
 import { createAuthorization, authorizationTypedData } from '../shared/authorization.ts';
 import { EXPLORER_URL, RPC_URL, assertWalletContext } from '../safety.ts';
 import { createWalletSession } from '../wallet-session.ts';
 import { createVerifierStatusMonitor, fetchVerifierJson } from './verifier-status.ts';
-import { publishRun, RunPublicationError, runPublicationMessage } from '../../generated/games/rare-rush/public-runs.ts';
+import { findPublishedRun, publishRun, RunPublicationError, runPublicationMessage } from '../../generated/games/rare-rush/public-runs.ts';
 
 const client = createPublicClient({ chain: TESTNET_CHAIN, transport: http(RPC_URL, { timeout: 12000, retryCount: 1, batch: { wait: 10, batchSize: 20 } }), cacheTime: 0 });
 const tokenAbi = parseAbi(['function balanceOf(address) view returns(uint256)', 'function allowance(address,address) view returns(uint256)']);
@@ -21,6 +21,14 @@ const MODES = ['easy', 'normal', 'degen'] as const;
 const durations = [120, 90, 60];
 const multipliers = ['0.75×', '1×', '2×'];
 const ENTRY = 110n * 10n ** 18n;
+const PUBLIC_RUNS_ENDPOINT = 'https://rarerush.app/api/runs';
+// Lookup and publication must hash the same original recording, without claim state.
+function publicationPayload(saved: SavedRun) {
+  return { source: 'testnet' as const, actor: 'human' as const, collection: saved.run.collection,
+    tokenId: saved.run.tokenId, runId: saved.run.runId, seed: saved.run.seed,
+    difficulty: MODES[saved.run.difficulty], player: saved.run.player,
+    replay: { version: 'rare-rush-agent-local-v1' as const, finalTick: saved.completedTicks, inputs: saved.replay } };
+}
 const short = (v: string) => `${v.slice(0,6)}…${v.slice(-4)}`;
 const amount = (v: bigint | string, decimals: number) => Number(formatUnits(BigInt(v), decimals)).toLocaleString('en-US', { maximumFractionDigits: 3 });
 type WalletProvider = EIP1193Provider & {on?: (name:string,listener:(...args:unknown[])=>void)=>void; removeListener?: (name:string,listener:(...args:unknown[])=>void)=>void};
@@ -66,6 +74,8 @@ export function App() {
   const [refreshCount,setRefreshCount]=useState(0);
   const [playbackSession,setPlaybackSession]=useState(0);
   const [publishing, setPublishing] = useState(false), [publishError, setPublishError] = useState(''), [publishedId, setPublishedId] = useState('');
+  const [publicationCheck, setPublicationCheck] = useState<'checking'|'missing'|'saved'|'error'>('checking');
+  const [publicationRetry, setPublicationRetry] = useState(0);
   const publication = useRef<AbortController|null>(null);
   const playbackPermit=useRef(0);
   const walletSession=useRef<ReturnType<typeof createWalletSession>|null>(null);
@@ -76,12 +86,29 @@ export function App() {
   const actionBusy = useRef(false);
   const epoch = useRef(0);
   const run = state?.savedRun;
+  const completedReplay = !!run && stats?.status === 'finished' && stats.completedTicks === run.completedTicks
+    && run.replay.frames.length === run.completedTicks;
   const currentRunId = useRef(run?.run.runId); currentRunId.current = run?.run.runId;
   useEffect(() => {
     publication.current?.abort(); publication.current = null;
     setPublishing(false); setPublishError(''); setPublishedId('');
     return () => { publication.current?.abort(); publication.current = null; };
   }, [account, run?.run.runId]);
+  useEffect(() => {
+    setPublicationCheck('checking'); setPublishError(''); setPublishedId('');
+    if (!account || !run || !completedReplay) return;
+    const controller = new AbortController();
+    // The public record survives navigation, reloads and saves made before this fix.
+    void findPublishedRun(publicationPayload(run), PUBLIC_RUNS_ENDPOINT, { signal: controller.signal }).then(saved => {
+      if (controller.signal.aborted) return;
+      setPublishedId(saved?.id ?? ''); setPublicationCheck(saved ? 'saved' : 'missing');
+    }).catch(() => {
+      if (controller.signal.aborted) return;
+      setPublicationCheck('error');
+      setPublishError('Could not check whether this run is already published. Check again before saving.');
+    });
+    return () => controller.abort();
+  }, [account, run?.run.runId, completedReplay, publicationRetry]);
   const pending = state?.pending;
   const expired = run ? Number(run.run.claimUntil) * 1000 <= now : false;
   const liveSaved = run && !['claimed','abandoned'].includes(run.status) && !expired;
@@ -284,7 +311,7 @@ export function App() {
     const a=document.createElement('a');a.href=url;a.download=`rare-rush-run-${run.run.runId}.json`;a.click();URL.revokeObjectURL(url);
   }
   async function publishReplay() {
-    if (!run || !account || publication.current || publishedId || busy || pending) return;
+    if (!run || !account || publication.current || publishedId || publicationCheck !== 'missing' || busy || pending) return;
     const original = run, expectedAccount = account, requestEpoch = epoch.current;
     const controller = new AbortController(); publication.current = controller;
     setPublishing(true); setPublishError('');
@@ -298,12 +325,9 @@ export function App() {
           throw new RunPublicationError('The selected wallet or run changed. Return to this run before saving.');
         }
       };
-      const saved = await publishRun({ source: 'testnet', actor: 'human', collection: original.run.collection,
-        tokenId: original.run.tokenId, runId: original.run.runId, seed: original.run.seed,
-        difficulty: MODES[original.run.difficulty], player: original.run.player,
-        replay: { version: 'rare-rush-agent-local-v1', finalTick: original.completedTicks, inputs: original.replay } }, wallet(),
-      'https://rarerush.app/api/runs', { signal: controller.signal, assertActive });
-      assertActive(); if (!controller.signal.aborted) setPublishedId(saved.id);
+      const saved = await publishRun(publicationPayload(original), wallet(), PUBLIC_RUNS_ENDPOINT,
+        { signal: controller.signal, assertActive });
+      assertActive(); if (!controller.signal.aborted) { setPublishedId(saved.id); setPublicationCheck('saved'); }
     } catch (error) { if (!controller.signal.aborted) setPublishError(runPublicationMessage(error)); }
     finally { if (publication.current === controller) { publication.current = null; setPublishing(false); } }
   }
@@ -377,8 +401,8 @@ export function App() {
     <h2>{run.status==='claimed'?'KEEP IT RARE.':run.status==='survived'?'CLAIM YOUR RUSH.':run.status==='lost'?'NEXT RUN. BIGGER RUSH.':run.status==='abandoned'||expired?'READY FOR THE NEXT?':'READY TO RUSH?'}</h2>
     {!dashboard&&stats?.status==='finished'&&<div className="result-score">{stats.score.toLocaleString()}<span>POINTS</span></div>}
     {stats&&<div className="result-stats"><span><b>{Math.floor(stats.distance)}m</b>DISTANCE</span><span><b>{stats.coins}</b>COINS</span><span><b>{stats.hearts}</b>HEARTS</span></div>}
-    {stats?.status==='finished'&&stats.completedTicks===run.completedTicks&&<div className="run-save">
-      {publishedId ? <><p role="status">Run saved to the public feed.</p><a className="outline-link" href={`https://rarerush.app/runs-feed/?run=${publishedId}`}>VIEW SAVED RUN ↗</a></> : <>
+    {completedReplay&&<div className="run-save">
+      {publishedId ? <><p role="status">Run saved to the public feed.</p><a className="outline-link" href={`https://rarerush.app/runs-feed/?run=${publishedId}`}>VIEW SAVED RUN ↗</a></> : publicationCheck === 'checking' ? <p role="status">Checking saved run…</p> : publicationCheck === 'error' ? <button className={dashboard?'outline-button':'primary'} onClick={()=>setPublicationRetry(n=>n+1)}>CHECK SAVED RUN ↻</button> : <>
         <p>Sign to publish this replay to the public feed. No transaction; rewards are claimed separately.</p>
         <button className={dashboard?'outline-button':'primary'} disabled={publishing||!!busy||!!pending||!account||chainId!==46630} onClick={()=>void publishReplay()}>{publishing?'WAITING FOR SAVE…':publishError?'RETRY SAVE RUN':'SAVE RUN'}</button>
       </>}{publishError&&<p role="alert">{publishError}</p>}

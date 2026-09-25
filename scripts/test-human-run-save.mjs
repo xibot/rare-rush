@@ -92,7 +92,7 @@ try {
         if (url.origin === origin) {
           if (url.pathname === '/api/status') return route.fulfill({ json: { ready: false } });
           if (url.pathname === '/api/arcade-events') return route.fulfill({ json: { accepted: true, receipt: 'fixture-receipt' } });
-          if (url.pathname === '/api/runs') {
+          if (url.pathname === '/api/runs' || url.pathname.startsWith('/api/runs/')) {
             if (request.method() === 'POST') posts.push(request.postDataJSON()); now = await page.evaluate(() => Date.now());
             const response = await handle(new Request(request.url(), { method: request.method(), headers: request.headers(), ...(request.method() === 'POST' ? { body: request.postData() } : {}) }));
             return route.fulfill({ status: response.status, headers: Object.fromEntries(response.headers), body: await response.text() });

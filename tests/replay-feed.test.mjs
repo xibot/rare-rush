@@ -107,6 +107,46 @@ test('duplicates retain first timestamp and retries repair an interrupted newest
   assert.equal([...f.store.data.keys()].filter(path => path.includes('/records/')).length, 1);
 });
 
+test('publication lookup returns a lightweight receipt with Testnet CORS and never writes', async () => {
+  const f = fixture(), saved = await save(f), writes = f.store.calls.put;
+  const response = await f.handle(new Request(`${site}/api/runs/${saved.id}?publication=1`, { headers: { origin: testnet } }));
+  assert.equal(response.status, 200);
+  assert.equal(response.headers.get('access-control-allow-origin'), testnet);
+  assert.equal(response.headers.get('cache-control'), 'no-store');
+  const receipt = await response.json();
+  assert.deepEqual(receipt, saved);
+  assert.equal('replay' in receipt, false); assert.equal('art' in receipt, false);
+  assert.equal(f.store.calls.put, writes);
+  const detail = await (await f.handle(f.get('/' + saved.id))).json();
+  assert.deepEqual(detail.replay, replay); assert.equal(detail.art.portraitUrl, portrait);
+});
+
+test('publication lookup leaves an incomplete index for an explicit POST retry to repair', async () => {
+  const f = fixture(), saved = await save(f);
+  const index = [...f.store.data.keys()].find(path => path.includes('/newest/'));
+  f.store.data.delete(index);
+  const writes = f.store.calls.put;
+  const response = await f.handle(f.get(`/${saved.id}?publication=1`));
+  assert.equal(response.status, 404);
+  assert.deepEqual(await response.json(), { error: 'Replay publication is incomplete.' });
+  assert.equal(f.store.calls.put, writes); assert.equal(f.store.data.has(index), false);
+  assert.equal((await f.handle(f.get('/' + saved.id))).status, 200);
+  assert.deepEqual(await save(f), saved);
+  const complete = await f.handle(f.get(`/${saved.id}?publication=1`));
+  assert.equal(complete.status, 200); assert.deepEqual(await complete.json(), saved);
+  assert.equal([...f.store.data.keys()].filter(path => path.includes('/records/')).length, 1);
+});
+
+test('publication lookup rejects an invalid or mismatched index without writing', async () => {
+  for (const patch of [{ id: 'a'.repeat(64) }, { createdAt: new Date(time + 1000).toISOString() }, { metrics: null }]) {
+    const f = fixture(), saved = await save(f), writes = f.store.calls.put;
+    const index = [...f.store.data.keys()].find(path => path.includes('/newest/'));
+    f.store.data.set(index, { ...f.store.data.get(index), ...patch });
+    assert.equal((await f.handle(f.get(`/${saved.id}?publication=1`))).status, 503);
+    assert.equal(f.store.calls.put, writes);
+  }
+});
+
 test('durable wallet publication limits survive separate serverless instances and permit safe retries', async () => {
   const store = memoryStore();
   for (let number = 1; number <= 3; number++) await save(fixture({ store }), variant(number));
