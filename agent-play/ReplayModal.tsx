@@ -3,6 +3,7 @@ import { createPortal } from 'react-dom';
 import { testRunArt } from '../testnet-app/src/play/art.ts';
 import { AgentStage } from './Stage.tsx';
 import { decodeRunArt, type RunRecord } from './feed-types.ts';
+import { resolveRunActor } from './run-actor.ts';
 import { advanceReplay, checkAgentReplay, createReplaySession, FIXED_STEP, type RunSession } from './runner.ts';
 import type { ArcadeFriend } from './arcade.ts';
 import './replay-modal.css';
@@ -191,7 +192,7 @@ export function ReplayModal({ record, liked, onToggleLike, onClose }: ReplayModa
         : !current ? <div className="replay-modal-message"><span aria-hidden="true">→ ↑ ↓ ←</span><p role="status">Loading and checking saved replay…</p></div>
         : <>
           <div className="replay-modal-stage">
-            {visible ? <AgentStage run={current.session.run} collection={current.record.collection} tokenId={current.record.tokenId}
+            {visible ? <AgentStage run={current.session.run} collection={current.record.collection} tokenId={current.record.tokenId} actor={resolveRunActor(current.record)}
               running={running && visible} reducedMotion={reduced} label="REPLAY" art={current.art ?? (record.actor === 'human' && record.source === 'testnet' ? testRunArt(record.collection, record.tokenId, record.runId!) : undefined)}
               fieldOverlay={finished && <div className="replay-modal-ended" role="status">
                 <span>REPLAY ENDED</span><strong>{metrics!.score.toLocaleString()}<small>POINTS</small></strong>

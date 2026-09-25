@@ -178,6 +178,7 @@ test('Arcade preserves the owner and real SDK packed sprites through save and re
   assert.equal(saved.response.status, 200, saved.text);
   assert.equal(saved.body.player, owner);
   assert.equal(saved.body.source, 'arcade');
+  assert.equal(saved.body.actor, 'autopilot');
   assert.deepEqual(saved.body.metrics, expected);
   const full = await request(`/api/runs/${saved.body.id}`);
   assert.equal(full.response.status, 200);
@@ -215,6 +216,7 @@ test('imports headless job replays without exposing wallet configuration or trus
   assert.ok(entry, 'Finished gameplay is available even when later claim work needs attention');
   assert.deepEqual(entry.metrics, expected);
   assert.equal(entry.verification, 'local-replay');
+  assert.equal(entry.actor, 'agentic');
   assert.ok(!first.text.includes('example-signer') && !first.text.includes('privateCheckpoint'));
   const full = await request(`/api/runs/${entry.id}`);
   assert.deepEqual(full.body.replay, replay);

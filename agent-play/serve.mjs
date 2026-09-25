@@ -67,7 +67,7 @@ async function saveRecord(input, agentJobId) {
   const file = resolve(data,`${id}.json`);
   try { return JSON.parse(await readFile(file,'utf8')); } catch { /* First recording of this run. */ }
   if ((await readdir(data)).filter(f => f.endsWith('.json')).length >= 250) throw new Error('Local replay library is full. Export or archive its data folder first.');
-  const record = {id,...identity,createdAt:new Date().toISOString(),agent:'Rare Rush autopilot',verification:'local-replay',metrics,replay:input.replay,...(art?{art}: {}),...(agentJobId?{agentJobId}: {})};
+  const record = {id,...identity,createdAt:new Date().toISOString(),actor:agentJobId?'agentic':'autopilot',agent:agentJobId?'Agentic player':'Rare Rush autopilot',verification:'local-replay',metrics,replay:input.replay,...(art?{art}: {}),...(agentJobId?{agentJobId}: {})};
   await writeFile(`${file}.tmp`,JSON.stringify(record));
   await rename(`${file}.tmp`,file);
   return record;

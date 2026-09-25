@@ -7,6 +7,8 @@ import { headingFor } from '../games/rare-rush/twist/presentation.ts';
 import type { RunState } from '../games/rare-rush/twist/engine.ts';
 import { testRunArt } from '../testnet-app/src/play/art.ts';
 import type { ArcadeFriend } from './arcade.ts';
+import type { PublicRunActor } from '../shared/replay-publication.ts';
+import { runningLabel } from './run-actor.ts';
 import './stage.css';
 
 export type AgentStageProps = {
@@ -14,6 +16,7 @@ export type AgentStageProps = {
   collection: 0 | 1;
   tokenId: string;
   running: boolean;
+  actor?: PublicRunActor;
   reducedMotion: boolean;
   label?: string;
   /** Saved Arcade artwork or the cosmetic art for this Testnet run. */
@@ -24,7 +27,7 @@ export type AgentStageProps = {
 const ZONES = ['GARDEN COMMONS', 'CIRCUIT COURTYARD', 'CRYSTAL MESA'];
 
 /** Watch-only presentation. The host owns time, inputs, replay, and run controls. */
-export function AgentStage({ run, collection, tokenId, running, reducedMotion, label = 'LOCAL', art: realArt, fieldOverlay }: AgentStageProps) {
+export function AgentStage({ run, collection, tokenId, running, actor, reducedMotion, label = 'LOCAL', art: realArt, fieldOverlay }: AgentStageProps) {
   const shell = useRef<HTMLElement>(null);
   const [viewportWidth, setViewportWidth] = useState(960);
   const testArt = useMemo(() => testRunArt(collection, tokenId, 'agent-play'), [collection, tokenId]);
@@ -41,7 +44,7 @@ export function AgentStage({ run, collection, tokenId, running, reducedMotion, l
   const jumping = !vertical && !run.player.grounded && !run.transition;
   const status = run.status === 'finished'
     ? run.finishReason === 'time' ? 'TIMER SURVIVED' : 'OUT OF HEARTS'
-    : active ? 'AGENT RUNNING' : run.elapsed > 0 ? 'PAUSED' : 'READY TO RUN';
+    : active ? runningLabel(actor) : run.elapsed > 0 ? 'PAUSED' : 'READY TO RUN';
   const friendLabel = realArt?.label ?? `${collection === 1 ? 'GENESIS' : 'GENERATIONS'} #${tokenId}`;
 
   useEffect(() => {
@@ -57,7 +60,7 @@ export function AgentStage({ run, collection, tokenId, running, reducedMotion, l
   return <section
     ref={shell}
     className="agent-stage"
-    aria-label="Watch the Rare Rush agent play"
+    aria-label="Watch the Rare Rush run"
     data-phase={run.phase}
     data-heading={vertical ? run.phase : leftward ? 'left' : 'right'}
     data-running={active}
@@ -106,7 +109,7 @@ export function AgentStage({ run, collection, tokenId, running, reducedMotion, l
 
     <div className="agent-stage-direction">
       <div className="agent-stage-heading"><b aria-hidden="true">{direction}</b><span>{run.transition ? 'CHANGING DIRECTION' : headingLabel}</span></div>
-      <div className="agent-stage-inputs" aria-label="Agent movement">
+      <div className="agent-stage-inputs" aria-label="Player movement">
         <span className="agent-stage-input-label">INPUT</span>
         {vertical ? <>
           <span data-pressed={active && screenAxis < 0}><kbd>←</kbd>LEFT</span>
