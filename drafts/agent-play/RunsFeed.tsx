@@ -159,7 +159,6 @@ export function RunsFeed({ records, likes, onToggleLike, onOpen, onBack, loading
 
   return (
     <section className="runs-feed" aria-labelledby={`${id}-title`}>
-      <button type="button" className="runs-feed-back" onClick={onBack}><span aria-hidden="true">←</span> AGENT PLAY</button>
       <div className="runs-feed-heading">
         <div><p>{publicFeed?'COMMUNITY RUNS · SAVED BY PLAYERS':'SAVED RUNS · LIKES ON THIS BROWSER'}</p><h1 id={`${id}-title`}>RUNS <span>FEED.</span></h1></div>
         <span className="runs-feed-total">{count(records.length)} SAVED</span>
