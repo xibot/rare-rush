@@ -1,0 +1,51 @@
+/* Match the testnet cabinet's viewport centering, gutters and mobile breakpoint. */
+body:has(.rf-game-frame):not(.rush-generations-selecting),
+body:has(.genesis-game-shell) {
+  box-sizing: border-box;
+  min-height: 100dvh;
+  display: block;
+  margin: 0;
+  padding: 0;
+}
+
+body:has(.rf-game-frame):not(.rush-generations-selecting) > #root,
+body:has(.genesis-game-shell) > #root {
+  box-sizing: border-box;
+  width: 100%;
+  max-width: none;
+  min-height: 100dvh;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  align-items: center;
+  padding: 0 16px;
+  margin: 0 !important;
+}
+
+.rf-game-frame:not(.rush-generations-frame),
+.genesis-game-shell {
+  width: calc(100% - 48px);
+  max-width: 960px;
+  min-width: 0;
+  min-height: 640px;
+  aspect-ratio: 3 / 2;
+  margin: 24px auto;
+}
+
+@media (max-width: 700px) {
+  body:has(.rf-game-frame):not(.rush-generations-selecting) > #root,
+  body:has(.genesis-game-shell) > #root {
+    display: block;
+    padding: 0;
+  }
+
+  .rf-game-frame:not(.rush-generations-frame),
+  .genesis-game-shell {
+    width: 100%;
+    max-width: none;
+    height: 100dvh;
+    margin: 0;
+    border: 0;
+    box-shadow: none;
+    aspect-ratio: auto;
+  }
+}

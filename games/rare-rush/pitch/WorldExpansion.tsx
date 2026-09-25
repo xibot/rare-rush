@@ -66,10 +66,10 @@ export function WorldExpansion() {
   return <section className="pitch-worlds" id="future-worlds" aria-labelledby="worlds-title">
     <div className="pitch-section-heading">
       <div><span className="pitch-kicker">05 / IMAGINE THE NEXT RUN</span><h2 id="worlds-title">The world<br/>gets <em>bigger.</em></h2></div>
-      <div className="pitch-world-intro"><span className="pitch-status">CONCEPT ART · NOT PLAYABLE</span><p>Branching paths, tougher stages, bigger encounters. A few ideas for where we’d love to take Rare Rush next.</p></div>
+      <div className="pitch-world-intro"><span className="pitch-status">FUTURE CONCEPTS</span><p>Right, up, down, and surprise leftward runs are already playable. These concepts go further: player-chosen routes, new stages, and bosses.</p></div>
     </div>
     <div className="pitch-world-grid">
-      <article><span className="pitch-card-index">01 / BRANCHING WORLDS</span><PathArt/><div className="pitch-world-caption"><h3>Choose your path.</h3><p>Left. Right. Up. Down. Imagine new routes between floating lands, with more ways to explore.</p></div></article>
+      <article><span className="pitch-card-index">01 / BRANCHING WORLDS</span><PathArt/><div className="pitch-world-caption"><h3>Choose your path.</h3><p>Today the track changes direction for you. A future version could let you choose routes between floating lands.</p></div></article>
       <article><span className="pitch-card-index">02 / NEW CHALLENGES</span><StakesArt/><div className="pitch-world-caption"><h3>Raise the stakes.</h3><p>Tougher stages, new obstacles, and trickier combinations that put your timing to the test.</p></div></article>
       <article><span className="pitch-card-index">03 / BIG ENCOUNTERS</span><BossArt/><div className="pitch-world-caption"><h3>Meet the boss.</h3><p>A bigger kind of rush. Boss encounters could give your Friend a whole new challenge.</p></div></article>
     </div>

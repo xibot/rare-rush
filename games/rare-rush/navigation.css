@@ -1,0 +1,88 @@
+/* One header across the public site, using the original landing proportions. */
+.site-header-shell {
+  box-sizing: border-box;
+  width: 100%;
+  max-width: 1480px;
+  margin: 0 auto;
+  padding: 0 48px;
+  background: #000;
+  color: #fff;
+}
+.site-header {
+  box-sizing: border-box;
+  height: 102px;
+  border-bottom: 1px solid #ffffff50;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 24px;
+  font: 400 16px var(--rush-font-mono);
+  letter-spacing: normal;
+}
+header.site-header a {
+  box-sizing: border-box;
+  color: inherit;
+  text-decoration: none;
+  text-underline-offset: auto;
+  -webkit-tap-highlight-color: transparent;
+}
+header.site-header a:hover { color: inherit; text-decoration: underline; }
+header.site-header a:focus-visible { outline: 3px solid #ccff00; outline-offset: 5px; }
+.site-header .site-logo { display: flex; align-items: center; gap: 12px; flex-shrink: 0; }
+.site-logo > .brand-icon { display: block; width: 42px; height: 42px; max-width: none; }
+.site-logo > .brand-name { font: 400 20px/1 var(--rush-font-display); letter-spacing: 0; }
+.site-logo > .brand-name > span { color: #ccff00; }
+.site-logo small { display: block; margin-top: 7px; font: 400 8px/1 var(--rush-font-mono); letter-spacing: 2.2px; }
+.site-header nav { display: flex; gap: 32px; align-items: center; font: 400 11px var(--rush-font-mono); letter-spacing: .5px; }
+.site-header nav a.nav-testnet {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 44px;
+  padding: 12px 14px;
+  border: 1px solid #ccff00;
+  border-radius: 0;
+  background: #ccff00;
+  color: #000;
+  white-space: nowrap;
+  text-decoration: none;
+}
+.site-header nav a.nav-testnet:is(:hover, :focus-visible) { background: #fff; border-color: #fff; color: #000; text-decoration: none; }
+.site-header nav a.nav-arcade {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 13px 17px;
+  border: 1px solid #fff;
+  border-radius: 0;
+  background: #000;
+  color: #fff;
+  white-space: nowrap;
+  text-decoration: none;
+}
+.site-header nav a.nav-arcade > span { color: #ccff00; margin-left: 18px; font-size: 17px; }
+.site-header nav a.nav-arcade:is(:hover, :focus-visible) { background: #ccff00; color: #000; border-color: #ccff00; text-decoration: none; }
+.site-header nav a.nav-arcade:is(:hover, :focus-visible) > span { color: #000; }
+@media (max-width: 1100px) { .site-header-shell { padding: 0 28px; } }
+@media (max-width: 800px) {
+  .site-header { height: 80px; }
+  .site-header nav { gap: 16px; font-size: 9px; }
+  .site-header nav > .nav-how-to-play { display: none; }
+}
+@media (max-width: 600px) {
+  .site-header-shell { padding: 0 20px; }
+  .site-header { height: auto; min-height: 104px; padding: 17px 0 12px; flex-wrap: wrap; gap: 12px 10px; }
+  .site-header .site-logo { gap: 8px; }
+  .site-logo > .brand-icon { width: 32px; height: 32px; }
+  .site-logo > .brand-name { font-size: 16px; }
+  .site-logo small { font-size: 7px; letter-spacing: 1.6px; }
+  .site-header nav { width: 100%; justify-content: space-between; gap: 12px; font-size: 11px; }
+  .site-header nav > a { min-height: 44px; display: flex; align-items: center; }
+  .site-header nav > .nav-how-to-play { display: none; }
+  .site-header nav a.nav-arcade { font-size: 10px; padding: 10px 12px; }
+  .site-header nav a.nav-arcade > span { margin-left: 8px; font-size: 14px; }
+}
+@media (max-width: 380px) {
+  .site-header nav { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px 12px; }
+  .site-header nav > a { justify-content: center; }
+}

@@ -1,12 +1,16 @@
 import { parseArcadeNavigation } from './navigation';
 import { syncFriendPortraits, cleanupFriendPortraits } from './host-portraits';
+import { bindGenerationsAnalytics } from './host-analytics';
+import { createSdkSiteHeader } from './site-navigation';
 
 /** Site chrome for the outer SDK host. Wallet, ownership and gameplay stay in FriendSDK. */
 function enhanceGenerationsEntry(): void {
   const root = document.getElementById('root');
   if (!root) return;
+  const analytics = bindGenerationsAnalytics(root);
 
   const update = () => {
+    analytics.update();
     let pickerOpen = false;
     for (const frame of root.querySelectorAll<HTMLElement>('.rf-game-frame')) {
       let framePickerOpen = false;
@@ -22,7 +26,8 @@ function enhanceGenerationsEntry(): void {
           const chrome = document.createElement('div');
           chrome.className = 'rush-generations-chrome';
           // Static, project-owned markup only. No wallet or RPC values enter HTML.
-          chrome.innerHTML = `<header class="rush-entry-header"><a class="rush-entry-logo" href="/" aria-label="Rare Rush by Xibot home"><img src="/favicon.svg" width="44" height="44" alt=""><span>RARE<span>RUSH</span><small>BY XIBOT</small></span></a><nav aria-label="Main navigation"><a href="/pitch/">PITCH</a><a href="/docs/">DOCS ↗</a></nav></header><div class="rush-entry-intro"><a class="rush-entry-collection" href="/arcade/">← CHOOSE COLLECTION</a><span class="rush-entry-kicker">THE NEXT GENERATION. THE SAME RUSH.</span><h1>Generations<br><span>unlocked.</span></h1><p>Bring your hardwired Generations Friend. Pick your mode. Make the run yours.</p></div>`;
+          chrome.innerHTML = `<div class="rush-entry-intro"><a class="rush-entry-collection" href="/arcade/">← CHOOSE COLLECTION</a><span class="rush-entry-kicker">THE NEXT GENERATION. THE SAME RUSH.</span><h1>Generations<br><span>unlocked.</span></h1><p>Bring your hardwired Generations Friend. Pick your mode. Make the run yours.</p></div>`;
+          chrome.prepend(createSdkSiteHeader());
           menu.prepend(chrome);
         }
         if (!menu.querySelector('.rush-generations-caption')) {
@@ -35,7 +40,11 @@ function enhanceGenerationsEntry(): void {
       }
       frame.classList.toggle('rush-generations-frame', framePickerOpen);
     }
+    const leavingPicker = document.body.classList.contains('rush-generations-selecting') && !pickerOpen;
     document.body.classList.toggle('rush-generations-selecting', pickerOpen);
+    if (leavingPicker) requestAnimationFrame(() => {
+      if (!document.body.classList.contains('rush-generations-selecting')) window.scrollTo(0, 0);
+    });
     if (!pickerOpen) cleanupFriendPortraits();
   };
 
@@ -50,8 +59,8 @@ function enhanceGenerationsEntry(): void {
   const observer = new MutationObserver(update);
   const observe = () => { observer.observe(root, { childList: true, characterData: true, subtree: true }); update(); };
   observe();
-  window.addEventListener('pagehide', () => { observer.disconnect(); cleanupFriendPortraits(); window.removeEventListener('message', navigate); });
-  window.addEventListener('pageshow', event => { if (event.persisted) { window.addEventListener('message', navigate); observe(); } });
+  window.addEventListener('pagehide', () => { observer.disconnect(); cleanupFriendPortraits(); analytics.close(); window.removeEventListener('message', navigate); });
+  window.addEventListener('pageshow', event => { if (event.persisted) { analytics.restore(); window.addEventListener('message', navigate); observe(); } });
 }
 
 if (window.self === window.top && /^\/play(?:\/|$)/.test(window.location.pathname)) {

@@ -44,15 +44,15 @@ function UnlockArt() {
 
 export function ClaimConcept() {
   return <section className="claim-concept" id="survive-to-claim" aria-labelledby="claim-concept-title">
-    <span className="status-tag">PLANNED CLAIM MECHANIC · NOT LIVE</span>
+    <span className="status-tag">LIVE ON TESTNET · TEST TOKENS ONLY</span>
     <h3 id="claim-concept-title">Survive. Then <span>claim.</span></h3>
-    <p className="claim-concept-intro">The proposed twist: your coins build the reward. Finishing the timer unlocks the claim.</p>
+    <p className="claim-concept-intro">Your coins build the reward. Survive the timer, verify the replay, and claim onchain before the deadline.</p>
     <ol className="claim-concept-grid">
       <li><span className="claim-concept-step">01 / THE RUN</span><CollectArt/><div className="claim-concept-caption"><h4>Collect coins.</h4><p>Build your run’s reward, one pickup at a time.</p></div></li>
       <li><span className="claim-concept-step">02 / THE CHALLENGE</span><SurviveArt/><div className="claim-concept-caption"><h4>Survive the timer.</h4><p>Reach zero with at least one heart left.</p></div></li>
-      <li><span className="claim-concept-step">03 / THE REWARD</span><UnlockArt/><div className="claim-concept-caption"><h4>Unlock the claim.</h4><p>Complete the run, pass verification, claim your earned RARERUSH.</p></div></li>
+      <li><span className="claim-concept-step">03 / THE REWARD</span><UnlockArt/><div className="claim-concept-caption"><h4>Unlock the claim.</h4><p>Pass verification and confirm the wallet transaction to mint tRARERUSH.</p></div></li>
     </ol>
-    <p className="claim-concept-rule"><strong>The stakes:</strong> under this proposed rule, losing all your hearts would forfeit that run’s claim.</p>
-    <p className="claim-concept-current"><strong>Playing today?</strong> Your collected demo rewards stay in this session, even if you lose all your hearts. Real token claims aren’t live yet.</p>
+    <p className="claim-concept-rule"><strong>The stakes:</strong> losing all your hearts forfeits that run’s reward. Close the run or wait for its claim window to expire; entry fees and daily attempts are not refunded.</p>
+    <p className="claim-concept-current"><strong>Playing Arcade?</strong> Its collected demo rewards stay in the session, even after a loss. Arcade does not make onchain claims. Testnet tokens are separate test assets with no real value.</p>
   </section>;
 }
