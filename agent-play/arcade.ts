@@ -1,4 +1,4 @@
-import { createPublicClient, custom, isAddress, zeroAddress, type Address } from 'viem';
+import { ContractFunctionExecutionError, ContractFunctionRevertedError, createPublicClient, custom, isAddress, zeroAddress, type Address } from 'viem';
 import { readGenerationEligibility } from '@rarefriends/friendsdk/identity';
 import { createGenerationSpriteReader, GENERATION_SPRITE_MANIFEST, type GenerationSprites } from '@rarefriends/friendsdk/sprites';
 import { createFriendWalletSession, type FriendWalletProvider, type FriendWalletSession } from '@rarefriends/friendsdk/wallet';
@@ -107,7 +107,17 @@ export async function loadArcadeFriend(
         chainId: GENESIS_DEPLOYMENT.chainId, blockNumber: identity.blockNumber,
         label: identity.label, portraitUrl: identity.image, bodyId: DEFAULT_BODY_ID });
     } else {
-      const eligibility = await readGenerationEligibility(client, id, account, GENERATION_SPRITE_MANIFEST);
+      const eligibility = await readGenerationEligibility(client, id, account, GENERATION_SPRITE_MANIFEST).catch(cause => {
+        assertActive();
+        const reverted = cause instanceof ContractFunctionExecutionError
+          ? cause.walk(error => error instanceof ContractFunctionRevertedError) : null;
+        if (cause instanceof ContractFunctionExecutionError && cause.functionName === 'ownerOf'
+          && reverted instanceof ContractFunctionRevertedError
+          && (reverted.signature === '0x7e273289' || reverted.data?.errorName === 'ERC721NonexistentToken')) {
+          throw new Error(`Generations #${id} does not exist on Robinhood mainnet. Choose a Friend from your wallet. Testnet NFT IDs are separate.`, { cause });
+        }
+        throw new Error('Could not check this Generations Friend on Robinhood mainnet. Check your wallet network and try again.', { cause });
+      });
       assertActive();
       if (eligibility.ownedByPlayer !== true) throw new Error('This Generations Friend is not owned by the connected wallet.');
       if (eligibility.eligible !== true) throw new Error('This Generations Friend is generation 0. Arcade requires a hardwired Friend (generation 1 or higher).');

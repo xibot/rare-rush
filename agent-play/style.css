@@ -61,3 +61,23 @@ footer{border-top:1px solid #555;padding:30px 0 40px;display:flex;align-items:ce
 
 /* Local preview navigation can wrap as community pages are added. */
 .agent-app:not(.public-community)>.site-header nav{flex-wrap:wrap}
+
+/* Wallet-owned Arcade selection, using the same pixel button typography. */
+.setup>.arcade-wallet-panel{margin:0 0 28px;padding:0 0 24px;border-top:0;border-bottom:1px solid #666}
+.arcade-friend-picker{margin-top:24px;min-width:0}
+.arcade-picker-heading{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:14px;font-size:10px}
+.arcade-picker-heading button,.arcade-more-friends{font-family:var(--rush-font-display);font-size:10px;padding:10px}
+.arcade-friend-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px;margin-bottom:14px;max-height:460px;overflow:auto;padding:3px}
+.arcade-friend-card{min-width:0;text-align:center;padding:14px 8px;border-color:#777}
+.arcade-friend-art{display:flex;align-items:center;justify-content:center;height:92px;margin-bottom:10px;background:#111}
+.arcade-friend-art img{width:80px;height:80px;object-fit:contain;image-rendering:pixelated}
+.arcade-art-placeholder{font-family:var(--rush-font-display);font-size:30px;color:#888}
+.arcade-friend-card b{display:block;font-family:var(--rush-font-display);font-size:11px;font-weight:400;overflow-wrap:anywhere;line-height:1.5}
+.arcade-friend-card small{display:block;font-size:9px;margin-top:8px}
+.arcade-more-friends{width:100%;margin-bottom:14px}
+.arcade-picker-error{color:#ffd1c7}
+.arcade-picker-connect,.arcade-selected-friend{margin-top:20px}
+.arcade-manual-id{margin-top:18px;padding-top:16px}
+.arcade-manual-id summary{font-size:11px;line-height:1.6}
+.arcade-manual-id .id-label{margin-top:0}
+@media(max-width:400px){.arcade-friend-card b{font-size:10px}}
