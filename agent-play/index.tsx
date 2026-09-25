@@ -345,7 +345,7 @@ function App() {
     if(!next||link?.target||link?.hasAttribute('download'))return;
     event.preventDefault();navigateCommunity(next);
   }}>
-    {PUBLIC_SITE?<SiteHeader page={page==='feed'?'runs-feed':page==='leaderboard'?'leaderboard':'agent-play'}/>:<header className="site-header"><a className="brand" href="/" aria-label="Rare Rush Agent Play"><BrandMark/></a><nav aria-label="Main navigation">{([{id:'leaderboard',label:'LEADERBOARD',path:LEADERBOARD_PATH},{id:'feed',label:'RUNS FEED',path:FEED_PATH},{id:'play',label:'AGENT PLAY',path:AGENT_PATH}] as const).map(item=><a key={item.id} href={item.path} aria-current={page===item.id?'page':undefined} aria-disabled={!!busy||!!tn?.busy} onClick={event=>{event.preventDefault();navigateCommunity(item.id);}}>{item.label}</a>)}<a href="https://rarerush.app" target="_blank" rel="noreferrer">ARCADE ↗</a><span className="local-label">LOCAL PREVIEW</span></nav></header>}
+    {PUBLIC_SITE?<SiteHeader page={page==='feed'?'runs-feed':page==='leaderboard'?'leaderboard':'agent-play'}/>:<header className="site-header"><a className="brand" href="/" aria-label="Rare Rush Agent Play"><BrandMark/></a><nav aria-label="Main navigation">{([{id:'feed',label:'RUNS FEED',path:FEED_PATH},{id:'leaderboard',label:'LEADERBOARD',path:LEADERBOARD_PATH},{id:'play',label:'AGENT PLAY',path:AGENT_PATH}] as const).map(item=><a key={item.id} href={item.path} aria-current={page===item.id?'page':undefined} aria-disabled={!!busy||!!tn?.busy} onClick={event=>{event.preventDefault();navigateCommunity(item.id);}}>{item.label}</a>)}<a href="https://rarerush.app" target="_blank" rel="noreferrer">ARCADE ↗</a><span className="local-label">LOCAL PREVIEW</span></nav></header>}
     <main>
       <div id="agent-play" hidden={page!=='play'}>
       <section className="hero"><div><p className="eyebrow">YOUR FRIEND. A NEW PLAYER.</p><h1>AGENT <span>PLAY.</span></h1></div><p>Your Friend. Your agent.<br/>Choose how you want to rush.</p></section>
@@ -399,7 +399,7 @@ function App() {
       {page==='feed'&&<div id="runs-feed"><RunsFeed records={records} likes={likes} onToggleLike={toggleLike} onOpen={setFeedRun} onBack={backToPlay} previewsPaused={!!feedRun} publicFeed={PUBLIC_SITE} loading={recordsLoading} error={recordsError} onRetry={()=>{setRecordsLoading(true);void loadRecords().catch(()=>{});}}/>{PUBLIC_SITE&&nextCursor&&<div className="feed-load-page"><button disabled={loadingMore} onClick={()=>void moreRecords()}>{loadingMore?'LOADING RUNS…':'LOAD OLDER RUNS ↓'}</button></div>}{likesError&&<p className="message" role="status">{likesError}</p>}</div>}
     </main>
     {page!=='play'&&feedRun&&<ReplayModal record={feedRun} liked={likes.has(feedRun.id)} onToggleLike={()=>toggleLike(feedRun.id)} onClose={()=>setFeedRun(null)}/>}
-    <footer><BrandMark attribution/><p>SMALL FRIEND. NEW PLAYER. SAME BIG RUSH.</p><span>{PUBLIC_SITE?'LEADERBOARD · RUNS FEED · AGENT PLAY':'AGENT PLAY · LOCAL PREVIEW'}</span></footer>
+    <footer><BrandMark attribution/><p>SMALL FRIEND. NEW PLAYER. SAME BIG RUSH.</p><span>{PUBLIC_SITE?'RUNS FEED · LEADERBOARD · AGENT PLAY':'AGENT PLAY · LOCAL PREVIEW'}</span></footer>
   </div>;
 }
 createRoot(document.getElementById('app')!).render(<App/>);
