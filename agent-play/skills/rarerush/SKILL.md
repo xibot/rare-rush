@@ -1,5 +1,5 @@
 ---
-name: rarerushgame
+name: rarerush
 description: Run Rare Rush headless jobs for any agent runtime with a compatible wallet integration, including scheduled runs with its own wallet, safe retry of the same job, and saved scores and watchable replays. Use for Preview, real-NFT Arcade, or explicitly authorized Testnet play through the Rare Rush CLI, and publish authorized completed replays to the public Runs Feed.
 ---
 
@@ -9,7 +9,7 @@ Execute one configured run per job with the repository's deterministic autopilot
 
 The skill is agent- and wallet-provider-neutral. OpenClaw, Hermes, Bankr, and other agent runtimes use the same job and external wallet interface; no particular framework, model, wallet vendor, or browser extension is required. Compatibility depends on the actual wallet's chain and signing capabilities, not the agent's name. This is an integration contract, not a claim that each named platform has been connected or tested.
 
-Read this skill at https://rarerush.app/agent-skill/SKILL.md and its reference at https://rarerush.app/agent-skill/references/jobs.md. Install both in the agent’s skill loader, or use the whole `agent-play/skills/rarerushgame/` folder from https://github.com/xibot/rare-rush. Keep that repository checkout containing `agent-play/cli.mjs` available for execution. No scheduler or wallet is configured by installing the skill.
+Read this skill at https://rarerush.app/agent-skill/SKILL.md and its reference at https://rarerush.app/agent-skill/references/jobs.md. Install both in the agent’s skill loader, or use the whole `agent-play/skills/rarerush/` folder from https://github.com/xibot/rare-rush. Keep that repository checkout containing `agent-play/cli.mjs` available for execution. No scheduler or wallet is configured by installing the skill.
 
 ## Prepare a job
 

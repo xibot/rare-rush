@@ -200,7 +200,7 @@ try {
   await page.getByRole('button', { name: 'RETRY SKILL', exact: true }).click();
   const rawSkill = page.locator('[data-agentic-skill]');
   await rawSkill.waitFor();
-  const skillText = await readFile(resolve(here, 'skills/rarerushgame/SKILL.md'), 'utf8');
+  const skillText = await readFile(resolve(here, 'skills/rarerush/SKILL.md'), 'utf8');
   assert.equal(await rawSkill.textContent(), skillText, 'Agentic shows the actual current skill file');
   assert.equal(await page.locator('#agentic-panel').getByRole('button', { name: /CONNECT.*WALLET/ }).count(), 0);
   for (const width of [1440, 768, 390, 320]) {

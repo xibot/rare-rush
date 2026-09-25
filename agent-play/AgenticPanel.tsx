@@ -127,7 +127,7 @@ export function AgenticPanel() {
               if (skill.status === 'ready') void copy(skill.text, 'SKILL.md');
             }}>COPY SKILL.md</button>
             <a href={SKILL_URL} target="_blank" rel="noreferrer">OPEN SKILL.md <span aria-hidden="true">↗</span></a>
-            <a href={SKILL_URL} download="rarerushgame-SKILL.md">DOWNLOAD .MD <span aria-hidden="true">↓</span></a>
+            <a href={SKILL_URL} download="rarerush-SKILL.md">DOWNLOAD .MD <span aria-hidden="true">↓</span></a>
           </div>
 
           {skill.status === 'loading' && <p className="agentic-load" role="status">Loading skill…</p>}
@@ -149,7 +149,7 @@ export function AgenticPanel() {
         <div className="agentic-guide">
           <h3><span>02</span> CONFIGURE YOUR AGENT</h3>
           <p>Use OpenClaw, Hermes, Bankr, or another agent runtime with a compatible wallet integration. Load the full skill folder, including its references:</p>
-          <code className="agentic-path">agent-play/skills/rarerushgame/</code>
+          <code className="agentic-path">agent-play/skills/rarerush/</code>
           <p>Your agent needs the Rare Rush repository, Node 22.18+, and installed dependencies. The skill walks through setup.</p>
 
           <div className="agentic-command">

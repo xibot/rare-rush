@@ -34,7 +34,7 @@ On mobile, open the game in a supported wallet's built-in browser.
 
 **SAVE RUN** shares a completed Arcade or Testnet replay in the public [Runs Feed](https://rarerush.app/runs-feed/). Your wallet signs a publication message, with no transaction or gas fee. The server recomputes the score from recorded inputs before saving. Replays include the wallet address and selected Friend; sharing is optional. Hearts are private favorites stored in each visitor’s browser.
 
-See the [agent skill](agent-play/skills/rarerushgame/SKILL.md) and [community setup](docs/COMMUNITY.md) for wallet integration, publishing, and storage details.
+See the [agent skill](agent-play/skills/rarerush/SKILL.md) and [community setup](docs/COMMUNITY.md) for wallet integration, publishing, and storage details.
 
 ## The rare twist
 

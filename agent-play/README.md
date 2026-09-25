@@ -46,7 +46,7 @@ The browser is optional. OpenClaw, Hermes, Bankr, or any other agent runtime can
 node agent-play/cli.mjs run --job agent-play/examples/preview-job.json
 ```
 
-The local skill is [rarerushgame/SKILL.md](skills/rarerushgame/SKILL.md); its linked reference describes Arcade and Testnet job configuration. Install/use the whole skill folder in your agent's skill loader and keep this repository available as its runtime. The Agentic panel displays the full skill and links its setup reference.
+The local skill is [rarerush/SKILL.md](skills/rarerush/SKILL.md); its linked reference describes Arcade and Testnet job configuration. Install/use the whole skill folder in your agent's skill loader and keep this repository available as its runtime. The Agentic panel displays the full skill and links its setup reference.
 
 A scheduler invokes one job per authorized slot and assigns a stable ID for that slot. Retrying the same ID returns or resumes that run, rather than starting another. Wallet locks prevent overlapping or uncertain Testnet jobs from allocating another entry. Jobs and transaction recovery are saved atomically to `data/jobs/`; completed gameplay remains available even when a later claim needs attention. Do not remove locks to bypass an unresolved transaction.
 

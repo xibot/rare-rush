@@ -137,7 +137,7 @@ const server = createServer(async (req,res) => {
     if (pathname.startsWith('/api/')) return json(res,404,{error:'Unknown local route.'});
     if (req.method !== 'GET' && req.method !== 'HEAD') return json(res,405,{error:'Method not allowed.'});
     if (/^\/agent-skill\/(SKILL\.md|references\/[a-z0-9-]+\.md)$/.test(pathname)) {
-      const file = resolve(here, 'skills/rarerushgame', pathname.slice('/agent-skill/'.length));
+      const file = resolve(here, 'skills/rarerush', pathname.slice('/agent-skill/'.length));
       try {
         const bytes = await readFile(file);
         res.writeHead(200,{...headers,'Content-Type':'text/plain; charset=utf-8'});
