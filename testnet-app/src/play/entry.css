@@ -77,7 +77,7 @@
   background: var(--entry-lime);
   color: #000;
   padding: 15px;
-  font: 13px/1.5 Sometype, monospace;
+  font: 400 13px/1.5 Silkscreen, monospace;
 }
 .testnet-entry .testnet-entry-caption {
   font: 12px/1.8 Sometype, monospace;

@@ -480,9 +480,8 @@ export function App() {
       {route.collection==null ? <CollectionChoice onChoose={collection=>navigatePlay({collection})}/> : <CollectionFriends collection={route.collection} account={account} busy={!!busy||!!pending||(!verified&&!!account)} friends={verified?state?.friends??[]:[]} walletControls={walletControls} feedback={feedback} onBack={()=>navigatePlay()} onChoose={chooseFriend}>{manualFriend}</CollectionFriends>}
       {route.collection==null&&<div className="entry-notices">{route.runId&&!arcade&&<div className="play-wallet"><span>LOAD YOUR SAVED RUN</span><div className="play-actions">{walletControls}</div></div>}{feedback}</div>}
       {pendingPanel}
-      {run&&<div className="entry-run-link"><span>{liveSaved?'You have a saved run.':'Your last run is saved.'}</span><a href={`/play/?run=${run.run.runId}`}>VIEW RUN #{run.run.runId} ↗</a></div>}
       {route.runId&&(!run||route.runId!==run.run.runId)&&<p className="entry-notices">{account?'This run is not saved in this browser. Recover it from your Dashboard.':'Connect your wallet to load your saved run.'} <a href="/dashboard/">DASHBOARD ↗</a></p>}
     </>}
-    {!arcade&&footer}
+    {dashboard&&footer}
   </div></>;
 }
