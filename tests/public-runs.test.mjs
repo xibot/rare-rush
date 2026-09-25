@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { privateKeyToAccount } from 'viem/accounts';
-import { publishRun, runPublicationMessage, MAX_PUBLIC_REPLAY_PAYLOAD_BYTES } from '../games/rare-rush/public-runs.ts';
+import { publishRun, readRunServiceResponse, RunPublicationError, runPublicationMessage, MAX_PUBLIC_REPLAY_PAYLOAD_BYTES } from '../games/rare-rush/public-runs.ts';
 import { createHumanRecording, advanceHumanRecording, exportHumanReplay } from '../games/rare-rush/replay-recorder.ts';
 import { publicationPayloadHash } from '../shared/replay-publication.ts';
 import { createReplayFeed } from '../server/replay-feed.mjs';
@@ -117,4 +117,36 @@ test('payload/response bounds and exact content identity protect the saved link'
   await assert.rejects(publishRun(base, wallet(), undefined, { fetcher: async () => new Response('x'.repeat(16_385)) }), /invalid response/);
   await assert.rejects(publishRun(base, wallet(), undefined, { fetcher: async () => Response.json({ source: base.source, tokenId: base.tokenId, collection: base.collection, seed: base.seed, difficulty: base.difficulty, player: base.player, id: '0'.repeat(64) }) }), /different run/);
   await assert.rejects(publishRun(base, wallet(), undefined, { fetcher: async () => Response.json({ error: 'https://private.example/secret' }, { status: 503 }) }), error => !error.message.includes('secret'));
+});
+
+test('hosting startup errors show a friendly retry message for feed reads and publication', async () => {
+  for (const body of ['A server error has occurred\nFUNCTION_INVOCATION_FAILED', '<html><body>Bad Gateway</body></html>', '']) {
+    await assert.rejects(readRunServiceResponse(new Response(body, { status: 500 })), error => {
+      assert(error instanceof RunPublicationError);
+      assert.equal(error.message, 'The run service is temporarily unavailable. Please try again.');
+      return true;
+    });
+  }
+  const before = JSON.stringify(replay);
+  await assert.rejects(publishRun(base, wallet(), undefined, {
+    fetcher: async () => new Response('A server error has occurred\nFUNCTION_INVOCATION_FAILED', { status: 500 }),
+  }), error => {
+    assert(error instanceof RunPublicationError);
+    assert.equal(error.message, 'The run could not be published. Your replay is still here; try again.');
+    return true;
+  });
+  assert.equal(JSON.stringify(replay), before);
+  const f = server();
+  assert.equal((await publishRun(base, wallet(), undefined, { fetcher: f.fetcher })).id, publicationPayloadHash(normalize(base)).slice(2));
+});
+
+test('shared run response reader retains safe API errors and bounds malformed or excessive bodies', async () => {
+  await assert.rejects(readRunServiceResponse(Response.json({ error: 'Replay not found.' }, { status: 404 })), /Replay not found\./);
+  for (const body of ['{', 'null', '[]', '42']) {
+    await assert.rejects(readRunServiceResponse(new Response(body)), /invalid response.*try again/i);
+  }
+  await assert.rejects(readRunServiceResponse(new Response('x'.repeat(21)), { maxBytes: 20 }), /invalid response/);
+  await assert.rejects(readRunServiceResponse(new Response('x', { status: 503, headers: { 'content-length': '21' } }), { maxBytes: 20 }), /temporarily unavailable/);
+  await assert.rejects(readRunServiceResponse(Response.json({ error: '<html>private failure</html>' }, { status: 502 })), /temporarily unavailable/);
+  assert.deepEqual(await readRunServiceResponse(Response.json({ runs: [], nextCursor: null })), { runs: [], nextCursor: null });
 });

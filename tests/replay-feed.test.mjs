@@ -207,6 +207,9 @@ test('same Testnet payload retries repair record or index failures after its imm
 
 test('explicit main/Testnet CORS works; opaque or unknown origins cannot publish', async () => {
   const f = fixture();
+  const www = await f.handle(new Request('https://www.rarerush.app/api/runs', { headers: { origin: 'https://www.rarerush.app' } }));
+  assert.equal(www.status, 200);
+  assert.equal(www.headers.get('access-control-allow-origin'), 'https://www.rarerush.app');
   const preflight = await f.handle(new Request(site + '/api/runs', { method: 'OPTIONS', headers: { origin: testnet } }));
   assert.equal(preflight.status, 204); assert.equal(preflight.headers.get('access-control-allow-origin'), testnet);
   assert.equal(preflight.headers.get('access-control-allow-credentials'), null);

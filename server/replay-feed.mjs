@@ -6,8 +6,8 @@ import { PUBLICATION_TTL_SECONDS, publicationPayloadHash, publicationTypedData }
 export const REPLAY_FEED_PREFIX = 'public-runs/v1';
 export const MAX_PUBLICATION_BYTES = 1_800_000;
 export const MAX_FEED_PAGE = 24;
-export const PUBLICATION_ORIGINS = ['https://rarerush.app', 'https://rarerush.vercel.app', 'https://testnet.rarerush.app'];
-const HOSTS = PUBLICATION_ORIGINS.slice(0, 2);
+export const PUBLICATION_ORIGINS = ['https://rarerush.app', 'https://www.rarerush.app', 'https://rarerush.vercel.app', 'https://testnet.rarerush.app'];
+const HOSTS = PUBLICATION_ORIGINS.slice(0, 3);
 const ID = /^[a-f0-9]{64}$/;
 const ADDRESS = /^0x[0-9a-f]{40}$/i;
 const DECIMAL = /^[1-9][0-9]{0,77}$/;

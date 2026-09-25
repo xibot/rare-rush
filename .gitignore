@@ -3,6 +3,7 @@ dist/
 games/*/.friendsdk/
 artifacts/
 .vercel/
+server/generated/
 .DS_Store
 .env*
 !.env.example

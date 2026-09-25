@@ -1,4 +1,4 @@
-import { context } from 'esbuild';
+import { build, context } from 'esbuild';
 import { publicTestnetSources } from './public-testnet-sources.mjs';
 import { ENGINE_SOURCE_PATHS, engineVersionFromSources } from '../infra/testnet/src/protocol.ts';
 import { buildGame } from '@rarefriends/friendsdk/build';
@@ -18,6 +18,14 @@ export async function buildRushSite({ outdir = path.join(project, 'dist'), watch
   const deployment = JSON.parse(await readFile(path.join(project,'testnet-app/src/shared/deployment.json'),'utf8'));
   const physics = Object.fromEntries(await Promise.all(ENGINE_SOURCE_PATHS.map(async name=>[name,await readFile(path.join(project,'games/rare-rush',name),'utf8')])));
   if(engineVersionFromSources(physics)!==deployment.engineVersion)throw new Error('Public replays require the approved Testnet engine.');
+  // Keep the function's mixed TS/MJS dependency graph in one JS module. Vercel's
+  // file tracer otherwise transpiles TS files without rewriting MJS imports.
+  await build({
+    absWorkingDir: project, entryPoints: ['server/replay-feed-runtime.mjs'],
+    outfile: 'server/generated/replay-feed-runtime.mjs', bundle: true,
+    platform: 'node', format: 'esm', target: 'node22', packages: 'external',
+    logLevel: 'warning',
+  });
   // Retired public showcase: also remove output left by a previous build/cache.
   await rm(path.join(outdir, 'genesis-lab'), { recursive: true, force: true });
   const game = await buildGame(path.join(project, 'games/rare-rush'), { outdir: path.join(outdir, 'play'), watch });

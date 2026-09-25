@@ -17,6 +17,38 @@ export const MAX_PUBLIC_REPLAY_PAYLOAD_BYTES = 1_799_000;
 export function runPublicationMessage(error: unknown): string {
   return error instanceof RunPublicationError ? error.message : 'The run could not be published. Your replay is still here; try again.';
 }
+
+/** The hosting platform can return plain text or HTML before the API starts.
+ * Keep those responses out of user-facing errors while retaining bounded API messages. */
+export async function readRunServiceResponse<T>(response: Response, options: { maxBytes?: number; errorMessage?: string } = {}): Promise<T> {
+  const { maxBytes = 2_500_000, errorMessage = 'The run service is temporarily unavailable. Please try again.' } = options;
+  const invalidMessage = response.ok ? 'The run service returned an invalid response. Please try again.' : errorMessage;
+  if (Number(response.headers.get('content-length')) > maxBytes || !response.body) throw new RunPublicationError(invalidMessage);
+  const reader = response.body.getReader(), decoder = new TextDecoder();
+  let bytes = 0, text = '';
+  try {
+    for (;;) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      bytes += value.byteLength;
+      if (bytes > maxBytes) throw new RunPublicationError(invalidMessage);
+      text += decoder.decode(value, { stream: true });
+    }
+    let value: unknown;
+    try { value = JSON.parse(text + decoder.decode()); }
+    catch { throw new RunPublicationError(invalidMessage); }
+    if (!value || typeof value !== 'object' || Array.isArray(value)) throw new RunPublicationError(invalidMessage);
+    if (!response.ok) {
+      const message = (value as { error?: unknown }).error;
+      throw new RunPublicationError(typeof message === 'string' && message.length > 0 && message.length <= 300
+        && !/https?:\/\/|[\r\n<>]/.test(message) ? message : errorMessage);
+    }
+    return value as T;
+  } catch (error) {
+    if (error instanceof RunPublicationError) throw error;
+    throw new RunPublicationError(errorMessage);
+  } finally { void reader.cancel().catch(() => {}); reader.releaseLock(); }
+}
 function active(options: PublishOptions) {
   if (options.signal?.aborted) throw new RunPublicationError('Saving was cancelled. Your replay is still here.');
   options.assertActive?.();
@@ -72,20 +104,8 @@ export async function publishRun(input: ReplayPublication, provider: Publication
     const response = await bounded((options.fetcher ?? fetch)(endpoint, { method: 'POST', credentials: 'omit',
       headers: { 'Content-Type': 'application/json' }, signal: controller.signal,
       body: JSON.stringify({ ...payload, authorization: { expiresAt: authorization.expiresAt, signature } }) }), 20_000, controller.signal);
-    if (Number(response.headers.get('content-length')) > 16_384 || !response.body) throw new RunPublicationError('The save service returned an invalid response.');
-    const reader = response.body.getReader(); let bytes = 0, text = ''; const decoder = new TextDecoder();
-    try {
-      for (;;) {
-        const { done, value } = await bounded(reader.read(), 20_000, controller.signal);
-        if (done) break;
-        bytes += value.byteLength;
-        if (bytes > 16_384) throw new RunPublicationError('The save service returned an invalid response.');
-        text += decoder.decode(value, { stream: true });
-      }
-    } finally { await reader.cancel().catch(() => {}); reader.releaseLock(); }
-    const saved = JSON.parse(text + decoder.decode()) as PublishedRun & { error?: string };
-    if (!response.ok) throw new RunPublicationError(typeof saved.error === 'string' && saved.error.length <= 300
-      && !/https?:\/\/|\n/.test(saved.error) ? saved.error : 'The run could not be published. Your replay is still here; try again.');
+    const saved = await bounded(readRunServiceResponse<PublishedRun>(response, { maxBytes: 16_384,
+      errorMessage: 'The run could not be published. Your replay is still here; try again.' }), 20_000, controller.signal);
     if (saved.id !== publicationPayloadHash(payload).slice(2) || saved.source !== payload.source || saved.tokenId !== payload.tokenId
       || saved.collection !== payload.collection || saved.seed !== payload.seed.toLowerCase() || saved.difficulty !== payload.difficulty
       || saved.player?.toLowerCase() !== payload.player.toLowerCase() || saved.runId !== payload.runId) {

@@ -1,2 +1,2 @@
-import { replayFeed } from '../../server/replay-feed-runtime.mjs';
+import { replayFeed } from '../../server/generated/replay-feed-runtime.mjs';
 export default { fetch: request => replayFeed.handle(request) };

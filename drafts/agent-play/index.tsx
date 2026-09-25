@@ -3,7 +3,7 @@ import { createRoot } from 'react-dom/client';
 import { formatUnits } from 'viem';
 import { SiteHeader } from '../../games/rare-rush/SiteHeader.tsx';
 import { PUBLIC_SITE, AGENT_PATH, FEED_PATH, isFeedPage } from './site-mode.ts';
-import { publishRun } from '../../games/rare-rush/public-runs.ts';
+import { publishRun, readRunServiceResponse } from '../../games/rare-rush/public-runs.ts';
 import type { ReplayPublication } from '../../shared/replay-publication.ts';
 import { BrandMark } from '../../games/rare-rush/BrandMark.tsx';
 import { FIXED_STEP } from '../../games/rare-rush/twist/engine.ts';
@@ -35,7 +35,7 @@ const fmt = (value:bigint|undefined,decimals=18) => value == null ? '—' : Numb
 const err = (error:unknown) => (error as any)?.shortMessage || (error as Error)?.message || 'Something did not connect. Try again.';
 async function request(path:string, body?:unknown) {
   const response = await fetch(path,{...(body === undefined ? {} : {method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body,(_,v)=>typeof v==='bigint'?v.toString():v)}),signal:AbortSignal.timeout(20_000)});
-  const value = await response.json(); if(!response.ok) throw new Error(value.error || 'The run service did not respond.'); return value;
+  return readRunServiceResponse<any>(response);
 }
 
 function App() {

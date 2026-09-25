@@ -18,7 +18,7 @@ The first release keeps hearts in the visitor’s browser storage. They are priv
 
 The main Vercel project uses its existing private Blob store via `BLOB_READ_WRITE_TOKEN` or `BLOB_STORE_ID`. Replays live under `public-runs/v1`, separate from the private analytics prefix. Full records and newest-first indexes are immutable. Content IDs make retrying the same publication idempotent; a durable per-wallet quota limits new records to three per minute. The API serves public record data without disclosing Blob credentials or direct private object URLs.
 
-The main build resolves committed shared Testnet source/ABI assets; it does not require ignored generated artifacts. Its engine fingerprint must match the currently approved Testnet deployment. Testnet’s deployment still uses its own preparation/build workflow and server-only verifier secrets.
+The main build resolves committed shared Testnet source/ABI assets and bundles the replay API's local TypeScript dependencies into server-only JavaScript before Vercel packages the functions; it does not require ignored generated artifacts. Its engine fingerprint must match the currently approved Testnet deployment. Testnet’s deployment still uses its own preparation/build workflow and server-only verifier secrets.
 
 `npm run dev` serves static pages locally. Public API integration uses the Vercel runtime and configured Blob storage; the local draft server keeps its separate local library. `npm run test:community` tests the production UI with isolated fixture responses, and publication tests use an in-memory store. No fixture runs are published to production.
 
@@ -28,6 +28,7 @@ The main build resolves committed shared Testnet source/ABI assets; it does not 
 npm run typecheck:rush
 npm run test:community:api
 npm run build
+node --test tests/replay-feed-deployment.test.mjs
 npm run test:community
 node --test drafts/agent-play/cli.test.ts
 ```
