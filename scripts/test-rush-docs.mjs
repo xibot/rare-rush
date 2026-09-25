@@ -38,17 +38,17 @@ try {
     assert(typography.loaded);
     assert.equal(await page.locator('body').evaluate(body => body.scrollWidth > window.innerWidth), false, 'Guide fits viewport');
     assert.equal(await page.locator('.docs-logo small').count(), 0);
-    assert.equal(await page.locator('.docs-nav a').count(), 6);
+    assert.equal(await page.locator('.docs-nav a').count(), 8);
     await page.screenshot({ path: `artifacts/docs-${width}-hero.png` });
-    assert.equal(await page.locator('.experience-card').count(), 2, 'Guide offers both live experiences');
-    assert.equal(await page.locator('.experience-card a[href="/arcade/"]').count(), 1);
-    assert.equal(await page.locator('.experience-card a[href="https://testnet.rarerush.app/"]').count(), 1);
-    assert.match(await page.locator('.experience-grid').innerText(), /SIMULATED REWARDS/);
-    assert.match(await page.locator('.experience-grid').innerText(), /PLAY → VERIFY → MINT/);
+    assert.equal(await page.locator('#start .experience-card').count(), 2, 'Guide offers both live experiences');
+    assert.equal(await page.locator('#start .experience-card a[href="/arcade/"]').count(), 1);
+    assert.equal(await page.locator('#start .experience-card a[href="https://testnet.rarerush.app/"]').count(), 1);
+    assert.match(await page.locator('#start .experience-grid').innerText(), /SIMULATED REWARDS/);
+    assert.match(await page.locator('#start .experience-grid').innerText(), /PLAY → VERIFY → MINT/);
     assert.equal(await page.locator('.direction-grid article').count(), 4);
     assert.match(await page.locator('.direction-route').innerText(), /occasional surprise, not a fixed sequence/);
     assert.match(await page.locator('.control-card').last().innerText(), /onchain claim deadline keeps counting down/);
-    await page.locator('.experience-grid').screenshot({ path: `artifacts/docs-${width}-experiences.png` });
+    await page.locator('#start .experience-grid').screenshot({ path: `artifacts/docs-${width}-experiences.png` });
     await page.locator('.direction-route').screenshot({ path: `artifacts/docs-${width}-directions.png` });
 
     const collect = page.getByRole('button', { name: 'COLLECT 5 COINS +' });

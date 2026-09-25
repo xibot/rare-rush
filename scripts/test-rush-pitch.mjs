@@ -50,10 +50,10 @@ try {
     assert.equal(await preview.getAttribute('controls'), '', 'Native playback controls are available');
     assert.equal(await preview.getAttribute('playsinline'), '', 'Mobile playback stays inline');
     assert.match(await page.locator('#pitch-video-caption').innerText(), /Recorded Testnet demo gameplay · normal speed/);
-    assert.equal(await page.locator('.pitch-playable-grid article').count(), 2);
-    assert.match(await page.locator('.pitch-playable-grid article').first().innerText(), /mainnet.*simulated/s);
-    assert.match(await page.locator('.pitch-playable-grid article').last().innerText(), /chain 46630.*no real value/s);
-    assert.equal(await page.locator('.pitch-playable-grid a').last().getAttribute('href'), 'https://testnet.rarerush.app');
+    assert.equal(await page.locator('.pitch-playable .pitch-playable-grid article').count(), 2);
+    assert.match(await page.locator('.pitch-playable .pitch-playable-grid article').first().innerText(), /mainnet.*simulated/s);
+    assert.match(await page.locator('.pitch-playable .pitch-playable-grid article').last().innerText(), /chain 46630.*no real value/s);
+    assert.equal(await page.locator('.pitch-playable .pitch-playable-grid a').last().getAttribute('href'), 'https://testnet.rarerush.app');
     assert.match(await page.locator('.pitch-future-heading').innerText(), /LIVE ON ROBINHOOD TESTNET/);
     assert.match(await page.locator('.pitch-world-intro').innerText(), /already playable/);
     assert.match(await page.locator('.pitch-economy-now').innerText(), /ARCADE \/ SESSION SIMULATION/);

@@ -84,7 +84,7 @@ function Pitch() {
 
     <main>
       <section className="pitch-hero" aria-labelledby="pitch-title">
-        <div className="pitch-hero-copy"><span className="pitch-kicker"><i/> THE RARE FRIENDS VIBEATHON PITCH</span><h1 id="pitch-title">YOUR FRIEND.<br/><em>YOUR RUN.</em></h1><p>A runner with a rare twist. Start sideways, get pulled upward, spin into a free fall—and sometimes come out running backwards. Bring your Friend. Find your rhythm in the chaos.</p><a className="pitch-button" href="/arcade/">PLAY ARCADE <span aria-hidden="true">↗</span></a><div className="pitch-hero-note"><span className="pitch-status">PLAYABLE NOW</span><span>PHONE + DESKTOP<br/>ARCADE + TESTNET</span></div></div>
+        <div className="pitch-hero-copy"><span className="pitch-kicker"><i/> THE RARE FRIENDS VIBEATHON PITCH</span><h1 id="pitch-title">YOUR FRIEND.<br/><em>YOUR RUN.</em></h1><p>A runner with a rare twist. Start sideways, get pulled upward, spin into a free fall—and sometimes come out running backwards. Play yourself or bring an agent. Save your run for everyone to watch.</p><a className="pitch-button" href="/arcade/">PLAY ARCADE <span aria-hidden="true">↗</span></a><div className="pitch-hero-note"><span className="pitch-status">PLAYABLE NOW</span><span>PHONE + DESKTOP<br/>ARCADE + TESTNET</span></div></div>
         <GameplayClip/>
       </section>
 
@@ -119,9 +119,18 @@ function Pitch() {
         <p className="pitch-small-note">Testnet minting is working today with valueless assets. Mainnet RARERUSH, liquidity, and automatic prize payouts are not live.</p>
       </section>
 
+      <section className="pitch-identity" aria-labelledby="community-title">
+        <div className="pitch-section-heading"><div><span className="pitch-kicker">LIVE / PEOPLE, AGENTS & REPLAYS</span><h2 id="community-title">Your Friend.<br/>More ways to play.</h2></div><p>Take the controls, watch Autopilot, or send your own agent. Then share the run and see how other Friends handle the twist.</p></div>
+        <div className="pitch-playable-grid">
+          <article><span className="pitch-status">AGENT PLAY</span><h3>Same Friend.<br/>A new player.</h3><p><strong>Autopilot</strong> plays in your browser with the Friend and difficulty you choose. You confirm any Testnet wallet actions.</p><p><strong>Agentic</strong> gives your own agent the <a className="pitch-text-link" href="/agent-skill/SKILL.md">rarerush skill</a> to play Arcade or Testnet. Connect its compatible wallet and configure its schedule; installing the skill alone does not do that setup.</p><a className="pitch-text-link" href="/agent-play/">EXPLORE AGENT PLAY ↗</a></article>
+          <article><span className="pitch-status">RUNS FEED</span><h3>Good run?<br/>Let it live on.</h3><p>People and agents can choose <strong>SAVE RUN</strong> after a completed Arcade or Testnet run. Wins, losses, close calls, and every rare twist can join the public feed.</p><p>Browse animated replay previews, find a Friend, and open a run to watch it in full. Tap a heart to keep a private favorite in your browser.</p><a className="pitch-text-link" href="/runs-feed/">WATCH THE RUNS FEED ↗</a></article>
+        </div>
+        <p className="pitch-small-note">Sharing is optional. SAVE RUN asks for a wallet message signature, with no transaction or gas fee, and publishes your wallet address, Friend, and replay. Testnet entry and reward claims still use transactions. Preview runs stay local. Shared wallet-signed voting is a future feature.</p>
+      </section>
+
       <WorldExpansion/>
 
-      <section className="pitch-endcap" aria-labelledby="endcap-title"><span className="pitch-kicker">06 / LESS PITCH. MORE PLAY.</span><Coin size={90}/><h2 id="endcap-title">ONE FRIEND.<br/><em>ONE MORE RUN.</em></h2><p>Give your Rare Friend a minute in the spotlight.<br/>See how far the twist takes you.</p><div className="pitch-final-actions"><a className="pitch-button" href="/arcade/">PLAY ARCADE <span aria-hidden="true">↗</span></a><a className="pitch-text-link" href="https://testnet.rarerush.app">TRY TESTNET ↗</a><a className="pitch-text-link" href="/docs/">EXPLORE THE DOCS ↗</a></div><small>Choose Genesis or Generations. Real NFT holders can play Arcade; faucet NFTs get you started on Testnet. On mobile, use your wallet’s browser.</small></section>
+      <section className="pitch-endcap" aria-labelledby="endcap-title"><span className="pitch-kicker">06 / LESS PITCH. MORE PLAY.</span><Coin size={90}/><h2 id="endcap-title">ONE FRIEND.<br/><em>ONE MORE RUN.</em></h2><p>Play it. Send an agent. Share the rush.<br/>See how far the twist takes your Friend.</p><div className="pitch-final-actions"><a className="pitch-button" href="/arcade/">PLAY ARCADE <span aria-hidden="true">↗</span></a><a className="pitch-text-link" href="https://testnet.rarerush.app">TRY TESTNET ↗</a><a className="pitch-text-link" href="/docs/">EXPLORE THE DOCS ↗</a></div><small>Choose Genesis or Generations. Real NFT holders can play Arcade; faucet NFTs get you started on Testnet. On mobile, use your wallet’s browser.</small></section>
     </main>
 
     <footer className="pitch-footer"><div><b>RARE RUSH / BY XIBOT</b><span>A PLAYABLE VIBEATHON BUILD</span></div><div><a href="https://github.com/xibot/rare-rush">EXPLORE THE SOURCE ↗</a><a href="https://github.com/spokesz/friendsdk">BUILT WITH FRIENDSDK ↗</a><a href="https://rarefriends.com/">ART & WORLD BY RARE FRIENDS ↗</a><a href="#top">BACK TO TOP ↑</a></div></footer>
