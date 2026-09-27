@@ -80,3 +80,27 @@ The local game server listens at port 4173. The test browser was installed under
 
 - Submitted on September 20, 2026 through [PR #22](https://github.com/spokesz/rarefriends-vibeathon/pull/22), adding only `submissions/rare-rush/README.md` to the event repository. The PR is open and is not a draft; organizer review and acceptance remain pending.
 - The README and PR description include the user-supplied public contacts, Economy Potential category, public source and game/pitch/guide links, reproducible setup, wallet requirements, simulated mechanics, asset credits and recorded validation. The source repository is public.
+
+## Submission refresh — September 26, 2026
+
+The existing Rare Rush entry is refreshed for four-direction gameplay, browser Autopilot, the `rarerush` agent skill/CLI, the public Runs Feed, Leaderboard and separate Testnet demonstration. The synchronized entry text is in [SUBMISSION.md](SUBMISSION.md). Arcade remains the simulated Vibeathon MVP; mainnet issuance, liquidity and funding remain future work.
+
+Checks below were re-run against gameplay commit `e4b56e28e99bcd754e26025dbe6a937d02428960` with Node.js 22.22.0. This refresh changes documentation only.
+
+| Command | Result |
+| --- | --- |
+| `npm run typecheck:rush` | Passed |
+| `npm run test:rush` | 110 tests passed |
+| `npm run test:community:api` | 22 tests passed |
+| `npm run test:community:save` | 27 tests passed |
+| `node --test agent-play/jobs.test.ts agent-play/cli.test.ts agent-play/headless-testnet.test.ts agent-play/wallet-provider.test.ts agent-play/runner.test.ts agent-play/replay-preview.test.ts agent-play/preview-plan.test.ts` | 43 tests passed |
+| `npm run check` | FriendSDK validation passed |
+| `npm run build` | Production site and server bundles built |
+
+All 202 tests passed, with zero failures, skips or cancellations. Some checks initially could not resolve ignored shared Testnet artifacts in the main checkout. After compiling the existing contract sources and running `npm --prefix testnet-app run prepare:shared`, all checks passed. Preparation verified the approved V2 engine hash and copied only its allowlisted shared files. The fresh-checkout prerequisite is `npm ci --prefix infra/testnet`, then `npm --prefix infra/testnet run compile` and `npm --prefix testnet-app run prepare:shared`; these are local build operations, not deployments.
+
+The no-wallet command `node agent-play/cli.mjs run --job agent-play/examples/preview-job.json` was executed with an isolated temporary `--jobs-dir`. It completed with 9,289 points, 160 coins, 3 hearts, 2,669 metres and side/up/down phases. The full recorded inputs were retained with the result; no production replay was published.
+
+Read-only HTTP checks returned 200 for the landing, Arcade collection page and SDK entry, Agent Play, Runs Feed, Leaderboard, hosted skill, guide, pitch, existing gameplay MP4, Testnet landing/play pages and public replay-list API. Testnet `/api/status` returned `ready: true`, chain 46630, and the current V2 game/engine identifiers. Availability checks are snapshots, not complete wallet playthroughs.
+
+RPC, wallet and publication/storage behavior in the automated suites use fixtures/mocks. No real wallet transactions, framework-specific wallet integration, deployment or fresh browser suite was performed for this documentation update. Earlier browser/local-EVM results above and in the Agent Play/Testnet guides remain historical checks rather than new results.
