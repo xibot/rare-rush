@@ -63,8 +63,9 @@ const validNotes = (notes: ChipNote[]) => {
   }
 };
 
-test('each difficulty has an original, finite arrangement with a faster pulse and distinct world/direction phrases', () => {
-  assert(TRACKS.easy.bpm < TRACKS.normal.bpm && TRACKS.normal.bpm < TRACKS.degen.bpm);
+test('each difficulty has an original, finite arrangement at a shared tempo with distinct world/direction phrases', () => {
+  assert.equal(TRACKS.normal.bpm, TRACKS.easy.bpm);
+  assert.equal(TRACKS.degen.bpm, TRACKS.easy.bpm);
   const arrangements = new Set<string>();
   for (const mode of modes) {
     const variants = new Set<string>();
@@ -246,8 +247,12 @@ test('a late browser timer schedules the next beat instead of a backlog of notes
     context.currentTime = 120;
     await new Promise(resolve => setTimeout(resolve, 60));
     const afterStall = context.sources.slice(beforeStall);
-    assert(afterStall.length > 0 && afterStall.length <= 24, 'Only a short current lookahead is rendered');
+    assert(afterStall.length <= 24, 'A short lookahead may contain a musical rest, never a backlog');
     assert(afterStall.every(source => source.starts[0] >= 120));
+    context.currentTime = 120.25;
+    await new Promise(resolve => setTimeout(resolve, 40));
+    const continued = context.sources.slice(beforeStall);
+    assert(continued.length > 0 && continued.length <= 24, 'Music continues after the rest without catching up missed bars');
     assert(audio.diagnostics.voices <= 48);
   } finally { audio.dispose(); }
 });
