@@ -28,7 +28,18 @@ async function withDeadline<T>(read: (signal: AbortSignal) => Promise<T>, outer?
 }
 
 function ArcadeChoice() {
-  return <><SiteHeader page="genesis"/><div className="genesis-entry"><main className="collection-choice"><span className="genesis-kicker">ONE WORLD. TWO WAYS TO RUSH.</span><h1>Bring your<br/><span>Rare Friend.</span></h1><p>Choose the collection you want to play with. Both use your real NFT and simulated rewards.</p><div className="collection-cards"><a href="/genesis/"><svg viewBox="0 0 60 60" width="76" height="76" aria-hidden="true"><TokenCoin size={60}/></svg><span className="genesis-kicker">THE ORIGINAL FRIENDS</span><h2>Genesis</h2><p>Free entry.<br/><strong>100× demo token rewards.</strong></p><b>PLAY GENESIS ↗</b></a><a href="/play/"><svg viewBox="0 0 60 60" width="76" height="76" aria-hidden="true"><TokenCoin size={60}/></svg><span className="genesis-kicker">GENERATION 1 AND BEYOND</span><h2>Generations</h2><p>1 demo RF per run.<br/><strong>Standard rewards + mode bonuses.</strong></p><b>PLAY GENERATIONS ↗</b></a></div><p className="genesis-caption">Connect a browser wallet on Robinhood Chain. Genesis needs an owned Genesis NFT; Generations needs an owned hardwired NFT. No funds are spent and no tokens are minted.</p></main></div><SiteFooter/></>;
+  return <><SiteHeader page="genesis"/><div className="genesis-entry"><main className="collection-choice">
+    <span className="genesis-kicker">ONE WORLD. YOUR WAY TO RUSH.</span><h1>Find your<br/><span>Rare Rush.</span></h1><p>Jump straight into Free Play, or bring your own Rare Friend.</p>
+    <a className="collection-free-play" href="/free-play/">
+      <div><span className="genesis-kicker">NO WALLET. NO SIGN-IN.</span><h2>Free Play</h2><p>Pick a sample Friend. Take the controls in Easy, Normal, or Degen with every direction twist and the full soundtrack.</p><small>Unlimited runs. Best scores stay in this browser. No tokens or entry fees.</small></div>
+      <b>FREE PLAY <span aria-hidden="true">↗</span></b>
+    </a>
+    <section id="collections" className="collection-wallet-options" aria-labelledby="collection-wallet-title">
+      <h2 id="collection-wallet-title">Play with your Rare Friend.</h2><p>Connect your wallet and choose your collection. Both use your real NFT and simulated rewards.</p>
+      <div className="collection-cards"><a href="/genesis/"><svg viewBox="0 0 60 60" width="76" height="76" aria-hidden="true"><TokenCoin size={60}/></svg><span className="genesis-kicker">THE ORIGINAL FRIENDS</span><h2>Genesis</h2><p>Free entry.<br/><strong>100× demo token rewards.</strong></p><b>PLAY GENESIS ↗</b></a><a href="/play/"><svg viewBox="0 0 60 60" width="76" height="76" aria-hidden="true"><TokenCoin size={60}/></svg><span className="genesis-kicker">GENERATION 1 AND BEYOND</span><h2>Generations</h2><p>1 demo RF per run.<br/><strong>Standard rewards + mode bonuses.</strong></p><b>PLAY GENERATIONS ↗</b></a></div>
+      <p className="genesis-caption">Connect a browser wallet on Robinhood Chain. Genesis needs an owned Genesis NFT; Generations needs an owned hardwired NFT. No funds are spent and no tokens are minted.</p>
+    </section>
+  </main></div><SiteFooter/></>;
 }
 
 function GenesisHost() {

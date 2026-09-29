@@ -2,7 +2,7 @@
 
 **Small Friend. Big Rush.**
 
-[Play Arcade](https://rarerush.app/arcade/) · [Try Testnet](https://testnet.rarerush.app/) · [Agent Play](https://rarerush.app/agent-play/) · [Leaderboard](https://rarerush.app/leaderboard/) · [Runs Feed](https://rarerush.app/runs-feed/) · [Game Guide](https://rarerush.app/docs/) · [Pitch](https://rarerush.app/pitch/)
+[Free Play](https://rarerush.app/free-play/) · [Play Arcade](https://rarerush.app/arcade/) · [Try Testnet](https://testnet.rarerush.app/) · [Agent Play](https://rarerush.app/agent-play/) · [Leaderboard](https://rarerush.app/leaderboard/) · [Runs Feed](https://rarerush.app/runs-feed/) · [Game Guide](https://rarerush.app/docs/) · [Pitch](https://rarerush.app/pitch/)
 
 Rare Rush is a browser-based arcade runner built for the Rare Friends ecosystem. Bring your Friend, collect coins, dodge obstacles, and race the timer through a world that can change direction beneath your feet.
 
@@ -10,15 +10,17 @@ A run starts as a classic side-scroller. Then comes the rare twist: an air intak
 
 Created by **XIBOT** for the [Rare Friends Vibeathon](https://github.com/spokesz/rarefriends-vibeathon).
 
-## Two ways to play
+## Three ways to play
 
-| | Arcade MVP | Play-to-mint Testnet |
-| --- | --- | --- |
-| **Play** | [rarerush.app](https://rarerush.app/arcade/) | [testnet.rarerush.app](https://testnet.rarerush.app/) |
-| **Your Friend** | Your owned Genesis or eligible Generations NFT | Free test Genesis or Generations NFT |
-| **Network** | Robinhood mainnet for ownership checks | Robinhood Testnet |
-| **Economy** | Simulated entry fees, rewards, and prize pool | Onchain test entries and verified `tRARERUSH` reward claims |
-| **Transactions** | None required to play | Test ETH for gas; test RF for Generations entries |
+| | Free Play | Arcade MVP | Play-to-mint Testnet |
+| --- | --- | --- | --- |
+| **Play** | [Free Play](https://rarerush.app/free-play/) | [Arcade](https://rarerush.app/arcade/#collections) | [Testnet](https://testnet.rarerush.app/) |
+| **Your Friend** | Choose a sample Friend | Your owned Genesis or eligible Generations NFT | Free test Genesis or Generations NFT |
+| **Network** | No wallet or sign-in | Robinhood mainnet for ownership checks | Robinhood Testnet |
+| **Economy** | No entry fees or token rewards | Simulated entry fees, rewards, and prize pool | Onchain test entries and verified `tRARERUSH` reward claims |
+| **Transactions** | None | None required to play | Test ETH for gas; test RF for Generations entries |
+
+**Free Play** is unlimited human-controlled play with a sample Friend. Choose Easy, Normal, or Degen and enjoy the full directional gameplay, music, and sound effects without a wallet or sign-in. Best scores are kept separately for each difficulty in this browser when storage is available. Free Play does not earn tokens or publish to Runs Feed.
 
 **Arcade** is the Vibeathon MVP. Connect a browser wallet, choose Genesis or Generations, and pick your difficulty. Genesis holders enter free; Generations uses an owned hardwired NFT, generation 1 or higher. All Arcade balances and rewards are simulated. You can also watch the landing-page preview without connecting a wallet.
 
@@ -26,13 +28,13 @@ Created by **XIBOT** for the [Rare Friends Vibeathon](https://github.com/spokesz
 
 Test assets have no monetary value and are separate from real Rare Friends holdings. Testnet economics are provisional; a mainnet RARERUSH token, liquidity pools, and final launch tokenomics are still in development.
 
-On mobile, open the game in a supported wallet's built-in browser.
+On mobile, Free Play works in your browser. For wallet play, open the game in a supported wallet's built-in browser.
 
 ## Agent Play and Runs Feed
 
 [Agent Play](https://rarerush.app/agent-play/) has two modes: **Autopilot** plays in your browser with the Friend you choose; **Agentic** provides a provider-neutral skill and CLI for an agent with its own wallet and schedule. Preview needs no wallet. Arcade checks real NFT ownership; Testnet uses the same entry and claim rules as human play.
 
-**SAVE RUN** shares a completed Arcade or Testnet replay in the public [Runs Feed](https://rarerush.app/runs-feed/). Your wallet signs a publication message, with no transaction or gas fee. The server recomputes the score from recorded inputs before saving. Replays include the wallet address and selected Friend; sharing is optional. Hearts are private favorites stored in each visitor’s browser.
+**SAVE RUN** shares a completed wallet-connected Arcade or Testnet replay in the public [Runs Feed](https://rarerush.app/runs-feed/). Your wallet signs a publication message, with no transaction or gas fee. The server recomputes the score from recorded inputs before saving. Replays include the wallet address and selected Friend; sharing is optional. Free Play and Preview runs stay local. Hearts are private favorites stored in each visitor’s browser.
 
 The [Leaderboard](https://rarerush.app/leaderboard/) keeps **Best of the Rush** in one place, with each Friend’s best loaded run and a watchable replay. It compares the records currently loaded, rather than claiming a complete global ranking.
 
@@ -52,11 +54,11 @@ See the [agent skill](agent-play/skills/rarerush/SKILL.md) and [community setup]
 | Normal | 90 seconds | 1× |
 | Degen | 60 seconds | 2× |
 
-Genesis adds a 100× token-reward multiplier, subject to each mode's economy and supply limits. Token multipliers do not multiply the arcade score.
+In wallet play, Genesis adds a 100× token-reward multiplier, subject to each mode's economy and supply limits. Token multipliers do not multiply the arcade score. Free Play uses the same run times without token rewards.
 
 **Controls:** Space / ↑ / W to jump; press again to double jump. Hold ↓ / S to slide. Use ← / → to adjust pace on horizontal tracks and steer in vertical sections. Touch controls are built in. See the [game guide](https://rarerush.app/docs/) for the full rules.
 
-**Audio:** MUSIC and SFX have separate controls and default to ON, with sound starting after player interaction. Mute choices are remembered in your browser when storage is available. Audio goes quiet on pause or when the page loses focus. Live Arcade, Testnet, and browser Autopilot runs support audio; feed previews, replays, and headless agents stay silent.
+**Audio:** MUSIC and SFX have separate controls and default to ON, with sound starting after player interaction. Mute choices are remembered in your browser when storage is available. Audio goes quiet on pause or when the page loses focus. Free Play, live Arcade, Testnet, and browser Autopilot runs support audio; feed previews, replays, and headless agents stay silent.
 
 ## Run locally
 
@@ -69,11 +71,12 @@ npm ci
 npm run dev
 ```
 
-Open [localhost:4173](http://localhost:4173). The preview and build need no credentials. Arcade wallet play requires an eligible NFT on Robinhood mainnet, chain `4663`.
+Open [localhost:4173](http://localhost:4173). Free Play, the preview, and the build need no credentials. Arcade wallet play requires an eligible NFT on Robinhood mainnet, chain `4663`.
 
 ```sh
 npm run typecheck:rush
 npm run test:rush
+npm run test:free-play
 npm run check
 npm run build
 ```

@@ -30,7 +30,9 @@
     "test:community": "node scripts/test-community.mjs",
     "test:community:api": "node --test tests/replay-feed.test.mjs tests/agent-testnet-proxy.test.ts",
     "test:community:save": "node --test tests/human-replay.test.ts tests/public-runs.test.mjs agent-play/publish-job.test.ts",
-    "test:community:wallet": "node scripts/test-human-run-save.mjs"
+    "test:community:wallet": "node scripts/test-human-run-save.mjs",
+    "test:free-play": "node --test tests/free-play.test.ts",
+    "test:free-play:browser": "node scripts/test-free-play.mjs"
   },
   "dependencies": {
     "@rarefriends/friendsdk": "file:rarefriends-friendsdk-0.1.2.tgz",

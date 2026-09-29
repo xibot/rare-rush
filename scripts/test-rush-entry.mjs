@@ -123,7 +123,7 @@ try {
     await home.click();
     await page.waitForURL(`${origin}/`);
     assert.equal(await page.locator('iframe').count(), 0, 'The arcade logo leaves the top-level host for the public landing');
-    await page.getByRole('link', { name: /PLAY WITH YOUR FRIEND/i }).waitFor();
+    await page.locator('.landing-cta-wallet').waitFor();
     assert.deepEqual(errors, []); assert.deepEqual(fixture.errors, []);
     await page.close();
     console.log(`${width}px: branded entry, real sprite previews, verified selection, arcade BACK/home navigation, menu reuse and disconnect passed`);

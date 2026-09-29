@@ -1,4 +1,18 @@
-# Validation — September 20, 2026
+# Validation log
+
+## Free Play — September 29, 2026
+
+- Added `/free-play/`: human-controlled sample Friends, all three difficulties, unlimited runs, per-difficulty browser bests, shared directional gameplay and audio. The mode performs no wallet discovery, ownership/RPC reads, token accounting, public replay publication, or transactions.
+- `npm run typecheck`, `npm run check`, and `npm run build`: passed. The pinned Testnet engine and contracts are unchanged.
+- Local-best, human-replay, Arcade twist, and presentation tests: 29 passed, including blocked storage, malformed scores, and preserving newer bests from another tab.
+- `RUSH_BROWSER_CHANNEL=chrome npm run test:free-play:browser`: passed at 1440, 640, 390, and 360px. Checks cover sample artwork, all difficulty choices, genuine keyboard/touch inputs, pause and blur, repeated runs, results, best-score reload, invitation links, route boundaries, and zero wallet/RPC/external requests.
+- Visually reviewed ready, gameplay, and results screens. A focused final phone check after the compact ready-screen styling confirmed the start button is fully visible without scrolling at 390 and 360px; gameplay keeps its intended aspect ratio.
+- Landing regression passed at desktop and both phone sizes, including the existing preview, reduced motion, and wallet entry gate. Updated old landing/footer selectors to match the current UI.
+- Entry-point checks passed at 1440, 800, 390, and 320px. Free Play is reachable from the landing and Arcade pages. Public saving remains a separate wallet-signed Arcade/Testnet action; guest scores cannot be submitted as wallet runs.
+- `npm run test:community:wallet`: passed all four human/Autopilot × Genesis/Generations flows, including a declined signature, retry, exact artwork, and verified replay saving. Updated the fixture to use the current owned-Friend picker and its read-only log lookup.
+- Browser checks use local builds and isolated fixtures. They do not represent real-wallet signing, public publication, or physical-device testing.
+
+## Initial Arcade — September 20, 2026
 
 - `npm run typecheck:rush`: passed. This scoped check keeps Rare Rush separate from other games being developed in this shared workspace.
 - `npm run test:rush`: 83 tests passed (38 engine, 30 economy, 15 Genesis identity).

@@ -17,8 +17,11 @@ function Landing() {
           <div className="landing-eyebrow"><span/> A LITTLE FRIEND. A LONG WAY TO GO.</div>
           <h1 id="hero-title"><span className="hero-small">SMALL FRIEND.</span><span>BIG RUSH.</span></h1>
           <p>Floating worlds. Bear coins. One big rush.<br/>Easy, Normal or Degen. How hard will you rush?</p>
-          <a className="landing-cta" href="./arcade/">PLAY WITH YOUR FRIEND <span>↗</span></a>
-          <small className="entry-caption">Genesis or Generations. Connect your wallet. Chase your best.</small>
+          <div className="landing-actions">
+            <a className="landing-cta" href="./free-play/">FREE PLAY <span aria-hidden="true">↗</span></a>
+            <a className="landing-cta landing-cta-wallet" href="./arcade/#collections">PLAY ARCADE <span aria-hidden="true">↗</span></a>
+          </div>
+          <small className="entry-caption">Free Play: no wallet, just rush.<br/>Arcade: connect with your Genesis or Generations.</small>
         </div>
         <div className="hero-preview" id="preview">
           <div className="preview-caption"><span><i/> WATCH THE RARE TWIST</span><span>01 / THE ENDLESS WORLD</span></div>
