@@ -72,46 +72,86 @@ export function circuitMusicStep(index: number, scene: MusicScene, tonic: number
   return notes;
 }
 
-// MIDNIGHT RIFT — F# natural minor. Longer phrases, a lower lead register,
-// simple minor/major triads and a spacious drum pulse provide the intensity.
-// There are no chromatic stabs, mirrored phrases, or rapid counter-melodies.
+// BREAKBEAT RUSH — F# natural minor. A syncopated bass hook and a two-step
+// drum break supply the drive at the same tempo as EASY and NORMAL. Sixteen
+// bars move from the hook to a short breakdown, rebuild, and fuller final drop.
 const Fsm: Chord = { bass: 0, tones: [0,3,7] };
 const Dmajor: Chord = { bass: -4, tones: [-4,0,3] };
-const Amajor: Chord = { bass: 3, tones: [3,7,10] };
 const Emajor: Chord = { bass: -2, tones: [-2,2,5] };
 const Bminor: Chord = { bass: -7, tones: [-7,-4,0] };
-const Csm: Chord = { bass: -5, tones: [-5,-2,2] };
-const RIFT_HARMONY = [Fsm,Dmajor,Amajor,Emajor, Fsm,Dmajor,Amajor,Emajor, Bminor,Dmajor,Fsm,Csm, Fsm,Dmajor,Amajor,Emajor];
+const RIFT_HARMONY = [Fsm,Dmajor,Emajor,Fsm, Fsm,Dmajor,Emajor,Fsm, Bminor,Dmajor,Emajor,Emajor, Fsm,Dmajor,Emajor,Fsm];
 const RIFT_MELODY: readonly Phrase[] = [
-  [[0,0,5.5],[6,3,1.5],[8,7,5.5],[14,3,1.5]],
-  [[0,8,7.5],[8,3,5.5],[14,0,1.5]],
-  [[0,7,5.5],[6,5,1.5],[8,3,7.5]],
-  [[0,5,5.5],[6,2,1.5],[8,10,7.5]],
-  [[0,12,7.5],[8,7,3.5],[12,3,3.5]],
-  [[0,8,5.5],[6,7,1.5],[8,3,7.5]],
-  [[0,7,7.5],[8,10,3.5],[12,3,3.5]],
-  [[0,5,5.5],[6,2,1.5],[8,-2,7.5]],
-  [[0,5,7.5],[8,8,7.5]],
-  [[0,12,7.5],[8,8,3.5],[12,3,3.5]],
-  [[0,7,7.5],[8,3,7.5]],
-  [[0,7,5.5],[6,10,1.5],[8,14,7.5]],
-  [[0,12,5.5],[6,7,1.5],[8,3,7.5]],
+  [[0,12,2.5],[3,7,1.5],[6,12,3.5],[10,15,1.5],[14,7,1.5]],
+  [[0,12,2.5],[3,8,1.5],[6,12,3.5],[10,15,1.5],[14,8,1.5]],
+  [[0,14,3.5],[6,17,1.5],[8,14,3.5],[12,10,3.5]],
+  [[0,12,5.5],[6,7,1.5],[10,3,3.5],[14,7,1.5]],
+  [[0,12,2.5],[3,7,1.5],[6,12,1.5],[10,15,3.5],[14,19,1.5]],
+  [[0,15,3.5],[6,12,1.5],[8,8,5.5],[14,12,1.5]],
+  [[0,14,3.5],[6,17,1.5],[8,14,3.5],[12,10,3.5]],
+  [[0,12,5.5],[6,7,1.5],[10,3,3.5]],
+  [[0,8,7.5],[8,5,7.5]],
   [[0,8,7.5],[8,12,7.5]],
-  [[0,10,5.5],[6,7,1.5],[8,3,7.5]],
-  [[0,2,7.5],[8,5,5.5],[14,2,1.5]],
+  [[0,10,5.5],[6,14,1.5],[10,17,3.5]],
+  [[0,14,3.5],[6,17,3.5],[12,10,1.5]],
+  [[0,12,2.5],[3,7,1.5],[6,12,1.5],[10,15,3.5],[14,19,1.5]],
+  [[0,15,3.5],[6,12,1.5],[8,8,5.5],[14,12,1.5]],
+  [[0,14,3.5],[6,17,1.5],[8,14,3.5],[12,10,3.5]],
+  [[0,12,5.5],[6,7,1.5],[10,3,1.5],[14,7,1.5]],
+];
+// Root/fifth/octave phrases leave pockets around the snare. Two related
+// patterns make the bass answer itself; the low and octave voices stay locked.
+const RIFT_BASS: readonly Phrase[] = [
+  [[0,0,1.6],[3,0,.7],[6,12,2.8],[10,7,1.6],[14,0,1.6]],
+  [[0,0,1.6],[2,12,1.5],[6,0,2.7],[9,7,2.5],[14,0,1.6]],
 ];
 
 export function riftMusicStep(index: number, scene: MusicScene, tonic: number, step: number): ChipNote[] {
   const tick = Math.floor(index)%16, bar = Math.floor(index/16)%16;
-  const chord = RIFT_HARMONY[bar], bridge = bar>=8 && bar<12;
+  const chord = RIFT_HARMONY[bar];
+  const breakdown = bar===8 || bar===9, build = bar===10 || bar===11, drop = bar>=12;
   const notes: ChipNote[] = [];
+  const pan = scene.direction==='left' ? .12 : -.12;
   for (const [onset,pitch,length] of RIFT_MELODY[bar]) {
-    if (tick===onset) notes.push(n('pulse',tonic+pitch,step*length,.20,scene.direction==='left'?.12:-.12));
+    if (tick===onset) notes.push(n(breakdown?'bell':'pulse',tonic+pitch,step*length,breakdown?.14:drop?.17:.15,pan));
   }
-  if (has([0,8],tick)) notes.push(n('triangle',tonic-24+chord.bass+(tick===8?7:0),step*5.5,.37));
-  if (has(bridge?[0]:[0,10],tick)) notes.push(n('kick',43,.17,scene.urgent?.51:.47));
-  if (tick===8) notes.push(n('snare',48,.15,.19,.06));
-  if (has([2,6,10,14],tick)) notes.push(n('hat',92,.035,.047,.25));
-  atmosphere(notes,tick,scene,chord,tonic,step,true);
+  const bassPhrase: Phrase = breakdown ? [[0,0,6.5],[8,7,6.5]] : RIFT_BASS[bar%2];
+  for (const [onset,pitch,length] of bassPhrase) {
+    if (tick!==onset) continue;
+    const root = tonic-24+chord.bass;
+    // A rounded sub plus a quieter octave pulse keeps the bass audible on
+    // laptop speakers. No detuning or chromatic movement against the chords.
+    notes.push(n('triangle',root+pitch,step*length,breakdown?.30:.43));
+    if (!breakdown) notes.push(n('pulse',root+12+pitch,step*Math.min(length,1.8),drop?.12:.095));
+  }
+  const kicks = breakdown ? [0] : bar%2===0 ? [0,6,10] : [0,7,10];
+  if (has(kicks,tick)) notes.push(n('kick',43,.13,breakdown?.38:scene.urgent?.58:.55));
+  if (has(breakdown?[8]:[4,12],tick)) notes.push(n('snare',48,.13,breakdown?.18:drop?.31:.28,.04));
+  // Quiet ghost hits and alternating hat accents create the break's swing;
+  // sixteenth-note details are reserved for the ends of phrases.
+  const fill = bar===7 || bar===11 || bar===15;
+  if (!breakdown && !(fill && tick===14) && has(bar%2===0?[11]:[3,14],tick))
+    notes.push(n('snare',48,.045,.075,-.12));
+  if (has(breakdown?[2,10]:[0,2,4,6,8,10,12,14],tick)) {
+    const accent = tick%4===2;
+    notes.push(n('hat',92,accent?.055:.025,breakdown?.045:accent?.095:.045,accent?.25:-.18));
+  }
+  if (!breakdown && (drop || bar%4===3) && has([7,15],tick))
+    notes.push(n('hat',92,.022,.042,-.22));
+  if (fill && has([14,15],tick))
+    notes.push(n('snare',48,.047,tick===15?.13:.095,tick===15?.12:-.12));
+
+  const chordTicks = breakdown ? [0,8] : [2,10];
+  if (has(chordTicks,tick)) {
+    for (const pitch of chord.tones)
+      notes.push(n('triangle',tonic+pitch,step*(breakdown?6.5:1.4),breakdown?.038:.045,-pan));
+  }
+  // Scene changes add one quiet chord-tone answer, leaving the bass, groove,
+  // and main hook recognizable in every direction and world.
+  if (!breakdown && tick===14 && (scene.world>0 || scene.direction!=='right')) {
+    const pitch = scene.direction==='down' || scene.direction==='left' ? chord.tones[0] : chord.tones[2];
+    const octave = scene.direction==='up' || scene.world===2 ? 12 : 0;
+    notes.push(n('bell',tonic+12+pitch+octave,step*1.4,.040,-pan));
+  }
+  if (build && bar===11 && tick===0) notes.push(n('noise',48,step*8,.075,.12));
   return notes;
 }
