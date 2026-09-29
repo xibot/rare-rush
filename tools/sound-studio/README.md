@@ -11,6 +11,8 @@ npm run audio:studio
 
 Open http://127.0.0.1:4238/. Exporting all tracks can take several minutes. Outputs go to ignored `output/audio/rare-rush-8bit/`: three stereo WAV listening mixes, sixteen WAV effects, and a ZIP download. Pass the same optional output directory to both commands with `-- /path/to/audio` to use another location. `PORT` changes the local server port.
 
+To re-export selected tracks while preserving approved effects, set `RUSH_AUDIO_TRACKS=normal,degen RUSH_AUDIO_KEEP_EFFECTS=1` before the export command. The full pack must already exist when using this option.
+
 The live mixer uses the same score and synth as the game. It lets you audition each pace, world, direction, and effect. Downloaded tracks are arranged listening mixes; actual game audio responds to gameplay. Downloaded effects use NORMAL's key; live effects follow the selected mode.
 
 The game starts silent with separate MUSIC and SFX controls. Preferences persist in that browser. Runs Feed previews, replay viewers, and headless agents stay silent.
