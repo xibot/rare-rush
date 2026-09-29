@@ -15,7 +15,7 @@ To re-export selected tracks while preserving approved effects, set `RUSH_AUDIO_
 
 The live mixer uses the same score and synth as the game. It lets you audition each pace, world, direction, and effect. Downloaded tracks are arranged listening mixes; actual game audio responds to gameplay. Downloaded effects use NORMAL's key; live effects follow the selected mode.
 
-The game starts silent with separate MUSIC and SFX controls. Preferences persist in that browser. Runs Feed previews, replay viewers, and headless agents stay silent.
+MUSIC and SFX default to ON and start after the player’s first interaction, in line with browser audio rules. Separate controls remember each player’s choices in that browser. Runs Feed previews, replay viewers, and headless agents stay silent.
 
 Audio source is in `games/rare-rush/audio/`: `score.ts` contains compositions and cues, `synth.ts` renders them with Web Audio, and `run-audio.ts` observes run state without changing game physics, inputs, random generation, or rewards.
 

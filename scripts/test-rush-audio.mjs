@@ -127,11 +127,28 @@ try {
     Object.defineProperty(document, 'hidden', { configurable: true, get: () => window.__qaHidden });
   });
   await controls.goto(origin + '/audio-qa/');
+  await controls.getByRole('button', { name: 'Mute sound', exact: true }).waitFor();
+  assert.equal(await controls.getByRole('button', { name: 'Mute sound', exact: true }).getAttribute('aria-pressed'), 'true');
+  assert.equal(await controls.getByRole('button', { name: 'Mute effects', exact: true }).getAttribute('aria-pressed'), 'true');
+  assert.equal(await controls.evaluate(() => window.__audioContexts.length), 0, 'Both channels default ON without creating a context before a gesture');
+  await controls.getByRole('button', { name: 'Start fixture run', exact: true }).click();
+  await controls.waitForFunction(() => window.__audioContexts.length === 1 && window.__audioContexts[0].state === 'running' && window.__audioSources > 0);
+  await controls.getByRole('button', { name: 'Mute sound', exact: true }).click();
+  assert.equal(await controls.getByRole('button', { name: 'Turn sound on', exact: true }).getAttribute('aria-pressed'), 'false');
+  assert.equal(await controls.getByRole('button', { name: 'Mute effects', exact: true }).getAttribute('aria-pressed'), 'true', 'Muting music leaves effects ON');
+  assert.deepEqual(await controls.evaluate(() => JSON.parse(localStorage.getItem('rare-rush-audio-v1'))), { music: false, effects: true });
+  await controls.reload();
   await controls.getByRole('button', { name: 'Turn sound on', exact: true }).waitFor();
+  assert.equal(await controls.getByRole('button', { name: 'Mute effects', exact: true }).getAttribute('aria-pressed'), 'true', 'Independent channel preferences survive reload');
   assert.equal(await controls.evaluate(() => window.__audioContexts.length), 0);
+  await controls.getByRole('button', { name: 'Mute effects', exact: true }).click();
+  assert.deepEqual(await controls.evaluate(() => JSON.parse(localStorage.getItem('rare-rush-audio-v1'))), { music: false, effects: false });
+  await controls.reload();
+  await controls.getByRole('button', { name: 'Turn sound on', exact: true }).waitFor();
+  assert.equal(await controls.getByRole('button', { name: 'Turn effects on', exact: true }).getAttribute('aria-pressed'), 'false', 'Explicit OFF preferences survive reload');
   await controls.getByRole('button', { name: 'Start fixture run', exact: true }).click();
   await controls.waitForTimeout(220);
-  assert.equal(await controls.evaluate(() => window.__audioContexts.length), 0, 'Playing with audio off creates no context');
+  assert.equal(await controls.evaluate(() => window.__audioContexts.length), 0, 'Playing with both channels explicitly OFF creates no context');
   await controls.getByRole('button', { name: 'Turn sound on', exact: true }).click();
   await controls.waitForFunction(() => window.__audioContexts.length === 1 && window.__audioContexts[0].state === 'running' && window.__audioSources > 0);
   assert.equal(await controls.getByRole('button', { name: 'Mute sound', exact: true }).getAttribute('aria-pressed'), 'true');
@@ -166,6 +183,24 @@ try {
   const disposedSources = await controls.evaluate(() => window.__audioSources);
   await controls.waitForTimeout(200);
   assert.equal(await controls.evaluate(() => window.__audioSources), disposedSources, 'Unmount disposes the browser context and scheduler');
+
+  for (const [saved, music, effects] of [
+    ['not valid JSON', true, true],
+    ['null', true, true],
+    ['{"music":"false","effects":0}', true, true],
+    ['{"music":false}', false, true],
+    ['{"effects":false}', true, false],
+  ]) {
+    await controls.evaluate(saved => localStorage.setItem('rare-rush-audio-v1', saved), saved);
+    await controls.reload();
+    const musicButton = controls.getByRole('button', { name: music ? 'Mute sound' : 'Turn sound on', exact: true });
+    await musicButton.waitFor();
+    assert.equal(await musicButton.getAttribute('aria-pressed'), String(music), `Music preference fallback for ${saved}`);
+    assert.equal(await controls.getByRole('button', { name: effects ? 'Mute effects' : 'Turn effects on', exact: true }).getAttribute('aria-pressed'), String(effects), `Effects preference fallback for ${saved}`);
+    assert.equal(await controls.evaluate(() => window.__audioContexts.length), 0, 'Reading saved preferences never creates an AudioContext');
+  }
+  // Leave both channels ON for the shared-preview isolation checks below.
+  await controls.evaluate(() => localStorage.setItem('rare-rush-audio-v1', JSON.stringify({ music: true, effects: true })));
   await controls.close();
 
   // A shared rendering component must not turn every scrolling thumbnail into

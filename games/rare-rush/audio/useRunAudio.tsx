@@ -7,8 +7,11 @@ const PREFERENCE_KEY = 'rare-rush-audio-v1';
 function readPreferences(): AudioPreferences {
   try {
     const value = JSON.parse(localStorage.getItem(PREFERENCE_KEY) ?? '{}');
-    return { music: value?.music === true, effects: value?.effects === true };
-  } catch { return { music: false, effects: false }; }
+    return {
+      music: typeof value?.music === 'boolean' ? value.music : true,
+      effects: typeof value?.effects === 'boolean' ? value.effects : true,
+    };
+  } catch { return { music: true, effects: true }; }
 }
 
 /** Own audio above a changing run/result view when its end cue should continue. */
