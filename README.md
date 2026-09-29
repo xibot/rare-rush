@@ -44,6 +44,7 @@ See the [agent skill](agent-play/skills/rarerush/SKILL.md) and [community setup]
 - **Your Friend in motion.** Play with Genesis or Generations artwork, grow as you collect coins, and spin through vertical sections.
 - **Coins worth chasing.** Flying bonus coins, shields, and magnets add opportunities along the way.
 - **Three ways to rush.** Choose a longer, gentler run or a shorter burst of Degen chaos.
+- **An original 8-bit soundtrack.** Easy's bright, bouncy **Garden Bounce**, Normal's melodic **Circuit Chase**, and Degen's dynamic bass and breaks in **Breakbeat Rush** give each difficulty its own mood, with 16 gameplay sound effects.
 
 | Difficulty | Run time | Reward multiplier |
 | --- | --- | --- |
@@ -54,6 +55,8 @@ See the [agent skill](agent-play/skills/rarerush/SKILL.md) and [community setup]
 Genesis adds a 100× token-reward multiplier, subject to each mode's economy and supply limits. Token multipliers do not multiply the arcade score.
 
 **Controls:** Space / ↑ / W to jump; press again to double jump. Hold ↓ / S to slide. Use ← / → to adjust pace on horizontal tracks and steer in vertical sections. Touch controls are built in. See the [game guide](https://rarerush.app/docs/) for the full rules.
+
+**Audio:** MUSIC and SFX have separate controls and default to ON, with sound starting after player interaction. Mute choices are remembered in your browser when storage is available. Audio goes quiet on pause or when the page loses focus. Live Arcade, Testnet, and browser Autopilot runs support audio; feed previews, replays, and headless agents stay silent.
 
 ## Run locally
 
@@ -89,6 +92,7 @@ The repository contains the Arcade site, community pages, separately deployed Te
 | --- | --- |
 | [`games/rare-rush/`](games/rare-rush/) | Game, artwork rendering, economy, and site pages |
 | [`games/rare-rush/twist/`](games/rare-rush/twist/) | Directional gameplay and scene rendering |
+| [`games/rare-rush/audio/`](games/rare-rush/audio/) | Original 8-bit scores, synthesized effects, and audio controls |
 | [`agent-play/`](agent-play/) | Shared Agent Play UI, replay viewer, and headless job runner |
 | [`server/`](server/) | Public replay API and private analytics services |
 | [`testnet-app/`](testnet-app/) | Testnet UI and replay verifier |
@@ -118,6 +122,8 @@ For playtest reports, include Arcade or Testnet, your device/browser, difficulty
 ## Credits
 
 Game design and development by **XIBOT**, building on the **Rare Friends** ecosystem. Rare Friends retains ownership of its character artwork.
+
+The soundtrack and gameplay effects are original Rare Rush compositions and synthesis, generated in the browser with Web Audio.
 
 Rare Friends character artwork, world assets, token artwork, and SDK resources are credited to their creators and used under the applicable [FriendSDK notices](https://github.com/spokesz/friendsdk/blob/main/NOTICE.md). See [asset provenance](games/rare-rush/README.md#assets-and-provenance) and [font licenses](games/rare-rush/assets/fonts/provenance.md) for details.
 

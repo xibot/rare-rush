@@ -36,7 +36,10 @@ The preview's public artwork reads are cached in `landing/preview-art.json`, wit
 - Flying surprise coins use the same pixel-bear artwork at 60 logical pixels, twice the ordinary coin's 30-pixel display size. They award 10× the selected Friend’s current ordinary token rate, subject to remaining supply. Each is still one pickup: one growth increment, one combo increment and the ordinary coin's score award. On classic tracks the first wave spawns after 4–6 active seconds, then every 10–15 seconds while enough flight time remains; a wave occasionally contains a staggered pair. They fly at 1.15× current world-scroll speed + 25 logical pixels/second, with a gentle vertical bob. Shafts add gently swaying bonus coins along the barrier openings, using the same 10× reward and single-pickup accounting.
 - S: one-hit shield lasting up to 9 seconds. M: coin magnet lasting 8 seconds, attracting coins within 155 logical pixels.
 - Garden Commons, Circuit Courtyard and Crystal Steps arrive at each third of the selected run duration. The world generates indefinitely until the run ends. Seeded coin routes become more scattered in harder modes, stay within double-jump height, and are kept out of obstacle collision boxes.
-- Sound starts muted; FX OFF disables background parallax, sprite animation and decorative animation. Obstacles still move so the runner remains playable.
+- MUSIC and SFX have separate controls and default to ON. Sound begins after player interaction, and mute choices are remembered in the browser when storage is available. Pausing, switching away from the tab, or leaving the page silences audio.
+- FX OFF disables background parallax, sprite animation and decorative animation. Obstacles still move so the runner remains playable.
+
+Each difficulty has an original 8-bit track: Easy's **Garden Bounce** is bright and bouncy, Normal's **Circuit Chase** is melodic, and Degen's **Breakbeat Rush** brings dynamic bass and breakbeats. Sixteen synthesized gameplay effects cover movement, pickups, damage, direction changes, the countdown, and results. Audio supports live Arcade, Testnet, and browser Autopilot runs; feed previews, replays, and headless agents stay silent. The scores, Web Audio synth, and shared controls live in [`audio/`](audio/).
 
 ## Exact simulated economy
 
@@ -53,9 +56,11 @@ The separately deployed [Testnet build](https://github.com/xibot/rare-rush/tree/
 ```sh
 npm run typecheck:rush
 npm run test:rush
+npm run test:audio
 npm run check
 npm run build
 npx playwright install chromium
+npm run test:audio:browser
 npm run test:browser
 npm run test:landing
 npm run test:docs
@@ -78,7 +83,7 @@ The direction engine and scene live in `twist/`, shared by the playable main Arc
 
 - Canonical animated Rare Friends Generations sprites: SDK registry reader; the selected Friend's original 16×16 bitmap frames are rendered as black pixel masks with a light halo, without recoloring or substitution. Source: [FriendSDK](https://github.com/spokesz/friendsdk), pinned commit `762d6f58a73ace723f7f82dc1a61bfa036c21edc`, package v0.1.2. Artwork usage follows its [NOTICE](https://github.com/spokesz/friendsdk/blob/main/NOTICE.md).
 - Genesis portrait artwork: read directly from the verified canonical Genesis token’s `tokenURI` on Robinhood Chain. The original SVG is rendered as an image inside the Genesis sandbox, without inserting metadata as DOM markup. Ownership checks use the canonical contract `0x116EaA62241751E0c98dA43d458600c6C17cD361`.
-- Sounds: FriendSDK's synthesized sound kit, with its bundled provenance and licenses.
+- Music and sound effects: original Rare Rush scores and synthesis in [`audio/`](audio/), generated with Web Audio without recordings or samples. Rare Friends artwork and the bundled SDK retain their separate notices and credits.
 - World: canonical monochrome FriendSDK `renderWorld` output for all six island families: Garden Commons, Orbital Array, Tidal Islands, Circuit Courtyard, Rooftop Hangout and Crystal Steps. Complete and loading variants scroll in a stable sequence with varied heights and sizes. Trees, planters, flowers, benches, reeds, terminals, pipes, tanks, antennas, vents, circuits, rocks and crystals use original SDK `renderProp` artwork. Scenery is reused under the SDK artwork notice.
 - Obstacles: original SDK crystal, crate and bridge paths, cropped and sized for the runner's collision geometry. Ordinary coins, larger flying bonus coins and the shared **RARERUSH** header reuse the exact paths and colors of the [official $RAREFRIENDS pixel-bear token SVG](https://rarefriends.com/art/token.svg). Collectibles animate with horizontal rotation; bonus coins retain the same artwork at twice the display size. Character masks use the exact one-pixel white halo and black bitmap treatment from the SDK renderer.
 - UI and horizontal running lane: adapted for Rare Rush using the SDK's black/white/`#CCFF00` palette, native dither/grid/hatch patterns and square controls. Typography uses Silkscreen for pixel headings and Sometype Mono Variable for body text, using the exact font files from the official Rare Friends site, bundled locally with their SIL Open Font Licenses. See [brand sources](../../docs/RARE_RUSH_BRAND.md) and [font provenance](assets/fonts/provenance.md).
