@@ -17,7 +17,7 @@ const files = [
   'games/rare-rush/public-runs.ts', 'shared/replay-publication.ts',
   'shared/site-footer.ts', 'shared/site-footer.css',
   'games/rare-rush/engine.ts', 'games/rare-rush/difficulty.ts',
-  ...['score.ts', 'synth.ts', 'run-audio.ts', 'useRunAudio.tsx', 'audio.css'].map(name => `games/rare-rush/audio/${name}`),
+  ...['score.ts', 'tracks.ts', 'synth.ts', 'run-audio.ts', 'useRunAudio.tsx', 'audio.css'].map(name => `games/rare-rush/audio/${name}`),
   ...['engine.ts', 'DirectionScene.tsx', 'presentation.ts', 'VerticalWorld.tsx', 'TrackGate.tsx', 'transition-motion.ts'].map(name => `games/rare-rush/twist/${name}`),
   'games/rare-rush/WorldArt.tsx', 'games/rare-rush/RunnerArt.tsx', 'games/rare-rush/CanonicalArt.tsx',
   'games/rare-rush/genesis/GenesisRunnerSprite.tsx', 'games/rare-rush/genesis/bodies.ts',

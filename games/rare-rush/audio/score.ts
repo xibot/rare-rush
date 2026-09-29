@@ -1,4 +1,5 @@
 /** Original Rare Rush compositions. No recordings, samples, or game RNG are used. */
+import { circuitMusicStep, riftMusicStep } from './tracks.ts';
 export type AudioMode = 'easy' | 'normal' | 'degen';
 export type AudioDirection = 'right' | 'up' | 'down' | 'left';
 export type ChipVoice = 'pulse' | 'triangle' | 'bell' | 'kick' | 'snare' | 'hat' | 'noise';
@@ -17,36 +18,23 @@ export interface MusicScene { world: number; direction: AudioDirection; urgent: 
 
 export const TRACKS = {
   easy: { title: 'Garden Bounce', bpm: 132, root: 60, scale: [0, 2, 3, 5, 7, 9, 10], progression: [0, 3, 5, 4, 0, 3, 1, 4] },
-  normal: { title: 'Circuit Rush', bpm: 156, root: 62, scale: [0, 2, 3, 5, 7, 8, 10], progression: [0, 5, 3, 4, 0, 2, 5, 4] },
-  degen: { title: 'Crystal Overdrive', bpm: 184, root: 66, scale: [0, 2, 3, 5, 7, 8, 10], progression: [0, 0, 5, 4, 3, 5, 1, 4] },
+  normal: { title: 'Circuit Chase', bpm: 156, root: 62 },
+  degen: { title: 'Rift Riot', bpm: 184, root: 66 },
 } as const;
 
-// Four hand-written call/response phrases per track, in scale degrees. -99 is a rest.
+// The approved EASY score is preserved. Its four phrases use scale degrees;
+// NORMAL and DEGEN have independent compositions in tracks.ts.
 const REST = -99;
-const MELODIES: Record<AudioMode, readonly (readonly number[])[]> = {
-  easy: [
+const GARDEN_MELODIES = [
     [0,REST,2,REST,4,REST,7,REST,6,REST,4,REST,2,REST,4,REST],
     [0,REST,2,REST,3,REST,4,REST,2,REST,0,REST,1,REST,2,REST],
     [4,REST,7,REST,6,REST,4,REST,2,REST,4,REST,1,REST,REST,REST],
     [3,REST,2,REST,1,REST,0,REST,-1,REST,1,REST,2,REST,4,REST],
-  ],
-  normal: [
-    [0,REST,7,4,REST,2,4,REST,6,REST,7,6,4,REST,2,REST],
-    [0,2,REST,4,3,REST,2,0,REST,2,4,REST,7,6,REST,4],
-    [4,REST,6,7,REST,9,7,6,4,REST,2,4,REST,6,4,REST],
-    [3,2,REST,0,-1,REST,1,2,4,REST,3,2,1,REST,-1,REST],
-  ],
-  degen: [
-    [0,7,4,7,0,7,2,4,6,7,6,4,2,REST,4,6],
-    [0,2,4,7,6,4,2,0,3,4,6,7,9,REST,7,6],
-    [4,7,9,7,6,4,2,4,7,9,11,9,7,REST,6,4],
-    [3,2,0,-1,1,2,4,6,4,3,2,1,0,REST,-1,REST],
-  ],
-};
+] as const;
 
 export const sixteenthSeconds = (mode: AudioMode) => 60 / TRACKS[mode].bpm / 4;
-const degree = (mode: AudioMode, value: number) => {
-  const scale = TRACKS[mode].scale;
+const gardenDegree = (value: number) => {
+  const scale = TRACKS.easy.scale;
   return scale[((value % 7) + 7) % 7] + Math.floor(value / 7) * 12;
 };
 const note = (voice: ChipVoice, midi: number, duration: number, volume: number, pan = 0, at = 0, endMidi?: number): ChipNote =>
@@ -54,43 +42,45 @@ const note = (voice: ChipVoice, midi: number, duration: number, volume: number, 
 
 /** One sixteenth of a 16-bar arrangement; callers choose when to schedule it. */
 export function musicStep(mode: AudioMode, index: number, scene: MusicScene): ChipNote[] {
-  const track = TRACKS[mode], tick = Math.floor(index) % 16;
+  if (mode === 'normal') return circuitMusicStep(index, scene, TRACKS.normal.root, sixteenthSeconds(mode));
+  if (mode === 'degen') return riftMusicStep(index, scene, TRACKS.degen.root, sixteenthSeconds(mode));
+  const track = TRACKS.easy, tick = Math.floor(index) % 16;
   const bar = Math.floor(index / 16) % 16, chord = track.progression[bar % 8];
   const step = sixteenthSeconds(mode), world = Math.max(0, Math.min(2, scene.world));
   const vertical = scene.direction === 'up' || scene.direction === 'down';
   const breakdown = bar >= 8 && bar < 10 && !scene.urgent;
   const notes: ChipNote[] = [];
-  const root = track.root + degree(mode, chord);
-  const melody = MELODIES[mode][bar % 4];
+  const root = track.root + gardenDegree(chord);
+  const melody = GARDEN_MELODIES[bar % 4];
   const melodyTick = scene.direction === 'left' ? 15 - tick : tick;
   const value = melody[melodyTick];
 
   if (value !== REST && !breakdown) {
-    const pitch = track.root + 12 + degree(mode, chord + value);
-    notes.push(note('pulse', pitch, step * (mode === 'easy' ? 1.65 : .78), .17, -.16));
+    const pitch = track.root + 12 + gardenDegree(chord + value);
+    notes.push(note('pulse', pitch, step * 1.65, .17, -.16));
     // Crystal world answers the hook with a quiet, delayed octave sparkle.
     if (world === 2 && tick % 4 === 0) notes.push(note('bell', pitch + 12, step * 1.25, .048, .38, step * .65));
   }
 
-  const bassHit = mode === 'easy' ? tick % 4 === 0 || tick === 10 : mode === 'normal' ? tick % 2 === 0 || tick === 11 : tick % 2 === 0 || tick === 7 || tick === 15;
+  const bassHit = tick % 4 === 0 || tick === 10;
   if (bassHit) {
     const bassDegree = tick === 14 || tick === 15 ? chord - 1 : chord + (tick === 6 || tick === 10 ? 4 : tick === 8 ? 7 : 0);
-    notes.push(note('triangle', track.root - 24 + degree(mode, bassDegree), step * (mode === 'easy' ? 2.3 : 1.25), .36));
+    notes.push(note('triangle', track.root - 24 + gardenDegree(bassDegree), step * 2.3, .36));
   }
 
-  if (tick === 0 || tick === 8 || (mode !== 'easy' && tick === 6) || (mode === 'degen' && (tick === 3 || tick === 14)))
+  if (tick === 0 || tick === 8)
     notes.push(note('kick', 43, .14, .5));
   if (tick === 4 || tick === 12) notes.push(note('snare', 48, .12, .20, .07));
-  if (tick % 2 === 0 || (mode === 'degen' && !breakdown) || (scene.urgent && tick > 11))
+  if (tick % 2 === 0 || (scene.urgent && tick > 11))
     notes.push(note('hat', 92, tick % 4 === 2 ? .064 : .026, tick % 4 === 2 ? .11 : .062, tick % 4 === 0 ? -.3 : .3));
 
   // Garden: offbeat chord chips. Circuit: running arpeggio. Crystal: octave answers.
   if (world === 0 && !vertical && tick % 4 === 2) {
-    for (const offset of [0, 2, 4]) notes.push(note('triangle', track.root + degree(mode, chord + offset), step * .7, .046, .22));
-  } else if ((tick % 2 === 0 || (vertical && mode === 'degen')) && (world > 0 || vertical || breakdown)) {
+    for (const offset of [0, 2, 4]) notes.push(note('triangle', track.root + gardenDegree(chord + offset), step * .7, .046, .22));
+  } else if (tick % 2 === 0 && (world > 0 || vertical || breakdown)) {
     const order = scene.direction === 'down' || scene.direction === 'left' ? [7, 4, 2, 0] : [0, 2, 4, 7];
-    const arp = order[Math.floor(tick / (mode === 'degen' && vertical ? 1 : 2)) % 4];
-    notes.push(note('bell', track.root + 12 + degree(mode, chord + arp), step * .66, breakdown ? .13 : .067, .28));
+    const arp = order[Math.floor(tick / 2) % 4];
+    notes.push(note('bell', track.root + 12 + gardenDegree(chord + arp), step * .66, breakdown ? .13 : .067, .28));
   }
 
   // A short turn-around every fourth bar; the last seconds add a busier backbeat.
