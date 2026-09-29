@@ -104,3 +104,16 @@ The no-wallet command `node agent-play/cli.mjs run --job agent-play/examples/pre
 Read-only HTTP checks returned 200 for the landing, Arcade collection page and SDK entry, Agent Play, Runs Feed, Leaderboard, hosted skill, guide, pitch, existing gameplay MP4, Testnet landing/play pages and public replay-list API. Testnet `/api/status` returned `ready: true`, chain 46630, and the current V2 game/engine identifiers. Availability checks are snapshots, not complete wallet playthroughs.
 
 RPC, wallet and publication/storage behavior in the automated suites use fixtures/mocks. No real wallet transactions, framework-specific wallet integration, deployment or fresh browser suite was performed for this documentation update. Earlier browser/local-EVM results above and in the Agent Play/Testnet guides remain historical checks rather than new results.
+
+## Original audio release — September 28, 2026
+
+The approved soundtrack is Garden Bounce (Easy), Circuit Chase (Normal) and Breakbeat Rush (Degen), with sixteen synthesized game cues. The three scores are separate compositions at 132 BPM. Music follows each run’s mode, world and direction without changing game state. The shared integration covers Arcade, Testnet and browser Autopilot; saved replay viewers, feed previews and headless agents stay silent.
+
+- `npm run test:audio`: all 10 tests passed for the final compositions, note bounds, independent audio buses, voice limits, lazy initialization, pause/resume/disposal, result cues, effect throttling, late scheduler recovery and unchanged frozen gameplay state.
+- `npm run test:audio:browser`: passed in local Chrome after the default-ON update. Actual Web Audio rendering produced finite stereo samples with no clipping. Browser checks covered MUSIC/SFX initially ON without an AudioContext, activation on the first play interaction, independent mute choices surviving reload, malformed preference fallbacks, background/pause/unmount silence and silent feed/leaderboard previews.
+- TypeScript and the main production build passed. The Testnet build passed its unchanged V2 engine fingerprint and allowlisted shared-file checks.
+- Main source `af6e7ad2dd86b9b00e2e77a3f9432c04e3a80376` and Testnet source `5cccfa9` were pushed to GitHub. Vercel reported both default-ON releases READY and assigned `rarerush.app` and `testnet.rarerush.app` (deployment IDs `dpl_76dHMq3qx3ZPdSkAvB4ordmc18uD` and `dpl_EWsiBuLfKrgQTexjKUZBVhwM8JVB`).
+
+These are audio and release checks, not new real-wallet playthroughs. No contracts, reward rules, game physics or replay protocol changed. The earlier broad validation results remain dated records of their respective revisions.
+
+The accompanying audio documentation refresh also passed `npm run typecheck`, `npm run build`, `npm run test:docs` in Chrome at 1440, 390 and 360 pixels, and `npm run test:pitch` in Chrome at 1440, 768, 390 and 360 pixels. The existing page suites checked responsive layout, navigation, fonts, interactive content, silent pitch video playback, reduced-motion behavior and public-file boundaries. This refresh updates the Docs, Pitch, README, credits and existing submission copy without changing page styling or gameplay.
