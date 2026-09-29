@@ -1,3 +1,4 @@
+import { useEffect } from 'react';
 import { createRoot } from 'react-dom/client';
 import { TokenCoin } from '../CanonicalArt';
 import { SiteHeader } from '../SiteHeader';
@@ -7,6 +8,24 @@ import { DIFFICULTIES, DIFFICULTY_ORDER } from '../difficulty';
 import './landing.css';
 
 function Landing() {
+  useEffect(() => {
+    // Cross-page fragment navigation happens before React creates the section.
+    // Restore it after the content and fonts have established the final layout.
+    const hash = window.location.hash;
+    if (!hash) return;
+    let id: string;
+    try { id = decodeURIComponent(hash.slice(1)); } catch { return; }
+    const target = document.getElementById(id);
+    if (!target) return;
+    let cancelled = false;
+    void document.fonts.ready.then(() => {
+      if (!cancelled && window.location.hash === hash) {
+        target.scrollIntoView({ block: 'start', behavior: 'instant' });
+      }
+    });
+    return () => { cancelled = true; };
+  }, []);
+
   return <>
     <SiteHeader page="landing"/>
     <div className="rush-landing">

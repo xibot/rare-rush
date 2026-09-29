@@ -133,3 +133,11 @@ The approved soundtrack is Garden Bounce (Easy), Circuit Chase (Normal) and Brea
 These are audio and release checks, not new real-wallet playthroughs. No contracts, reward rules, game physics or replay protocol changed. The earlier broad validation results remain dated records of their respective revisions.
 
 The accompanying audio documentation refresh also passed `npm run typecheck`, `npm run build`, `npm run test:docs` in Chrome at 1440, 390 and 360 pixels, and `npm run test:pitch` in Chrome at 1440, 768, 390 and 360 pixels. The existing page suites checked responsive layout, navigation, fonts, interactive content, silent pitch video playback, reduced-motion behavior and public-file boundaries. This refresh updates the Docs, Pitch, README, credits and existing submission copy without changing page styling or gameplay.
+
+## Cross-page How to Play navigation — September 29, 2026
+
+The landing now restores its initial URL fragment after React renders the target and local fonts finish loading. This fixes navigation from other pages arriving at the top instead of the How to Play section.
+
+- `npm run typecheck`: passed.
+- `RUSH_BROWSER_CHANNEL=chrome npm run test:anchors`: passed against an isolated production build. Actual navbar clicks from Docs, Pitch, Arcade, Free Play, Agent Play, Runs Feed, Leaderboard, Genesis and the Generations SDK entry reached the section with delayed JavaScript loading.
+- Direct fragment loads and reloads passed at 1440px and 390px with delayed fonts. Same-page and repeated clicks, reduced motion, and ordinary homepage visits retaining their top position passed. All checked pages had no uncaught browser errors.
