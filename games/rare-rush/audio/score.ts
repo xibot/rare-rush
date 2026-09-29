@@ -18,8 +18,8 @@ export interface MusicScene { world: number; direction: AudioDirection; urgent: 
 
 export const TRACKS = {
   easy: { title: 'Garden Bounce', bpm: 132, root: 60, scale: [0, 2, 3, 5, 7, 9, 10], progression: [0, 3, 5, 4, 0, 3, 1, 4] },
-  normal: { title: 'Circuit Chase', bpm: 156, root: 62 },
-  degen: { title: 'Rift Riot', bpm: 184, root: 66 },
+  normal: { title: 'Circuit Chase', bpm: 132, root: 62 },
+  degen: { title: 'Midnight Rift', bpm: 132, root: 66 },
 } as const;
 
 // The approved EASY score is preserved. Its four phrases use scale degrees;
