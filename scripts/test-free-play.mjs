@@ -1,9 +1,10 @@
 import assert from 'node:assert/strict';
-import { mkdir, mkdtemp, rm, writeFile } from 'node:fs/promises';
+import { mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { chromium } from 'playwright';
+import { decodeGenerationSprites, spriteFrame } from '@rarefriends/friendsdk/sprites';
 import { buildRushSite, createRushSiteServer } from './rush-site.mjs';
 
 // Exercise the public build and the real manual runner. Virtual browser time
@@ -14,6 +15,14 @@ const artifacts = path.join(repo, 'artifacts/free-play');
 await mkdir(artifacts, { recursive: true });
 const modes = [['easy', 120], ['normal', 90], ['degen', 60]];
 const reports = [];
+const cachedArt = JSON.parse(await readFile(path.join(repo, 'games/rare-rush/landing/preview-art.json'), 'utf8'));
+const source = cachedArt.friends.find(friend => friend.tokenId === '42' || friend.tokenId === 42);
+const chosenArt = decodeGenerationSprites(BigInt(source.tokenId), source.familyId, source.seed,
+  source.frames.map(BigInt), cachedArt.provenance.manifest);
+const pixelPath = rows => rows.flatMap((row, y) => [...row].flatMap((pixel, x) =>
+  pixel === '#' ? [`M${x} ${y}h1v1h-1z`] : [])).join('');
+const chosenFrontPixels = pixelPath(spriteFrame(chosenArt, 'down', false, 0).frame.rows);
+const chosenRunningPixels = pixelPath(spriteFrame(chosenArt, 'right', false, 0).frame.rows);
 let built, server, browser;
 
 async function installOfflineGuard(page, origin) {
@@ -146,22 +155,33 @@ try {
     await page.goto(`${origin}/free-play/`);
     const samples = page.getByTestId('sample-friend');
     await samples.first().waitFor();
-    assert(await samples.count() >= 2, 'Players can choose from multiple cached sample Friends');
+    assert.equal(await samples.count(), 12, 'Players can choose six Genesis and six Generations samples');
+    for (const collection of ['genesis', 'generations']) {
+      assert.equal(await samples.and(page.locator(`[data-collection="${collection}"]`)).count(), 6,
+        `The picker offers six ${collection} Friends`);
+    }
+    const back = page.getByRole('link', { name: /BACK TO ARCADE/ });
+    assert.equal(await back.getAttribute('href'), '/arcade/');
+    const backBox = await assertTouchTarget(back);
+    const kickerBox = await page.locator('.free-play-kicker').boundingBox();
+    assert(backBox.y + backBox.height <= kickerBox.y + 1, 'Back to Arcade sits above You’re the Player');
+    const chosenSample = samples.and(page.locator('[data-collection="generations"][data-token-id="42"]'));
     await page.evaluate(() => document.fonts.ready);
     const root = page.locator('.rare-rush');
     await assertFits(page, root, 'sample selection');
-    await assertTouchTarget(samples.nth(1));
-    const chosenPixels = await samples.nth(1).locator('path[fill="#000000"]').getAttribute('d');
+    await assertTouchTarget(chosenSample);
+    assert.equal(await chosenSample.locator('path[fill="#000000"]').getAttribute('d'), chosenFrontPixels,
+      'Generations cards show canonical front-facing art');
     await page.screenshot({ path: path.join(artifacts, `${width}-samples.png`), fullPage: true });
-    await samples.nth(1).click();
+    await chosenSample.click();
     await page.getByRole('button', { name: /LET’S RUSH/ }).waitFor();
     assert.equal(await root.getAttribute('data-screen'), 'ready');
-    assert.equal(await page.locator('.free-play-game').getAttribute('aria-label'), 'Sample Friend #42 selected. Free Play game.');
+    assert.match(await page.locator('.free-play-game').getAttribute('aria-label'), /Sample Friend #42 selected\. Free Play game\.$/);
     assert.equal(await page.locator('iframe').count(), 0, 'The free runner loads directly without a wallet host');
     const pixels = root.locator('[data-character="friend"] path[fill="#000000"]');
     assert(await pixels.count() > 0, 'The selected Friend has real bitmap-derived pixel art');
     assert((await pixels.first().getAttribute('d')).length > 100, 'Friend art contains a real pixel silhouette');
-    assert.equal(await pixels.first().getAttribute('d'), chosenPixels, 'The runner renders the sample Friend the player selected');
+    assert.equal(await pixels.first().getAttribute('d'), chosenRunningPixels, 'The runner retains the selected Friend’s canonical side-facing gameplay art');
     await assertFreeUI(root);
     await assertFits(page, root, 'ready');
 
@@ -281,16 +301,84 @@ try {
     await guard.verify();
 
     await page.reload();
-    await samples.nth(1).click();
+    await chosenSample.click();
     await page.getByRole('button', { name: /LET’S RUSH/ }).waitFor();
     await page.getByRole('button', { name: new RegExp(`^${difficulty} difficulty$`, 'i') }).click();
     assert.equal(Number(await root.locator('[data-local-best]').getAttribute('data-local-best')), best,
       'An earned best survives a full page reload');
     await guard.verify();
+    if (width === 1440 || width === 390) {
+      await page.getByRole('button', { name: 'Choose another sample Friend', exact: true }).click();
+      const genesisSample = samples.and(page.locator('[data-collection="genesis"]')).first();
+      await genesisSample.waitFor();
+      const genesisId = await genesisSample.getAttribute('data-token-id');
+      const portrait = genesisSample.locator('img');
+      const portraitUrl = await portrait.getAttribute('src');
+      assert.match(portraitUrl, /^data:image\//, 'Genesis sample artwork is locally cached');
+      assert(await portrait.evaluate(image => image.complete && image.naturalWidth > 0),
+        'The Genesis front portrait decodes successfully');
+      await genesisSample.click();
+      await page.getByRole('button', { name: /LET’S RUSH/ }).waitFor();
+      assert.match(await page.locator('.free-play-game').getAttribute('aria-label'), new RegExp(`Genesis #${genesisId} selected`));
+      const genesisArt = root.locator('[data-genesis-art="true"]');
+      assert(await genesisArt.count() > 0, 'The actual Genesis portrait is attached to its runner body');
+      assert.equal(await genesisArt.first().getAttribute('href'), portraitUrl,
+        'The Genesis runner uses the exact portrait selected in the picker');
+      assert(await root.locator('[data-genesis-body-pixels]').count() > 0, 'Genesis has its animated runner body');
+      await page.getByRole('button', { name: /^degen difficulty$/i }).click();
+      await page.getByRole('button', { name: /LET’S RUSH/ }).click();
+      await page.clock.runFor(80);
+      const genesisCharacter = root.locator('[data-character="friend"]');
+      const genesisStartY = Number(await genesisCharacter.getAttribute('data-screen-y'));
+      if (mobile) await page.getByRole('button', { name: 'Jump, tap twice to double jump', exact: true }).tap();
+      else { await root.locator('.world-svg').focus(); await page.keyboard.press('Space'); }
+      await page.clock.runFor(160);
+      assert(Number(await genesisCharacter.getAttribute('data-screen-y')) < genesisStartY - 10,
+        'Manual controls move the selected Genesis character');
+      await assertFreeUI(root);
+      await assertFits(page, root, 'Genesis running');
+      await page.screenshot({ path: path.join(artifacts, `${width}-genesis-running.png`), fullPage: true });
+      await finishRun(page, root, 60);
+      assert(readScore(await root.locator('.result-score').innerText()) > 0, 'A real Genesis run earns a score');
+      await assertFreeUI(root);
+      await assertInvitation(page);
+      await guard.verify();
+    }
     reports.push({ width, height, difficulty, firstScore, secondScore, best,
       requests: guard.requests.map(request => ({ ...request, url: request.url.replace(origin, '') })) });
     await context.close();
     console.log(`${width}px ${difficulty}: local samples, all difficulty choices, manual ${mobile ? 'touch' : 'keyboard'} input, pause/blur, results, retry and persistent best passed`);
+  }
+
+  for (const width of [1440, 390]) {
+    const context = await browser.newContext({ viewport: { width, height: 1000 }, serviceWorkers: 'block' });
+    const page = await context.newPage();
+    const guard = await installOfflineGuard(page, origin);
+    await page.goto(`${origin}/arcade/`);
+    const card = page.locator('.collection-free-play');
+    const cta = card.locator('b');
+    await card.waitFor();
+    await page.mouse.move(0, 0);
+    assert.equal(await card.evaluate(element => getComputedStyle(element).borderTopColor), 'rgb(255, 255, 255)',
+      'Free Play card has the same default white border as the wallet collection cards');
+    assert.equal(await card.evaluate(element => getComputedStyle(element).boxShadow), 'none',
+      'Free Play card has a single flat outline like the wallet collection cards');
+    const buttonColors = await cta.evaluate(element => {
+      const style = getComputedStyle(element); return { background: style.backgroundColor, color: style.color };
+    });
+    assert.deepEqual(buttonColors, { background: 'rgb(204, 255, 0)', color: 'rgb(0, 0, 0)' });
+    await card.hover();
+    assert.equal(await card.evaluate(element => getComputedStyle(element).borderTopColor), 'rgb(204, 255, 0)',
+      'Hover changes only the card outline to lime');
+    await cta.hover();
+    assert.deepEqual(await cta.evaluate(element => {
+      const style = getComputedStyle(element); return { background: style.backgroundColor, color: style.color };
+    }), buttonColors, 'Free Play button keeps its lime fill and black label on hover');
+    assert.equal(await page.evaluate(() => document.documentElement.scrollWidth > innerWidth + 1), false,
+      'Arcade card must not create horizontal overflow');
+    await page.screenshot({ path: path.join(artifacts, `${width}-arcade-hover.png`), fullPage: true });
+    await guard.verify();
+    await context.close();
   }
 
   const request = await browser.newContext();

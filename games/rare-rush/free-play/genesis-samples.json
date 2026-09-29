@@ -1,0 +1,52 @@
+{
+  "schemaVersion": 1,
+  "provenance": {
+    "fetchedAt": "2026-09-29T17:42:40.515Z",
+    "chainId": 4663,
+    "contract": "0x116EaA62241751E0c98dA43d458600c6C17cD361",
+    "rpcUrl": "https://rpc.mainnet.chain.robinhood.com",
+    "blockNumber": "75844016",
+    "tokenIds": [
+      "1",
+      "2",
+      "3",
+      "4",
+      "5",
+      "6"
+    ],
+    "method": "tokenURI(uint256) at one pinned Robinhood mainnet block; validated by readGenesisPortrait",
+    "note": "Canonical public static front portraits bundled for no-wallet sample play. These samples do not assert ownership, eligibility, or wallet authority. Runtime use makes no RPC requests."
+  },
+  "friends": [
+    {
+      "tokenId": "1",
+      "image": "data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSI1MTIiIGhlaWdodD0iNTEyIiB2aWV3Qm94PSIwIDAgOCA4IiBzaGFwZS1yZW5kZXJpbmc9ImNyaXNwRWRnZXMiPjxyZWN0IHdpZHRoPSI4IiBoZWlnaHQ9IjgiIGZpbGw9IiNmZmYiLz48cGF0aCBmaWxsPSIjMDAwIiBkPSJNMCAwaDh2MWgtOHpNMCAxaDF2MWgtMXpNNyAxaDF2MWgtMXpNMCAyaDF2MWgtMXpNMiAyaDF2MWgtMXpNNSAyaDF2MWgtMXpNNyAyaDF2MWgtMXpNMCAzaDF2MWgtMXpNMiAzaDF2MWgtMXpNNSAzaDF2MWgtMXpNNyAzaDF2MWgtMXpNMCA0aDJ2MWgtMnpNNiA0aDJ2MWgtMnpNMCA1aDF2MWgtMXpNMyA1aDJ2MWgtMnpNNyA1aDF2MWgtMXpNMCA2aDF2MWgtMXpNNyA2aDF2MWgtMXpNMCA3aDh2MWgtOHoiLz48L3N2Zz4=",
+      "sha256": "72425bdf09e84f7ccc0d255ffb2c3af1150657919bf524807ea5fd8923796208"
+    },
+    {
+      "tokenId": "2",
+      "image": "data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSI1MTIiIGhlaWdodD0iNTEyIiB2aWV3Qm94PSIwIDAgOCA4IiBzaGFwZS1yZW5kZXJpbmc9ImNyaXNwRWRnZXMiPjxyZWN0IHdpZHRoPSI4IiBoZWlnaHQ9IjgiIGZpbGw9IiNmZmYiLz48cGF0aCBmaWxsPSIjMDAwIiBkPSJNMCAwaDh2MWgtOHpNMCAxaDN2MWgtM3pNNSAxaDN2MWgtM3pNMCAyaDF2MWgtMXpNNyAyaDF2MWgtMXpNMCAzaDF2MWgtMXpNMiAzaDF2MWgtMXpNNSAzaDF2MWgtMXpNNyAzaDF2MWgtMXpNMCA0aDF2MWgtMXpNMiA0aDF2MWgtMXpNNSA0aDF2MWgtMXpNNyA0aDF2MWgtMXpNMCA1aDF2MWgtMXpNNyA1aDF2MWgtMXpNMCA2aDh2MWgtOHpNMCA3aDh2MWgtOHoiLz48L3N2Zz4=",
+      "sha256": "3278e75106ee2042c9d69d48e5e8f7e1e64be44e76181d5d73a94af093bf1e95"
+    },
+    {
+      "tokenId": "3",
+      "image": "data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSI1MTIiIGhlaWdodD0iNTEyIiB2aWV3Qm94PSIwIDAgOCA4IiBzaGFwZS1yZW5kZXJpbmc9ImNyaXNwRWRnZXMiPjxyZWN0IHdpZHRoPSI4IiBoZWlnaHQ9IjgiIGZpbGw9IiNmZmYiLz48cGF0aCBmaWxsPSIjMDAwIiBkPSJNMCAwaDh2MWgtOHpNMCAxaDJ2MWgtMnpNNiAxaDJ2MWgtMnpNMCAyaDN2MWgtM3pNNSAyaDN2MWgtM3pNMCAzaDF2MWgtMXpNNyAzaDF2MWgtMXpNMCA0aDF2MWgtMXpNMiA0aDF2MWgtMXpNNSA0aDF2MWgtMXpNNyA0aDF2MWgtMXpNMCA1aDF2MWgtMXpNMyA1aDJ2MWgtMnpNNyA1aDF2MWgtMXpNMCA2aDF2MWgtMXpNNyA2aDF2MWgtMXpNMCA3aDh2MWgtOHoiLz48L3N2Zz4=",
+      "sha256": "6c157ece52ac62a9a6353491efff8432ef93df908461feeb329f96d148adc835"
+    },
+    {
+      "tokenId": "4",
+      "image": "data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSI1MTIiIGhlaWdodD0iNTEyIiB2aWV3Qm94PSIwIDAgOCA4IiBzaGFwZS1yZW5kZXJpbmc9ImNyaXNwRWRnZXMiPjxyZWN0IHdpZHRoPSI4IiBoZWlnaHQ9IjgiIGZpbGw9IiNmZmYiLz48cGF0aCBmaWxsPSIjMDAwIiBkPSJNMCAwaDh2MWgtOHpNMCAxaDF2MWgtMXpNNyAxaDF2MWgtMXpNMCAyaDF2MWgtMXpNMiAyaDF2MWgtMXpNNSAyaDF2MWgtMXpNNyAyaDF2MWgtMXpNMCAzaDF2MWgtMXpNMiAzaDF2MWgtMXpNNSAzaDF2MWgtMXpNNyAzaDF2MWgtMXpNMCA0aDF2MWgtMXpNMiA0aDF2MWgtMXpNNSA0aDF2MWgtMXpNNyA0aDF2MWgtMXpNMCA1aDJ2MWgtMnpNNiA1aDJ2MWgtMnpNMCA2aDJ2MWgtMnpNNiA2aDJ2MWgtMnpNMCA3aDh2MWgtOHoiLz48L3N2Zz4=",
+      "sha256": "2a7780dadb0333d1a811d8ddb4946198a8f92f53a609ca176a9f29ef0ad20510"
+    },
+    {
+      "tokenId": "5",
+      "image": "data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSI1MTIiIGhlaWdodD0iNTEyIiB2aWV3Qm94PSIwIDAgOCA4IiBzaGFwZS1yZW5kZXJpbmc9ImNyaXNwRWRnZXMiPjxyZWN0IHdpZHRoPSI4IiBoZWlnaHQ9IjgiIGZpbGw9IiNmZmYiLz48cGF0aCBmaWxsPSIjMDAwIiBkPSJNMCAwaDh2MWgtOHpNMCAxaDJ2MWgtMnpNMyAxaDJ2MWgtMnpNNiAxaDJ2MWgtMnpNMCAyaDF2MWgtMXpNMyAyaDJ2MWgtMnpNNyAyaDF2MWgtMXpNMCAzaDJ2MWgtMnpNNiAzaDJ2MWgtMnpNMCA0aDF2MWgtMXpNMiA0aDF2MWgtMXpNNSA0aDF2MWgtMXpNNyA0aDF2MWgtMXpNMCA1aDF2MWgtMXpNNyA1aDF2MWgtMXpNMCA2aDF2MWgtMXpNNyA2aDF2MWgtMXpNMCA3aDh2MWgtOHoiLz48L3N2Zz4=",
+      "sha256": "34e4c15849ff7bf191954c492fde60d5c16fbaa942df59663313c991fa1450d5"
+    },
+    {
+      "tokenId": "6",
+      "image": "data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSI1MTIiIGhlaWdodD0iNTEyIiB2aWV3Qm94PSIwIDAgOCA4IiBzaGFwZS1yZW5kZXJpbmc9ImNyaXNwRWRnZXMiPjxyZWN0IHdpZHRoPSI4IiBoZWlnaHQ9IjgiIGZpbGw9IiNmZmYiLz48cGF0aCBmaWxsPSIjMDAwIiBkPSJNMCAwaDh2MWgtOHpNMCAxaDF2MWgtMXpNMyAxaDJ2MWgtMnpNNyAxaDF2MWgtMXpNMCAyaDJ2MWgtMnpNMyAyaDJ2MWgtMnpNNiAyaDJ2MWgtMnpNMCAzaDF2MWgtMXpNNyAzaDF2MWgtMXpNMCA0aDF2MWgtMXpNMiA0aDF2MWgtMXpNNSA0aDF2MWgtMXpNNyA0aDF2MWgtMXpNMCA1aDF2MWgtMXpNMiA1aDF2MWgtMXpNNSA1aDF2MWgtMXpNNyA1aDF2MWgtMXpNMCA2aDF2MWgtMXpNNyA2aDF2MWgtMXpNMCA3aDh2MWgtOHoiLz48L3N2Zz4=",
+      "sha256": "271b63e100468c92e33aaae044bc66202cbef5cfef001ee914ce180b517bf772"
+    }
+  ]
+}

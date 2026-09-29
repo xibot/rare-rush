@@ -2,8 +2,8 @@ import { spriteFrame, type GenerationSprites } from '@rarefriends/friendsdk/spri
 import type { RunState } from './engine';
 import { CanonicalProp, TokenCoin } from './CanonicalArt';
 
-export function FriendSprite({ sprites, frame, walking = false }: { sprites: GenerationSprites; frame: number; walking?: boolean }) {
-  const rows = spriteFrame(sprites, 'right', walking, frame % 8).frame.rows;
+export function FriendSprite({ sprites, frame, walking = false, direction = 'right' }: { sprites: GenerationSprites; frame: number; walking?: boolean; direction?: Parameters<typeof spriteFrame>[1] }) {
+  const rows = spriteFrame(sprites, direction, walking, frame % 8).frame.rows;
   const halo = rows.map((row, y) => [...row].map((_, x) => {
     for (let yy = Math.max(0, y - 1); yy <= Math.min(15, y + 1); yy++) {
       for (let xx = Math.max(0, x - 1); xx <= Math.min(15, x + 1); xx++) if (rows[yy][xx] === '#') return '#';

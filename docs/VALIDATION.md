@@ -11,6 +11,8 @@
 - Entry-point checks passed at 1440, 800, 390, and 320px. Free Play is reachable from the landing and Arcade pages. Public saving remains a separate wallet-signed Arcade/Testnet action; guest scores cannot be submitted as wallet runs.
 - `npm run test:community:wallet`: passed all four human/Autopilot × Genesis/Generations flows, including a declined signature, retry, exact artwork, and verified replay saving. Updated the fixture to use the current owned-Friend picker and its read-only log lookup.
 - Browser checks use local builds and isolated fixtures. They do not represent real-wallet signing, public publication, or physical-device testing.
+- Picker refinement: added the Arcade backlink, canonical front-facing Generations thumbnails, and six distinct Genesis portraits bundled from mainnet block `75844016`. Genesis samples reuse the existing cosmetic body animation without wallet admission or token rewards. The Arcade Free Play card now matches the white/lime collection outline and retains its lime button on hover.
+- Rechecked typecheck/build, 16 focused local-score/body/replay tests, and all four wallet replay-save flows. Extended Free Play browser checks passed at 1440/640/390/360px, including exact front/right artwork, real Genesis runs on desktop/mobile, all 12 samples, backlink placement, card hover, and zero wallet/RPC/external requests. Desktop/mobile screenshots were visually reviewed.
 
 ## Initial Arcade — September 20, 2026
 
