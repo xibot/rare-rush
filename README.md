@@ -20,7 +20,7 @@ Created by **XIBOT** for the [Rare Friends Vibeathon](https://github.com/spokesz
 | **Economy** | No entry fees or token rewards | Simulated entry fees, rewards, and prize pool | Onchain test entries and verified `tRARERUSH` reward claims |
 | **Transactions** | None | None required to play | Test ETH for gas; test RF for Generations entries |
 
-**Free Play** is unlimited human-controlled play with a sample Friend. Choose Easy, Normal, or Degen and enjoy the full directional gameplay, music, and sound effects without a wallet or sign-in. Best scores are kept separately for each difficulty in this browser when storage is available. Free Play does not earn tokens or publish to Runs Feed.
+**Free Play** is unlimited human-controlled play with six sample Genesis and six sample Generations Friends. Choose Easy, Normal, or Degen and enjoy the full directional gameplay, music, and sound effects without a wallet or sign-in. Best scores are kept separately for each difficulty in this browser when storage is available. Free Play does not earn tokens or publish to Runs Feed.
 
 **Arcade** is the Vibeathon MVP. Connect a browser wallet, choose Genesis or Generations, and pick your difficulty. Genesis holders enter free; Generations uses an owned hardwired NFT, generation 1 or higher. All Arcade balances and rewards are simulated. You can also watch the landing-page preview without connecting a wallet.
 

@@ -20,6 +20,7 @@ import { requestArcadeNavigation } from './navigation';
 import { advanceHumanRecording, createHumanRecording, exportHumanReplay, queueHumanJump, releaseHumanControls, type HumanRecording } from './replay-recorder';
 import { requestArcadeRunSave, requestSavedRunNavigation, type ArcadeRunCapture } from './run-save-bridge';
 import { readFreePlayBests, recordFreePlayBest } from './free-play/bests';
+import type { FreePlayFriend } from './free-play/samples';
 import './style.css';
 
 type Screen = 'ready' | 'running' | 'result';
@@ -37,13 +38,14 @@ export function GenesisRush({ portraitUrl, beforeRun, ...props }: { friendId: bi
 }
 
 /** Bundled sample artwork enables manual play without a wallet or identity read. */
-export function FreeRush({ sprites, onChooseFriend, onNavigate }: { sprites: GenerationSprites; onChooseFriend: () => void; onNavigate?: ArcadeNavigation }) {
-  return <Runner friendId={sprites.tokenId} paused={false} guest={sprites}
+export function FreeRush({ friend, onChooseFriend, onNavigate }: { friend: FreePlayFriend; onChooseFriend: () => void; onNavigate?: ArcadeNavigation }) {
+  return <Runner friendId={BigInt(friend.tokenId)} paused={false} guest={friend}
     onNavigate={destination => destination === 'friends' ? onChooseFriend() : onNavigate ? onNavigate(destination) : window.location.assign('/')}/>;
 }
 
-function Runner({ friendId, client, paused, genesis, guest, onNavigate = requestArcadeNavigation, onAnalytics }: { friendId: bigint; client?: GameClient; paused: boolean; genesis?: { portraitUrl: string; beforeRun: () => Promise<void> }; guest?: GenerationSprites; onNavigate?: ArcadeNavigation; onAnalytics?: (event: ArcadeSignal) => void }) {
-  const collection = genesis ? 'genesis' : 'generations';
+function Runner({ friendId, client, paused, genesis, guest, onNavigate = requestArcadeNavigation, onAnalytics }: { friendId: bigint; client?: GameClient; paused: boolean; genesis?: { portraitUrl: string; beforeRun: () => Promise<void> }; guest?: FreePlayFriend; onNavigate?: ArcadeNavigation; onAnalytics?: (event: ArcadeSignal) => void }) {
+  const portraitUrl = genesis?.portraitUrl ?? (guest?.collection === 'genesis' ? guest.portraitUrl : undefined);
+  const collection = portraitUrl ? 'genesis' : 'generations';
   const [sprites, setSprites] = useState<GenerationSprites | null>(null);
   const [genesisBodyId, setGenesisBodyId] = useState(DEFAULT_BODY_ID);
   const previousGenesisBody = useRef<string | undefined>(undefined);
@@ -83,7 +85,7 @@ function Runner({ friendId, client, paused, genesis, guest, onNavigate = request
     setSaveBusy(false); setSaveError(''); setSavedRunId('');
     previousGenesisBody.current = undefined; setGenesisBodyId(DEFAULT_BODY_ID);
     const load = async () => {
-      if (guest) return guest;
+      if (guest) return guest.collection === 'generations' ? guest.sprites : null;
       if (genesis) return null;
       if (!client) throw new Error('Connect through the FriendSDK game host.');
       const [snapshot, art] = await Promise.all([client.read(), createFriendReader().read(friendId)]);
@@ -210,7 +212,7 @@ function Runner({ friendId, client, paused, genesis, guest, onNavigate = request
       if (!mounted.current) return;
       if (!guest && !enterRun(economy.current, collection)) { setError('You used all 100 demo RF. Reset the simulation in Token lab to keep testing.'); return; }
       let bodyId = genesisBodyId;
-      if (genesis) {
+      if (portraitUrl) {
         const body = pickGenesisBody(previousGenesisBody.current);
         previousGenesisBody.current = body; setGenesisBodyId(body); bodyId = body;
       }
@@ -225,7 +227,7 @@ function Runner({ friendId, client, paused, genesis, guest, onNavigate = request
     analyticsRun.current = guest ? null : startArcadeAnalytics(collection, difficulty, onAnalytics);
     setNotice(''); setError(''); setUserPaused(false); setScreen('running');
     requestAnimationFrame(() => stage.current?.focus());
-    } catch { if (mounted.current) setError('Could not verify your Genesis. Reconnect from the arcade entry and try again.'); }
+    } catch { if (mounted.current) setError(guest ? 'Could not start the run. Try again.' : 'Could not verify your Genesis. Reconnect from the arcade entry and try again.'); }
     finally { startingRef.current = false; if (mounted.current) setStarting(false); }
   }
   async function saveRun() {
@@ -251,9 +253,9 @@ function Runner({ friendId, client, paused, genesis, guest, onNavigate = request
   const growth = reduced ? run.growth : displayedGrowth.current;
   const friendCenter = run.player.x + run.player.w / 2;
   const friendHeight = run.player.slide ? 30 : 60 * growth;
-  const hasCharacter = Boolean(sprites || genesis);
-  const renderCharacter = (frame: number, walking = false) => genesis
-    ? <GenesisRunnerSprite portraitUrl={genesis.portraitUrl} bodyId={genesisBodyId} frame={frame} walking={walking && !reduced && !freeze}/>
+  const hasCharacter = Boolean(sprites || portraitUrl);
+  const renderCharacter = (frame: number, walking = false) => portraitUrl
+    ? <GenesisRunnerSprite portraitUrl={portraitUrl} bodyId={genesisBodyId} frame={frame} walking={walking && !reduced && !freeze}/>
     : sprites ? <Sprite sprites={sprites} frame={frame} walking={walking}/> : null;
 
   return <section ref={root} className={`rare-rush ${guest ? 'free-play-runner' : ''} ${reduced ? 'reduce-motion' : ''}`} data-mode={guest ? 'free-play' : 'arcade'} data-collection={collection} data-screen={screen} data-phase={run.phase} data-heading={vertical ? 0 : heading} data-difficulty={run.difficulty} data-run-duration={run.duration} data-bonus-coins={run.bonusCoins} aria-label={guest ? 'Rare Rush free game' : 'Rare Rush arcade game'}>
@@ -291,7 +293,7 @@ function Runner({ friendId, client, paused, genesis, guest, onNavigate = request
 
     {!loaded && <div className="game-overlay loading-screen"><div className="loading-pixel"/><p role={error?'alert':'status'}>{error || 'Loading your Rare Friend…'}</p>{error && <button className="primary" onClick={() => setRetry(value => value + 1)}>Try again</button>}</div>}
     {loaded && screen === 'ready' && <div className="start-screen">
-      <div className="start-title"><span className="eyebrow">ENDLESS WORLD. {mode.seconds} SECONDS.</span><h1>RARE<br/><span>RUSH</span><sup>✦</sup></h1>{hasCharacter && <svg className="mobile-friend" viewBox="-1 -1 18 18" aria-label={genesis ? 'Your Genesis Friend' : `Your ${sprites?.familyName} Friend`}>{renderCharacter(0)}</svg>}<div className="selected-friend">{guest ? 'SAMPLE FRIEND' : genesis ? 'GENESIS' : 'FRIEND'} #{friendId.toString()}<span>{genesis ? '100× DEMO REWARDS' : sprites?.familyName}</span></div></div>
+      <div className="start-title"><span className="eyebrow">ENDLESS WORLD. {mode.seconds} SECONDS.</span><h1>RARE<br/><span>RUSH</span><sup>✦</sup></h1>{hasCharacter && <svg className="mobile-friend" viewBox="-1 -1 18 18" aria-label={portraitUrl ? 'Your Genesis Friend' : `Your ${sprites?.familyName} Friend`}>{renderCharacter(0)}</svg>}<div className="selected-friend">{guest ? portraitUrl ? 'SAMPLE GENESIS' : 'SAMPLE FRIEND' : genesis ? 'GENESIS' : 'FRIEND'} #{friendId.toString()}<span>{guest && portraitUrl ? 'GENESIS' : genesis ? '100× DEMO REWARDS' : sprites?.familyName}</span></div></div>
       <div className="start-card"><div className="start-card-heading"><span className="card-kicker">YOUR NEXT HIGH SCORE STARTS HERE</span><button type="button" className="start-back" aria-label={guest ? 'Choose another sample Friend' : 'Back to Friend selection'} onClick={() => onNavigate('friends')}>BACK</button></div><h2>Run. Collect.<br/>{' '}Stay rare.</h2>
         <div className="difficulty-picker" role="group" aria-label="Choose difficulty">{DIFFICULTY_ORDER.map(key => <button key={key} type="button" aria-pressed={difficulty === key} aria-label={`${DIFFICULTIES[key].label} difficulty`} onClick={() => chooseDifficulty(key)}><b>{DIFFICULTIES[key].label}</b><span>{DIFFICULTIES[key].seconds}s{!guest && <> · {DIFFICULTIES[key].rewardLabel}</>}</span></button>)}</div>
         <div className="mode-description" aria-live="polite">{mode.description}<span>{guest ? '3 hearts · Your moves. Your high score.' : `${mode.rewardLabel} rewards · 3 hearts`}</span></div>
@@ -316,7 +318,7 @@ function Runner({ friendId, client, paused, genesis, guest, onNavigate = request
     {guest && <div className="free-play-status">HUMAN RUN <span>·</span> {bestsPersistent ? 'PERSONAL BESTS ON THIS BROWSER' : 'SESSION BESTS · STORAGE UNAVAILABLE'}</div>}
     {error && loaded && <div className="error-toast" role="alert">{error}</div>}
     {panel && <GameMenu title={panel === 'rules' ? 'HOW TO RUSH' : 'TOKEN LAB · SIMULATION'} onClose={() => { setPanel(null); if (running && !userPaused) requestAnimationFrame(() => stage.current?.focus()); }}>
-      {panel === 'rules' ? <div className="rules-panel"><p>Choose your difficulty before a run. Three hearts, an endless world, and a best score for each mode.</p><dl><dt>PICK YOUR CHALLENGE</dt><dd>{guest ? 'Easy: 120 seconds with roomy obstacles. Normal: 90 seconds with mixed obstacles. Degen: 60 seconds with tougher combinations and wider coin scatter.' : 'Easy: 120 seconds, roomy obstacles and 0.75× rewards. Normal: 90 seconds, mixed obstacles and 1× rewards. Degen: 60 seconds, tougher combinations, wider coin scatter and 2× rewards.'} Difficulty stays locked until the run ends.</dd>{genesis && <><dt>A NEW BODY EACH RUN</dt><dd>Your original Genesis face gets one of 36 Generations bodies at the start of each run. It stays with you until the run ends. Bodies are cosmetic: movement, collision rules and rewards stay the same.</dd></>}<dt>JUMP / DOUBLE JUMP</dt><dd>Space, ↑ or W. On phone, tap JUMP or the world. Tap again in the air for a double jump.</dd><dt>SLIDE</dt><dd>Hold ↓, S or SLIDE to duck under the floating bridges. Release to stand up.</dd><dt>SET YOUR PACE</dt><dd>Hold the direction you are running to speed up, or the opposite direction to slow down. On phone, hold FAST or SLOW. Release to return to cruising speed.</dd><dt>FOLLOW THE TWIST</dt><dd>Every run starts sideways. A ceiling intake can pull you up, or a break in the floor can drop you into free fall. Hold ← / → (LEFT / RIGHT on phone) to steer through the shaft. Your Friend spins continuously. A shaft can sometimes send you out running left; jump and slide return on the horizontal track.</dd><dt>COLLECT & GROW</dt><dd>Every bear coin grows your Friend, up to 1.75× size. An obstacle hit shrinks it by 0.35×, down to its starting size. A shield protects your size too. You can still squeeze under bridges.</dd><dt>{guest ? 'CHASE THE BONUS COIN' : 'CHASE THE 10× COIN'}</dt><dd>Giant bear coins fly in from ahead at surprise intervals, sometimes in a pair. {guest ? 'Chase them for coins and keep your chain growing.' : 'They are twice the size and earn 10× your difficulty’s current coin reward, up to the remaining emission cap.'} Jump, double jump, or use a magnet to catch them. Each still counts as one coin for growth and chains.</dd><dt>CHAIN YOUR COINS</dt><dd>Collect coins in a row to grow your score multiplier to ×5. Getting hit breaks your chain.</dd><dt>POWER UP</dt><dd>S shields you from a hit. M attracts nearby coins. Crystals and crates cost a heart.</dd><dt>TAKE A BREAK</dt><dd>Press P or Escape to pause. Switching tabs pauses your run. Music, sound effects and visual FX controls are at the top.</dd></dl><p className="fine-print">{guest ? 'Free Play uses sample artwork. Play as often as you like; personal bests stay in this browser when storage is available. Connecting later starts a separate wallet run. Public replay saving requires a wallet-signed run with your own eligible Friend.' : <>{genesis ? 'Genesis runs are free and earn 100× demo token rewards. ' : 'Each run costs 1 simulated RF. All fees enter the simulated prize pool. '} Coins earn demo $RUSH at the selected difficulty rate; combo boosts score only. Rewards are banked on timeout or your third hit. Reloading or switching Friends resets this session.</>}</p></div> : <div className="economy-panel">
+      {panel === 'rules' ? <div className="rules-panel"><p>Choose your difficulty before a run. Three hearts, an endless world, and a best score for each mode.</p><dl><dt>PICK YOUR CHALLENGE</dt><dd>{guest ? 'Easy: 120 seconds with roomy obstacles. Normal: 90 seconds with mixed obstacles. Degen: 60 seconds with tougher combinations and wider coin scatter.' : 'Easy: 120 seconds, roomy obstacles and 0.75× rewards. Normal: 90 seconds, mixed obstacles and 1× rewards. Degen: 60 seconds, tougher combinations, wider coin scatter and 2× rewards.'} Difficulty stays locked until the run ends.</dd>{portraitUrl && <><dt>A NEW BODY EACH RUN</dt><dd>Your original Genesis face gets one of 36 Generations bodies at the start of each run. It stays with you until the run ends. Bodies are cosmetic: movement, collision rules and rewards stay the same.</dd></>}<dt>JUMP / DOUBLE JUMP</dt><dd>Space, ↑ or W. On phone, tap JUMP or the world. Tap again in the air for a double jump.</dd><dt>SLIDE</dt><dd>Hold ↓, S or SLIDE to duck under the floating bridges. Release to stand up.</dd><dt>SET YOUR PACE</dt><dd>Hold the direction you are running to speed up, or the opposite direction to slow down. On phone, hold FAST or SLOW. Release to return to cruising speed.</dd><dt>FOLLOW THE TWIST</dt><dd>Every run starts sideways. A ceiling intake can pull you up, or a break in the floor can drop you into free fall. Hold ← / → (LEFT / RIGHT on phone) to steer through the shaft. Your Friend spins continuously. A shaft can sometimes send you out running left; jump and slide return on the horizontal track.</dd><dt>COLLECT & GROW</dt><dd>Every bear coin grows your Friend, up to 1.75× size. An obstacle hit shrinks it by 0.35×, down to its starting size. A shield protects your size too. You can still squeeze under bridges.</dd><dt>{guest ? 'CHASE THE BONUS COIN' : 'CHASE THE 10× COIN'}</dt><dd>Giant bear coins fly in from ahead at surprise intervals, sometimes in a pair. {guest ? 'Chase them for coins and keep your chain growing.' : 'They are twice the size and earn 10× your difficulty’s current coin reward, up to the remaining emission cap.'} Jump, double jump, or use a magnet to catch them. Each still counts as one coin for growth and chains.</dd><dt>CHAIN YOUR COINS</dt><dd>Collect coins in a row to grow your score multiplier to ×5. Getting hit breaks your chain.</dd><dt>POWER UP</dt><dd>S shields you from a hit. M attracts nearby coins. Crystals and crates cost a heart.</dd><dt>TAKE A BREAK</dt><dd>Press P or Escape to pause. Switching tabs pauses your run. Music, sound effects and visual FX controls are at the top.</dd></dl><p className="fine-print">{guest ? 'Free Play uses sample artwork. Play as often as you like; personal bests stay in this browser when storage is available. Connecting later starts a separate wallet run. Public replay saving requires a wallet-signed run with your own eligible Friend.' : <>{genesis ? 'Genesis runs are free and earn 100× demo token rewards. ' : 'Each run costs 1 simulated RF. All fees enter the simulated prize pool. '} Coins earn demo $RUSH at the selected difficulty rate; combo boosts score only. Rewards are banked on timeout or your third hit. Reloading or switching Friends resets this session.</>}</p></div> : <div className="economy-panel">
         <p>Early coins earn more. Every 10,000 simulated pickups halves the reward. Try a later chapter of the economy.</p>
         <div className="lab-stat"><span>NEXT COIN · {mode.label.toUpperCase()} · {mode.rewardLabel}{genesis ? ' · GENESIS 100×' : ''}</span><strong>{formatToken(nextCoinReward(e, run.difficulty, 1, collection))}<small> demo $RUSH</small></strong></div>
         <div className="scenario-buttons">{[[0,'LAUNCH'],[10000,'10K COINS'],[30000,'30K COINS'],[100000,'100K COINS']].map(([n,label]) => <button key={n} disabled={running} onClick={() => { economy.current = createEconomy(Number(n)); reward.current = 0n; setError(''); draw(performance.now()); }}>{label}</button>)}</div>
