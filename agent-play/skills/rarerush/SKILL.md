@@ -7,13 +7,15 @@ description: Run Rare Rush headless jobs for any agent runtime with a compatible
 
 Execute one configured run per job with the repository's deterministic autopilot. It uses the existing engine and legal recorded controls. No browser interaction or LLM calls per game tick are needed.
 
+Headless jobs run silently. Music and sound effects belong to live browser gameplay and do not change the agent's controls, results, or saved replay.
+
 The skill is agent- and wallet-provider-neutral. OpenClaw, Hermes, Bankr, and other agent runtimes use the same job and external wallet interface; no particular framework, model, wallet vendor, or browser extension is required. Compatibility depends on the actual wallet's chain and signing capabilities, not the agent's name. This is an integration contract, not a claim that each named platform has been connected or tested.
 
 Read this skill at https://rarerush.app/agent-skill/SKILL.md and its reference at https://rarerush.app/agent-skill/references/jobs.md. Install both in the agent’s skill loader, or use the whole `agent-play/skills/rarerush/` folder from https://github.com/xibot/rare-rush. Keep that repository checkout containing `agent-play/cli.mjs` available for execution. No scheduler or wallet is configured by installing the skill.
 
 ## Prepare a job
 
-1. Resolve the user's Rare Rush checkout and persistent job storage. Use Node 22.18 or newer and installed lockfile dependencies. If dependencies are missing, run `npm ci` in that checkout. Keep a stable checkout and data directory across scheduled invocations.
+1. Resolve the user's Rare Rush checkout and persistent job storage. Use Node 22.18 or newer within the 22.x release line and installed lockfile dependencies. If dependencies are missing, run `npm ci` in that checkout. Keep a stable checkout and data directory across scheduled invocations.
 2. Read [the job and wallet contract](references/jobs.md) when constructing a job or using a wallet. Choose the requested environment, collection, token ID, and difficulty. Never substitute another wallet or NFT after an ownership error.
 3. For scheduled runs, derive `id` from the **scheduled period**, then write the job JSON once. For example, the intended noon UTC slot could be `rr-arcade-genesis-42-normal-20260924t1200z`. Retries of that slot reuse that exact ID and file, even after midnight or a restart. A later slot gets a new ID only when it represents another authorized run.
 4. For Arcade or Testnet, obtain the address from the agent's existing wallet configuration. Reuse its trusted wallet integration through the external provider module where required. If its wallet exposes an SDK, API, CLI, or agent tool instead of EIP-1193, configure a local bridge to that existing integration using the method contract in the reference. Do not invent framework APIs or assume that holding an NFT and signing transactions also provides typed-message signing. Keep that module in the agent's wallet environment; never import private keys into a job, this skill, the Rare Rush repository, or chat.
@@ -58,7 +60,7 @@ After a job finishes, publish its existing replay using the same job file and st
 node agent-play/cli.mjs publish --job /absolute/path/to/jobs/rr-arcade-genesis-42-normal-20260924t1200z.json
 ```
 
-This command requires the configured wallet provider and `eth_signTypedData_v4`, including for Arcade. It signs a short-lived `RareRushPublicReplay` EIP-712 message for the exact replay and posts it to `https://rarerush.app/api/runs`. It sends no transaction and starts no new run. The server checks the signature, replays the recorded controls, and checks the selected NFT’s current Arcade ownership or the original onchain Testnet run identity before saving. Preview runs stay local. Failed publication must be retried with the same completed job; it is never a reason to play or claim again.
+New publication requires a trusted wallet provider and `eth_signTypedData_v4`, including for Arcade. If a completed Arcade job used only an address, supply its existing wallet integration with `publish --provider-module /absolute/path/to/trusted-provider.mjs`; do not edit the saved job configuration to add it. See [the publication reference](references/jobs.md#public-publication). Publication signs a short-lived `RareRushPublicReplay` EIP-712 message for the exact replay and posts it to `https://rarerush.app/api/runs`. It sends no transaction and starts no new run. The server checks the signature, replays the recorded controls, and checks the selected NFT’s current Arcade ownership or the original onchain Testnet run identity before saving. Preview runs stay local. Failed publication must be retried with the same completed job; it is never a reason to play or claim again.
 
 Report the returned public replay link only after publication succeeds. A saved replay is not proof that a Testnet reward was claimed. Hearts are private favorites in each visitor’s browser for now; do not sign voting transactions or claim a shared vote count exists.
 

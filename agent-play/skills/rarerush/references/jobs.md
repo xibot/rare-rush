@@ -22,7 +22,7 @@ Use a UTF-8 JSON file with one job. `--job` is the file path, not an inline JSON
 | `tokenId` | Positive decimal string, at most 77 digits; retain string form. |
 | `difficulty` | `easy`, `normal`, or `degen` |
 | `wallet.address` | Required for Arcade and Testnet; the selected agent wallet's address. |
-| `wallet.providerModule` | Required for Testnet and public publication; path to an external local provider module. Optional for local-only Arcade. |
+| `wallet.providerModule` | Required for Testnet; path to an external local provider module. Optional for Arcade reads. New public publication needs this provider or the `publish --provider-module` override below. |
 | `rpcUrl` | Optional HTTP(S) read endpoint for Arcade or Testnet; no username, password, or fragment. Use the correct chain and keep private RPC credentials out of shared jobs. |
 | `testnet` | Explicit permitted transaction actions for Testnet, described below. |
 
@@ -100,7 +100,15 @@ The external provider must run in the agent's own wallet environment. It may app
 
 ## Public publication
 
-`publish --job <file> [--jobs-dir <directory>]` reads an existing completed job and its replay. It never calls the play, entry, approval, or claim workflow. Use the same persistent directory as `run`. The job must match its stored fingerprint and record identity.
+`publish --job <file> [--jobs-dir <directory>] [--provider-module <trusted-module>]` reads an existing completed job and its replay. It never calls the play, entry, approval, or claim workflow. Use the same persistent directory as `run`. The job must match its stored fingerprint and record identity.
+
+For a completed address-only Arcade job, attach the same wallet's existing trusted signing integration without changing the saved job:
+
+```sh
+node agent-play/cli.mjs publish --job /absolute/path/to/job.json --jobs-dir /absolute/path/to/persistent/jobs --provider-module /absolute/path/to/trusted-provider.mjs
+```
+
+This override is accepted only by `publish` and takes precedence over `wallet.providerModule`. Use an absolute module path; relative override paths resolve from the command's working directory, while the job's provider path resolves from its JSON file. It must still provide the saved job's wallet address and network. Adding a provider field to the completed job instead would change its fingerprint and block recovery.
 
 Publication checks for the exact saved replay first. If it is already in the public feed, the command returns its existing link without asking the wallet to sign again. A temporary lookup failure can be retried with the same job.
 
