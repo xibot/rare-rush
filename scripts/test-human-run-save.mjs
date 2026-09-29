@@ -71,7 +71,7 @@ try {
         if (method === 'eth_accounts') return window.fixtureWallet.authorized ? [player] : [];
         if (method === 'eth_requestAccounts') { window.fixtureWallet.authorized = true; return [player]; }
         if (method === 'eth_chainId') return '0x1237';
-        if (['eth_call', 'eth_blockNumber'].includes(method)) return window.readFixtureRpc({ method, params });
+        if (['eth_call', 'eth_blockNumber', 'eth_getLogs'].includes(method)) return window.readFixtureRpc({ method, params });
         if (method === 'eth_signTypedData_v4') {
           if (window.fixtureWallet.reject) throw Object.assign(new Error('User rejected'), { code: 4001 });
           return window.signFixturePublication(JSON.parse(params[1]));
@@ -124,11 +124,19 @@ try {
       game = page;
       await page.locator('.sources button').filter({ hasText: 'ARCADE' }).click();
       await page.locator('.collections button').filter({ hasText: collection === 'genesis' ? 'GENESIS' : 'GENERATIONS' }).click();
-      await page.locator('#friend-id').fill(collection === 'genesis' ? '1' : '7730');
       await page.locator('.difficulties button').filter({ hasText: 'DEGEN' }).click();
       await page.getByRole('button', { name: 'CONNECT WALLET', exact: true }).click();
+      // Connecting invalidates stale IDs. Select a freshly discovered owned
+      // Friend, and finish the async picker work before changing browser time.
+      const choice = page.locator('.arcade-friend-card').filter({ hasText: collection === 'genesis' ? 'Genesis #1' : 'Generations #7730' });
+      await choice.click();
+      assert.equal(await choice.getAttribute('aria-pressed'), 'true');
+      const watch = page.getByRole('button', { name: /WATCH AGENT PLAY/ });
+      await page.locator('button.start:enabled').waitFor();
+      assert.equal(await watch.isEnabled(), true, 'An owned Friend is ready before the run starts');
       await page.clock.install();
-      await page.getByRole('button', { name: /WATCH AGENT PLAY/ }).click();
+      await watch.click();
+      await page.locator('.agent-stage[data-running="true"]').waitFor();
       await page.getByRole('button', { name: '1× PLAYBACK', exact: true }).click();
       await page.getByRole('button', { name: '2× PLAYBACK', exact: true }).click();
     }
@@ -157,7 +165,7 @@ try {
     else { assert.equal(saved.art.sprites.frames.length, 64); assert(saved.art.sprites.frames.every(word => typeof word === 'string')); }
     const methods = await page.evaluate(() => window.fixtureWallet.requests);
     assert.equal(methods.filter(name => name === 'eth_signTypedData_v4').length, 2);
-    assert(methods.every(name => ['eth_accounts', 'eth_requestAccounts', 'eth_chainId', 'eth_call', 'eth_blockNumber', 'eth_signTypedData_v4'].includes(name)));
+    assert(methods.every(name => ['eth_accounts', 'eth_requestAccounts', 'eth_chainId', 'eth_call', 'eth_blockNumber', 'eth_getLogs', 'eth_signTypedData_v4'].includes(name)));
     assert.deepEqual(errors, []); assert.deepEqual(violations, []); assert.deepEqual(await page.evaluate(() => window.fixtureViolations), []);
     console.log(`${actor} ${collection}: real gameplay → selected wallet → declined/retry signature → verified public replay (${saved.metrics.ticks} real ticks), exact art, no transaction.`);
     await page.close();

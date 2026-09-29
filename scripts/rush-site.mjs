@@ -46,7 +46,7 @@ export async function buildRushSite({ outdir = path.join(project, 'dist'), watch
     if (!gameHostHTML.includes('</head>')) throw new Error('The SDK host HTML has no head for site chrome.');
     await writeFile(gameHostPath, gameHostHTML.replace('</head>', '<link rel="icon" type="image/svg+xml" sizes="any" href="/favicon.svg"><script type="module" src="/host-navigation.js"></script></head>'));
     page = await context({
-      absWorkingDir: project, entryPoints: { landing: path.join(landing, 'index.tsx'), 'host-navigation': path.join(landing, '../host-navigation.ts'), 'docs/index': path.join(landing, '../docs/index.tsx'), 'pitch/index': path.join(landing, '../pitch/index.tsx'), 'genesis/index': path.join(landing, '../genesis/index.tsx'), 'genesis/child': path.join(landing, '../genesis/child.tsx'), 'community/index': path.join(landing, '../community/index.tsx') }, outdir,
+      absWorkingDir: project, entryPoints: { landing: path.join(landing, 'index.tsx'), 'host-navigation': path.join(landing, '../host-navigation.ts'), 'docs/index': path.join(landing, '../docs/index.tsx'), 'pitch/index': path.join(landing, '../pitch/index.tsx'), 'genesis/index': path.join(landing, '../genesis/index.tsx'), 'genesis/child': path.join(landing, '../genesis/child.tsx'), 'community/index': path.join(landing, '../community/index.tsx'), 'free-play/index': path.join(landing, '../free-play/index.tsx') }, outdir,
       bundle: true, platform: 'browser', format: 'esm', target: 'es2022', jsx: 'automatic', minify: true,
       loader: { '.woff2': 'file' }, assetNames: 'assets/[name]-[hash]', metafile: true,
       define: { 'process.env.NODE_ENV': '"production"', '__RUSH_PUBLIC_SITE__': 'true' }, logLevel: 'warning',
@@ -55,6 +55,8 @@ export async function buildRushSite({ outdir = path.join(project, 'dist'), watch
           if (result.errors.length) return;
           await writeFile(path.join(outdir, 'favicon.svg'), await readFile(path.join(landing, '../assets/favicon.svg')));
           await writeFile(path.join(outdir, 'index.html'), await readFile(path.join(landing, 'index.html')));
+          await mkdir(path.join(outdir, 'free-play'), { recursive: true });
+          await writeFile(path.join(outdir, 'free-play/index.html'), await readFile(path.join(landing, '../free-play/index.html')));
           for(const [route,title] of [['agent-play','Agent Play'],['runs-feed','Runs Feed'],['leaderboard','Leaderboard']]){
             await mkdir(path.join(outdir,route),{recursive:true});
             await writeFile(path.join(outdir,route,'index.html'),`<!doctype html><html lang="en"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="theme-color" content="#000000"><title>Rare Rush | ${title}</title><link rel="icon" href="/favicon.svg"><link rel="stylesheet" href="/community/index.css"></head><body><div id="app"></div><script type="module" src="/community/index.js"></script></body></html>`);
@@ -98,6 +100,10 @@ export function createRushSiteServer(outdir) {
   const directory = path.resolve(outdir);
   const gameServer = createGameServer(path.join(directory, 'play'));
   const publicFiles = new Map([
+    ['/free-play/', ['free-play/index.html', 'text/html; charset=utf-8']],
+    ['/free-play/index.html', ['free-play/index.html', 'text/html; charset=utf-8']],
+    ['/free-play/index.js', ['free-play/index.js', 'text/javascript; charset=utf-8']],
+    ['/free-play/index.css', ['free-play/index.css', 'text/css; charset=utf-8']],
     ['/agent-play/', ['agent-play/index.html','text/html; charset=utf-8']],
     ['/runs-feed/', ['runs-feed/index.html','text/html; charset=utf-8']],
     ['/leaderboard/', ['leaderboard/index.html','text/html; charset=utf-8']],
@@ -136,6 +142,7 @@ export function createRushSiteServer(outdir) {
       const url = new URL(request.url, 'http://localhost');
       if (url.pathname === '/agent-play' || url.pathname === '/runs-feed' || url.pathname === '/leaderboard') { response.writeHead(308,{Location:url.pathname+'/'}).end(); return; }
       if (url.pathname === '/play') { response.writeHead(308, { Location: '/play/' }).end(); return; }
+      if (url.pathname === '/free-play') { response.writeHead(308, { Location: '/free-play/' }).end(); return; }
       if (url.pathname === '/docs') { response.writeHead(308, { Location: '/docs/' }).end(); return; }
       if (url.pathname === '/pitch') { response.writeHead(308, { Location: '/pitch/' }).end(); return; }
       if (url.pathname === '/arcade' || url.pathname === '/genesis') { response.writeHead(308, { Location: `${url.pathname}/` }).end(); return; }

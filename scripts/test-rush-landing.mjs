@@ -143,7 +143,7 @@ try {
     await page.evaluate(() => window.scrollTo(0, 0));
     await page.screenshot({ path: `artifacts/landing-${label}.png`, fullPage: true, animations: 'allow' });
     if (width < 600) {
-      await page.locator('.landing-footer').scrollIntoViewIfNeeded();
+      await page.locator('.rush-site-footer').scrollIntoViewIfNeeded();
       await page.clock.runFor(150);
       const bounds = await preview.boundingBox();
       assert(bounds.y + bounds.height < 0, 'Preview is offscreen for visibility test');
@@ -151,8 +151,9 @@ try {
       await page.clock.runFor(600);
       assert.equal(await preview.getAttribute('data-preview-distance'), offscreenDistance, 'Offscreen autoplay is suspended');
     }
-    await page.getByRole('link', { name: /PLAY WITH YOUR FRIEND/ }).click();
-    await page.waitForURL(`${origin}/arcade/`);
+    assert.equal(await page.locator('.landing-actions a[href="./free-play/"]').count(), 1, 'Free Play has a direct no-wallet entry');
+    await page.locator('.landing-cta-wallet').click();
+    await page.waitForURL(`${origin}/arcade/#collections`);
     assert.equal(await page.locator('.collection-cards a[href="/genesis/"]').count(), 1, 'Collection choice offers Genesis');
     assert.equal(await page.locator('.collection-cards a[href="/play/"]').count(), 1, 'Collection choice preserves Generations SDK entry');
     await page.locator('.collection-cards a[href="/play/"]').click();
