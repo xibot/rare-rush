@@ -2,6 +2,7 @@ node_modules
 dist/
 games/*/.friendsdk/
 artifacts/
+output/audio/
 .vercel/
 server/generated/
 .DS_Store

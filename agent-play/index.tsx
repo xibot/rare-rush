@@ -12,6 +12,7 @@ import { DIFFICULTIES } from '../games/rare-rush/difficulty.ts';
 import { createAgentSession, advanceAgent, createReplaySession, advanceReplay, resumeAgentSession, exportAgentReplay, PROTOCOL_VERSION,
   type Difficulty, type RunSession } from './runner.ts';
 import { AgentStage } from './Stage.tsx';
+import { useRunAudio, RunAudioControls } from '../games/rare-rush/audio/useRunAudio.tsx';
 import { AgenticPanel } from './AgenticPanel.tsx';
 import { RunsFeed } from './RunsFeed.tsx';
 import { Leaderboard } from './Leaderboard.tsx';
@@ -83,6 +84,7 @@ function App() {
   const checkpointTick=useRef(0);
   const completed=useRef(false);
   const playing = screen==='watch';
+  const audio = useRunAudio(session.run, playing && running, session.kind==='agent' && page==='play' && view==='autopilot');
   const frozen = playing || !!busy || !!tn?.busy;
   const selectionMatches = tn?.selected?.collection===collection && tn.selected.tokenId===tokenId;
   const pending = tn?.playState?.pending || tn?.assetPending;
@@ -294,6 +296,7 @@ function App() {
     else {play();requestAnimationFrame(()=>stageAnchor.current?.scrollIntoView({behavior:'smooth',block:'start'}));}
   }
   async function begin() {
+    void audio.unlock();
     if(!validId(tokenId))throw new Error('Enter a positive Friend ID.');
     let runSeed=seed(), runId:string|undefined, player:string|undefined, art:any;
     if(source==='arcade'){
@@ -308,6 +311,7 @@ function App() {
     launch(createAgentSession(runSeed,difficulty),{source,collection,tokenId,difficulty,seed:runSeed,...(runId?{runId}:{}),...(player?{player}:{})},art);
   }
   function resumeSaved() {
+    void audio.unlock();
     const snap=adapter.current!.snapshot(),saved=snap.playState?.savedRun;if(!saved)throw new Error('No saved Testnet run.');
     if(saved.run.player.toLowerCase()!==snap.account?.toLowerCase()||snap.chainId!==46630||!snap.verified)throw new Error('Reconnect the run wallet on Robinhood Testnet.');
     if(snap.playState?.pending||snap.assetPending)throw new Error('Recover the pending wallet transaction first.');
@@ -325,6 +329,7 @@ function App() {
     launch(s,full,art);setRecord(full);
   }
   async function resume(){
+    void audio.unlock();
     if(session.kind==='agent'&&current?.source==='arcade'){
       if(!arcade || arcade.account.toLowerCase()!==current.player?.toLowerCase())throw new Error('Reconnect the original Arcade wallet to resume.');
       const art=await loadArcadeFriend(arcade.provider,arcade.account,current.collection,current.tokenId);setArcadeArt(art);artRef.current=art;
@@ -370,7 +375,7 @@ function App() {
       <div id="autopilot-panel" role="tabpanel" aria-labelledby="autopilot-tab" hidden={view!=='autopilot'}>
       <div ref={stageAnchor} className="watch-section" data-screen={screen} data-tick={tick}>
         <div className="section-top"><span className="eyebrow">01 / {session.kind==='replay'?'WATCH THE REPLAY':'WATCH THE RUSH'}</span><span>{screen==='ready'?'READY WHEN YOU ARE':screen==='result'?'RUN COMPLETE':running?'AGENT AT THE CONTROLS':'PAUSED'}</span></div>
-        <AgentStage actor={session.kind==='replay'?resolveRunActor(record):'autopilot'} run={session.run} collection={displayCollection} tokenId={validId(displayToken)?displayToken:'1'} running={running} reducedMotion={reduced} label={(current?.source??source)==='testnet'?'TESTNET':(current?.source??source)==='arcade'?'ARCADE':'LOCAL PREVIEW'} art={arcadeArt??undefined} fieldOverlay={screen==='result'&&<div className="agent-result-overlay" role="dialog" aria-label="Agent run result"><section className="result-card"><p className="eyebrow">{session.run.finishReason==='time'?'TIMER SURVIVED.':'OUT OF HEARTS.'}</p><h2 ref={resultHeading} tabIndex={-1}>{session.run.finishReason==='time'?'KEEP IT RARE.':'ANOTHER RUSH AWAITS.'}</h2><div className="result-score">{session.run.score.toLocaleString()}<span>POINTS</span></div><div className="result-stats"><span><b>{Math.floor(session.run.distance).toLocaleString()}m</b>DISTANCE</span><span><b>{session.run.coins}</b>COINS</span><span><b>{session.run.hearts}</b>HEARTS</span></div><p>{record?(PUBLIC_SITE?'✓ Replay verified and saved to the public feed.':'✓ Replay checked locally and saved to this computer.'):'Replay ready to save.'}</p><div className="inline-actions"><button onClick={download}>SAVE REPLAY ↓</button>{record&&<button disabled={!!busy} onClick={openFeed}>VIEW IN RUNS FEED ↗</button>}{record&&<button disabled={!!busy} onClick={()=>void act('Loading replay…',async()=>{await replayRecord(record);})}>WATCH REPLAY ▶</button>}{!record&&(PUBLIC_SITE?current?.source!=='local':true)&&<button disabled={!!busy} onClick={()=>void act(PUBLIC_SITE?'Sign to publish your replay…':'Saving replay…',async()=>{if(PUBLIC_SITE)await savePublicRun();else await finish(session);})}>{PUBLIC_SITE?'SAVE RUN':'RETRY SAVE'}</button>}</div>{PUBLIC_SITE&&current?.source!=='local'&&!record&&<p className="community-publish-note">Sign to publish your wallet address, Friend and replay. No transaction or gas fee.</p>}
+        <AgentStage topActions={session.kind==='agent'?<RunAudioControls audio={audio}/>:undefined} actor={session.kind==='replay'?resolveRunActor(record):'autopilot'} run={session.run} collection={displayCollection} tokenId={validId(displayToken)?displayToken:'1'} running={running} reducedMotion={reduced} label={(current?.source??source)==='testnet'?'TESTNET':(current?.source??source)==='arcade'?'ARCADE':'LOCAL PREVIEW'} art={arcadeArt??undefined} fieldOverlay={screen==='result'&&<div className="agent-result-overlay" role="dialog" aria-label="Agent run result"><section className="result-card"><p className="eyebrow">{session.run.finishReason==='time'?'TIMER SURVIVED.':'OUT OF HEARTS.'}</p><h2 ref={resultHeading} tabIndex={-1}>{session.run.finishReason==='time'?'KEEP IT RARE.':'ANOTHER RUSH AWAITS.'}</h2><div className="result-score">{session.run.score.toLocaleString()}<span>POINTS</span></div><div className="result-stats"><span><b>{Math.floor(session.run.distance).toLocaleString()}m</b>DISTANCE</span><span><b>{session.run.coins}</b>COINS</span><span><b>{session.run.hearts}</b>HEARTS</span></div><p>{record?(PUBLIC_SITE?'✓ Replay verified and saved to the public feed.':'✓ Replay checked locally and saved to this computer.'):'Replay ready to save.'}</p><div className="inline-actions"><button onClick={download}>SAVE REPLAY ↓</button>{record&&<button disabled={!!busy} onClick={openFeed}>VIEW IN RUNS FEED ↗</button>}{record&&<button disabled={!!busy} onClick={()=>void act('Loading replay…',async()=>{await replayRecord(record);})}>WATCH REPLAY ▶</button>}{!record&&(PUBLIC_SITE?current?.source!=='local':true)&&<button disabled={!!busy} onClick={()=>void act(PUBLIC_SITE?'Sign to publish your replay…':'Saving replay…',async()=>{if(PUBLIC_SITE)await savePublicRun();else await finish(session);})}>{PUBLIC_SITE?'SAVE RUN':'RETRY SAVE'}</button>}</div>{PUBLIC_SITE&&current?.source!=='local'&&!record&&<p className="community-publish-note">Sign to publish your wallet address, Friend and replay. No transaction or gas fee.</p>}
           {isTestnetRun&&matchesSaved&&stateRun&&<div className="claim-actions">{stateRun.status==='claimed'?<p className="lime">MINT CONFIRMED · {stateRun.reward?`${fmt(BigInt(stateRun.reward),6)} tRARERUSH`:''}</p>:!claimWindowOpen?<p>This run’s claim window expired. Pick your next run; its replay remains saved locally.</p>:session.run.finishReason==='time'?<><p>Survived runs can request a verifier signature, then claim through your wallet.</p><button disabled={!!busy||!!pending} onClick={()=>void act(freshClaim?'Confirm claim in your wallet…':'Sign replay authorization…',async()=>{if(freshClaim){await adapter.current!.claim();setNotice('Your Testnet mint is confirmed.');}else{await adapter.current!.verify();setNotice('Replay verified. Claim in your wallet when ready.');}})}>{freshClaim?'CLAIM TESTNET REWARD ↗':'VERIFY TESTNET RUN ↗'}</button></>:stateRun.status!=='abandoned'&&<><p>This run earned no claim. Close it onchain to free this NFT for its next attempt.</p><button disabled={!!busy||!!pending} onClick={()=>void act('Close run in your wallet…',async()=>{await adapter.current!.abandon();setNotice('Run closed. Remaining daily attempts are available.');})}>CLOSE TESTNET RUN</button></>}</div>}
           <button className="primary next-run" disabled={!!busy} onClick={()=>void act('Preparing next run…',reset)}>PICK NEXT RUN ↗</button>
           {busy&&<p className="result-progress" role="status">{busy}</p>}

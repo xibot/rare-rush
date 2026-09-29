@@ -2,6 +2,7 @@ import { PROTOCOL_VERSION } from '../../generated/infra/testnet/src/protocol.ts'
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { createPublicClient, createWalletClient, custom, formatUnits, http, isHash, parseAbi, type Address, type EIP1193Provider, type Hash } from 'viem';
 import { RunCanvas, TestFriendAvatar } from './RunCanvas.tsx';
+import { useAudioController } from '../../generated/games/rare-rush/audio/useRunAudio.tsx';
 import { ArcadeCabinet } from './ArcadeCabinet.tsx';
 import { CollectionChoice, CollectionFriends } from './CollectionEntry.tsx';
 import { SiteHeader } from '../SiteHeader.tsx';
@@ -52,6 +53,7 @@ function readPlayRoute(): PlayRoute {
 }
 
 export function App() {
+  const audio = useAudioController();
   const dashboard = location.pathname.startsWith('/dashboard');
   const [route, setRoute] = useState(readPlayRoute);
   const [account, setAccount] = useState<Address|null>(null);
@@ -446,7 +448,7 @@ export function App() {
       {(busy||error||info||server!=='ready')&&<div className="arcade-feedback">{feedback}</div>}
       {pendingPanel}
       {showStoredRun&&run ? <>
-        {active ? <RunCanvas key={run.run.runId} seed={run.run.seed} difficulty={MODES[run.run.difficulty]} collection={run.run.collection} tokenId={run.run.tokenId} runId={run.run.runId} initialReplay={run.replay} completedTicks={run.completedTicks} onProgress={progress} onFinish={finish}/> :
+        {active ? <RunCanvas audio={audio} key={run.run.runId} seed={run.run.seed} difficulty={MODES[run.run.difficulty]} collection={run.run.collection} tokenId={run.run.tokenId} runId={run.run.runId} initialReplay={run.replay} completedTicks={run.completedTicks} onProgress={progress} onFinish={finish}/> :
           <ArcadeCabinet difficulty={MODES[run.run.difficulty]} collection={run.run.collection} tokenId={run.run.tokenId} runId={run.run.runId} snapshot={stats??undefined}><div className="game-overlay result-screen"><div className="result-card testnet-result">{runSummary}</div></div></ArcadeCabinet>}
         <div className="arcade-run-heading">{runHeading}</div>
       </> : selected && <ArcadeCabinet difficulty={MODES[difficulty]} collection={selected.collection} tokenId={selected.tokenId}>

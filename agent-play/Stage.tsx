@@ -22,12 +22,14 @@ export type AgentStageProps = {
   /** Saved Arcade artwork or the cosmetic art for this Testnet run. */
   art?: Pick<ArcadeFriend, 'sprites' | 'bodyId' | 'portraitUrl' | 'label'>;
   fieldOverlay?: ReactNode;
+  /** The active host may supply controls; thumbnails and replay viewers stay silent. */
+  topActions?: ReactNode;
 };
 
 const ZONES = ['GARDEN COMMONS', 'CIRCUIT COURTYARD', 'CRYSTAL MESA'];
 
 /** Watch-only presentation. The host owns time, inputs, replay, and run controls. */
-export function AgentStage({ run, collection, tokenId, running, actor, reducedMotion, label = 'LOCAL', art: realArt, fieldOverlay }: AgentStageProps) {
+export function AgentStage({ run, collection, tokenId, running, actor, reducedMotion, label = 'LOCAL', art: realArt, fieldOverlay, topActions }: AgentStageProps) {
   const shell = useRef<HTMLElement>(null);
   const [viewportWidth, setViewportWidth] = useState(960);
   const testArt = useMemo(() => testRunArt(collection, tokenId, 'agent-play'), [collection, tokenId]);
@@ -72,7 +74,7 @@ export function AgentStage({ run, collection, tokenId, running, actor, reducedMo
         <svg viewBox="0 0 30 30" aria-hidden="true"><TokenCoin size={30}/></svg>
         <span>RARE<span>RUSH</span></span>
       </div>
-      <div className="agent-stage-tags"><span>AGENT PLAY</span><b>{label}</b></div>
+      <div className="agent-stage-actions"><div className="agent-stage-tags"><span>AGENT PLAY</span><b>{label}</b></div>{topActions}</div>
     </header>
 
     <div className="agent-stage-hud" aria-label="Run statistics">

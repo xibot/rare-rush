@@ -11,9 +11,11 @@ import { advanceRecorder, createRecorder, exportReplay, queueControls, releaseCo
   type DifficultyId, type Replay, type RunSnapshot } from './recorder.ts';
 import { testRunArt } from './art.ts';
 import { ArcadeCabinet } from './ArcadeCabinet.tsx';
+import { useAudioController, RunAudioControls } from '../../generated/games/rare-rush/audio/useRunAudio.tsx';
 
 export type RunCanvasProps = {
   seed: Hex;
+  audio?: ReturnType<typeof useAudioController>;
   difficulty: DifficultyId;
   collection: 0 | 1;
   tokenId: string | bigint;
@@ -27,7 +29,15 @@ export type RunCanvasProps = {
 
 /** A new confirmed run creates a new session; callback rerenders never reset an active recording. */
 export function RunCanvas(props: RunCanvasProps) {
-  return <RunSession key={`${props.runId}:${props.seed}:${props.difficulty}`} {...props}/>;
+  return props.audio
+    ? <RunSession key={`${props.runId}:${props.seed}:${props.difficulty}`} {...props} audio={props.audio}/>
+    : <StandaloneRunCanvas {...props}/>;
+}
+
+/** Standalone development/test canvases own their audio; the app keeps it through results. */
+function StandaloneRunCanvas(props: RunCanvasProps) {
+  const audio = useAudioController();
+  return <RunSession key={`${props.runId}:${props.seed}:${props.difficulty}`} {...props} audio={audio}/>;
 }
 
 export function TestFriendAvatar({ collection, tokenId }: { collection: 0 | 1; tokenId: string | bigint }) {
@@ -37,7 +47,7 @@ export function TestFriendAvatar({ collection, tokenId }: { collection: 0 | 1; t
   </svg>;
 }
 
-function RunSession(props: RunCanvasProps) {
+function RunSession(props: RunCanvasProps & { audio: ReturnType<typeof useAudioController> }) {
   const [recording] = useState(() => createRecorder(props.seed, props.difficulty, props.initialReplay, props.completedTicks));
   const [art] = useState(() => testRunArt(props.collection, props.tokenId, props.runId));
   const [run, setRun] = useState(() => snapshotRun(recording));
@@ -58,6 +68,13 @@ function RunSession(props: RunCanvasProps) {
   const noticeExpires = useRef(0);
   const mode = difficultySettings(props.difficulty);
   const isFinished = run.status === 'finished';
+  const audio = props.audio;
+
+  useEffect(() => { audio.update(recording.run, !paused && !isFinished); });
+  useEffect(() => () => {
+    // The parent keeps the short outcome cue alive when it replaces the canvas.
+    if (recording.run.status !== 'finished') audio.pause();
+  }, [recording]);
 
   function checkpoint(final = false) {
     const replay = exportReplay(recording);
@@ -65,6 +82,7 @@ function RunSession(props: RunCanvasProps) {
     callbacks.current.onProgress(replay, snapshot);
     lastCheckpoint.current = snapshot.completedTicks;
     if (final && !finished.current) {
+      audio.update(recording.run, false);
       callbacks.current.onFinish(replay, snapshot);
       finished.current = true;
     }
@@ -93,6 +111,7 @@ function RunSession(props: RunCanvasProps) {
   }
   function resume() {
     if (recording.run.status !== 'running' || document.hidden) return;
+    void audio.unlock();
     clearInput();
     setSaveError('');
     if (!persistSafely()) return;
@@ -254,7 +273,7 @@ function RunSession(props: RunCanvasProps) {
 
   return <section ref={shell} className="rush-run" aria-label="Rare Rush testnet run" data-run-id={props.runId.toString()} data-status={run.status} data-paused={paused} data-phase={run.phase} data-tick={run.completedTicks} data-difficulty={props.difficulty}>
     <ArcadeCabinet difficulty={props.difficulty} collection={props.collection} tokenId={props.tokenId} runId={props.runId} snapshot={run} world={world} fieldOverlays={overlays} onHome={returnHome} touchControls={touchControls}
-      topActions={<><button type="button" onClick={() => setReduced(value => !value)} aria-pressed={reduced} title="Reduce background motion">FX {reduced ? 'OFF' : 'ON'}</button><button type="button" onClick={paused ? resume : pause} disabled={isFinished} aria-label={paused ? '▶ RESUME' : 'Ⅱ PAUSE'}>{paused ? '▶' : 'Ⅱ'}</button></>}>
+      topActions={<><RunAudioControls audio={audio} onInteract={() => { if (!pausedRef.current) stage.current?.focus({ preventScroll: true }); }}/><button type="button" onClick={() => setReduced(value => !value)} aria-pressed={reduced} title="Reduce background motion">FX {reduced ? 'OFF' : 'ON'}</button><button type="button" onClick={paused ? resume : pause} disabled={isFinished} aria-label={paused ? '▶ RESUME' : 'Ⅱ PAUSE'}>{paused ? '▶' : 'Ⅱ'}</button></>}>
       {paused && !hasStarted && !isFinished && <div className="start-screen">
         <div className="start-title"><span className="eyebrow">ENDLESS WORLD. {mode.seconds} SECONDS.</span><h1>RARE<br/><span>RUSH</span><sup>✦</sup></h1><span className="mobile-friend"><TestFriendAvatar collection={props.collection} tokenId={props.tokenId}/></span><div className="selected-friend">{props.collection === 1 ? 'GENESIS' : 'FRIEND'} #{props.tokenId.toString()}<span>{props.collection === 1 ? '100× REWARDS' : art.sprites.familyName}</span></div></div>
         <div className="start-card confirmed-start-card"><span className="card-kicker">{label}</span><h2>Run. Collect.<br/>{' '}Stay rare.</h2><div className="quick-stats"><span>MODE<b>{mode.label}</b></span><span>TIME<b>{mode.seconds}s</b></span><span>HEARTS<b>3</b></span></div><button type="button" className="primary" onClick={resume}>LET’S RUSH <span>↗</span></button><small className="entry-note">Your testnet entry is confirmed. Ready when you are.</small><small className="run-window-note">The onchain claim window continues while paused.</small>{saveError && <p className="run-save-error" role="alert">{saveError}</p>}</div>
