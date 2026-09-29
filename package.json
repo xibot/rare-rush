@@ -18,6 +18,7 @@
     "audio:export": "node tools/sound-studio/export.mjs",
     "audio:studio": "node tools/sound-studio/server.mjs",
     "test:landing": "node scripts/test-rush-landing.mjs",
+    "test:anchors": "node scripts/test-rush-anchors.mjs",
     "test:docs": "node scripts/test-rush-docs.mjs",
     "test:pitch": "node scripts/test-rush-pitch.mjs",
     "test:genesis": "node scripts/test-rush-genesis.mjs",
