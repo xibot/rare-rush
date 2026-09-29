@@ -120,7 +120,7 @@ Arcade/community and Testnet use separate hosting projects. Contract source and 
 
 Found a bug, an awkward turn, or an idea for the next run? [Open an issue](https://github.com/xibot/rare-rush/issues) or reach out to [XIBOT on X](https://x.com/xavieriturralde).
 
-For playtest reports, include Arcade or Testnet, your device/browser, difficulty, and what happened. A screenshot or short recording helps. Never include private keys, seed phrases, or private RPC credentials.
+For playtest reports, include Free Play, Arcade or Testnet, your device/browser, difficulty, and what happened. A screenshot or short recording helps. Never include private keys, seed phrases, or private RPC credentials.
 
 ## Credits
 

@@ -6,7 +6,7 @@ The main site serves `/agent-play/`, `/leaderboard/`, `/runs-feed/`, and `/agent
 
 Autopilot runs in the browser. Agentic jobs run through `node agent-play/cli.mjs` in the agent’s own environment. The skill supplies setup and retry rules; it does not install a wallet or create a schedule.
 
-Arcade and Testnet result screens offer **SAVE RUN**. Publication is optional, needs a wallet EIP-712 message signature, and sends no transaction. Testnet verification/claiming remains a separate action. Preview recordings stay local and cannot enter the public feed.
+Wallet-connected Arcade and Testnet result screens offer **SAVE RUN**. Publication is optional, needs a wallet EIP-712 message signature, and sends no transaction. Testnet verification/claiming remains a separate action. Free Play keeps per-difficulty best scores in the browser and does not publish replays. Autopilot Preview recordings stay local and cannot enter the public feed.
 
 `POST /api/runs` accepts a bounded full recording, selected Friend identity, actor label, and short-lived `RareRushPublicReplay` authorization. The server recovers the signer, replays canonical fixed-step inputs to calculate the score, and validates current Arcade NFT ownership or the original onchain Testnet run. It never accepts client-uploaded score totals. Actor labels are descriptive, not human/AI attestation; saved Arcade artwork is submitted by the signing wallet.
 

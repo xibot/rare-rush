@@ -141,3 +141,13 @@ The landing now restores its initial URL fragment after React renders the target
 - `npm run typecheck`: passed.
 - `RUSH_BROWSER_CHANNEL=chrome npm run test:anchors`: passed against an isolated production build. Actual navbar clicks from Docs, Pitch, Arcade, Free Play, Agent Play, Runs Feed, Leaderboard, Genesis and the Generations SDK entry reached the section with delayed JavaScript loading.
 - Direct fragment loads and reloads passed at 1440px and 390px with delayed fonts. Same-page and repeated clicks, reduced motion, and ordinary homepage visits retaining their top position passed. All checked pages had no uncaught browser errors.
+
+## Free Play documentation refresh — September 29, 2026
+
+The public guide, pitch, developer game README, community notes and existing submission now describe Free Play alongside wallet-connected Arcade and Testnet. The copy covers six Genesis and six Generations sample appearances, manual keyboard/touch play, the shared soundtrack and directional gameplay, per-difficulty browser bests, and the wallet requirement for public replay publication. Guide and pitch entry links open Free Play directly; their Arcade and Testnet links remain available.
+
+- `npm run typecheck` and all five `npm run test:free-play` storage checks passed.
+- `npm run test:docs` passed in local Chrome at 1440, 390 and 360px, including guide interactions, Free Play navigation and the 6+6 picker, layout, fonts, existing Arcade ownership-gate navigation and static-file boundaries.
+- `npm run test:pitch` passed in local Chrome at 1440, 768, 390 and 360px, including responsive layout, local fonts, video playback/pause, reduced motion, Free Play entry and the existing Arcade gate. Both suites built isolated production output. Desktop and phone screenshots were inspected.
+
+This refresh changes documentation, page copy and entry links. The earlier gameplay and audio results above remain dated release records; no new wallet transactions or contract changes were made for this update.

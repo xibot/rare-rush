@@ -50,8 +50,9 @@ try {
     assert.equal(await preview.getAttribute('controls'), '', 'Native playback controls are available');
     assert.equal(await preview.getAttribute('playsinline'), '', 'Mobile playback stays inline');
     assert.match(await page.locator('#pitch-video-caption').innerText(), /Recorded Testnet demo gameplay · normal speed/);
-    assert.equal(await page.locator('.pitch-playable .pitch-playable-grid article').count(), 2);
-    assert.match(await page.locator('.pitch-playable .pitch-playable-grid article').first().innerText(), /mainnet.*simulated/s);
+    assert.equal(await page.locator('.pitch-playable .pitch-playable-grid article').count(), 3);
+    assert.equal(await page.locator('.pitch-hero .pitch-button').getAttribute('href'), '/free-play/');
+    assert.match(await page.locator('.pitch-playable .pitch-playable-grid article').nth(1).innerText(), /mainnet.*simulated/s);
     assert.match(await page.locator('.pitch-playable .pitch-playable-grid article').last().innerText(), /chain 46630.*no real value/s);
     assert.equal(await page.locator('.pitch-playable .pitch-playable-grid a').last().getAttribute('href'), 'https://testnet.rarerush.app');
     assert.match(await page.locator('.pitch-future-heading').innerText(), /LIVE ON ROBINHOOD TESTNET/);
@@ -84,6 +85,11 @@ try {
     await page.waitForTimeout(300);
     assert.equal(await preview.evaluate(el => el.currentTime), offscreen, 'Offscreen clip stops playing');
     await page.screenshot({ path: `artifacts/pitch-${width}-full.png`, fullPage: true });
+    await page.locator('.pitch-endcap a[href="/free-play/"]').click();
+    await page.waitForURL(`${origin}/free-play/`);
+    await page.getByRole('heading', { name: 'Choose a sample Friend', exact: true }).waitFor();
+    assert.equal(await page.getByTestId('sample-friend').count(), 12, 'Pitch Free Play CTA opens the sample picker directly');
+    await page.goto(`${origin}/pitch/`);
     await page.locator('main a[href="/arcade/"]').last().click();
     await page.waitForURL(`${origin}/arcade/`);
     assert.equal(await page.locator('.collection-cards a[href="/genesis/"]').count(), 1);
@@ -93,7 +99,7 @@ try {
     assert.equal(await page.locator('iframe').count(), 0, 'Pitch CTA preserves the real SDK ownership gate');
     assert.deepEqual(errors, []); assert.deepEqual(external, []); assert.deepEqual(failures, []);
     await page.close();
-    console.log(`${width}px: pitch navigation, current build status, fonts, layout, real video playback, pause, offscreen suspension and gated play passed`);
+    console.log(`${width}px: pitch navigation, current build status, fonts, layout, real video playback, pause, offscreen suspension, Free Play and gated wallet play passed`);
   }
   const page = await browser.newPage({ viewport: { width: 390, height: 844 }, reducedMotion: 'reduce' });
   await page.goto(`${origin}/pitch/`);

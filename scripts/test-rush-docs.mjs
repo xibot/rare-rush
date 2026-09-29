@@ -40,7 +40,8 @@ try {
     assert.equal(await page.locator('.docs-logo small').count(), 0);
     assert.equal(await page.locator('.docs-nav a').count(), 8);
     await page.screenshot({ path: `artifacts/docs-${width}-hero.png` });
-    assert.equal(await page.locator('#start .experience-card').count(), 2, 'Guide offers both live experiences');
+    assert.equal(await page.locator('#start a[href="/free-play/"]').count(), 1, 'Guide offers manual play without a wallet');
+    assert.equal(await page.locator('#start .experience-card').count(), 2, 'Guide also offers both wallet-connected experiences');
     assert.equal(await page.locator('#start .experience-card a[href="/arcade/"]').count(), 1);
     assert.equal(await page.locator('#start .experience-card a[href="https://testnet.rarerush.app/"]').count(), 1);
     assert.match(await page.locator('#start .experience-grid').innerText(), /SIMULATED REWARDS/);
@@ -121,7 +122,13 @@ try {
     assert.deepEqual(external, [], 'Guide runs without wallet, RPC or external assets');
     assert.deepEqual(failed, [], 'All bundled guide resources load');
     await page.screenshot({ path: `artifacts/docs-${width}-full.png`, fullPage: true });
-    await page.getByRole('link', { name: 'LET’S RUSH ↗' }).click();
+    await page.locator('.docs-cta').click();
+    await page.waitForURL(`${origin}/free-play/`);
+    await page.getByRole('heading', { name: 'Choose a sample Friend' }).waitFor();
+    assert.equal(await page.locator('[data-testid="sample-friend"][data-collection="genesis"]').count(), 6, 'Guide CTA reaches six sample Genesis appearances');
+    assert.equal(await page.locator('[data-testid="sample-friend"][data-collection="generations"]').count(), 6, 'Guide CTA reaches six sample Generations appearances');
+    await page.goBack();
+    await page.locator('#start .experience-card a[href="/arcade/"]').click();
     await page.waitForURL(`${origin}/arcade/`);
     assert.equal(await page.locator('.collection-cards a[href="/genesis/"]').count(), 1, 'Guide offers the Genesis tester route');
     await page.locator('.collection-cards a[href="/play/"]').click();
@@ -129,7 +136,7 @@ try {
     await page.getByRole('button', { name: 'Check for wallet', exact: true }).waitFor();
     assert.equal(await page.locator('iframe').count(), 0, 'Guide CTA reaches real ownership gate');
     await page.close();
-    console.log(`${width}px: navigation, fonts, layout, growth, reward curve, shared difficulty, FAQ, collection choice and SDK entry passed`);
+    console.log(`${width}px: navigation, fonts, layout, growth, reward curve, shared difficulty, FAQ, Free Play samples, collection choice and SDK entry passed`);
   }
   const page = await browser.newPage();
   const redirect = await page.request.get(`${origin}/docs`, { maxRedirects: 0 });
