@@ -16,6 +16,9 @@ export type RunsFeedProps = {
   onRetry: () => void;
   previewsPaused?: boolean;
   publicFeed?: boolean;
+  hasMore?: boolean;
+  loadingMore?: boolean;
+  onLoadMore?: () => Promise<boolean>;
 };
 
 type EnvironmentFilter = 'all' | RunRecord['source'];
@@ -77,7 +80,7 @@ const RunCard = memo(function RunCard({ record, liked, animate, candidateKey, on
   );
 });
 
-export function RunsFeed({ records, likes, onToggleLike, onOpen, onBack, loading, error, onRetry, previewsPaused = false, publicFeed = false }: RunsFeedProps) {
+export function RunsFeed({ records, likes, onToggleLike, onOpen, onBack, loading, error, onRetry, previewsPaused = false, publicFeed = false, hasMore = false, loadingMore = false, onLoadMore }: RunsFeedProps) {
   const id = useId();
   const [environment, setEnvironment] = useState<EnvironmentFilter>('all');
   const [likedOnly, setLikedOnly] = useState(false);
@@ -90,6 +93,7 @@ export function RunsFeed({ records, likes, onToggleLike, onOpen, onBack, loading
   const [visibleCovers, setVisibleCovers] = useState<ReadonlySet<string>>(() => new Set());
   const [catalogues, setCatalogues] = useState<ReadonlyMap<string, readonly ReplayPreviewCandidate[]>>(() => new Map());
   const grid = useRef<HTMLDivElement>(null);
+  const paging = useRef(false);
   const actions = useRef({ onOpen, onToggleLike });
   actions.current = { onOpen, onToggleLike };
   const openRun = useCallback((record: RunRecord) => actions.current.onOpen(record), []);
@@ -157,6 +161,22 @@ export function RunsFeed({ records, likes, onToggleLike, onOpen, onBack, loading
     setVisible(PAGE_SIZE);
   }
 
+  async function showMoreRuns() {
+    if (loading || loadingMore || paging.current) return;
+    if (visible < filtered.length) {
+      setVisible(value => value + PAGE_SIZE);
+      return;
+    }
+    if (!hasMore || !onLoadMore) return;
+    paging.current = true;
+    try {
+      // The same click fetches the next page and reveals its cards.
+      if (await onLoadMore()) setVisible(value => value + PAGE_SIZE);
+    } finally {
+      paging.current = false;
+    }
+  }
+
   return (
     <section className="runs-feed" aria-labelledby={`${id}-title`}>
       <div className="runs-feed-heading">
@@ -192,7 +212,6 @@ export function RunsFeed({ records, likes, onToggleLike, onOpen, onBack, loading
         <div ref={grid} className="runs-feed-grid">{shownRecords.map(record => <RunCard key={record.id} record={record} liked={likes.has(record.id)}
           animate={motionEnabled && !previewsPaused && pageVisible && animatedIds.has(record.id)}
           candidateKey={previewPlan.get(record.id)} onCandidates={receiveCandidates} onToggleLike={toggleLike} onOpen={openRun} />)}</div>
-        {visible < filtered.length && <div className="runs-feed-more"><button type="button" onClick={() => setVisible(value => value + PAGE_SIZE)}>LOAD MORE RUNS <span aria-hidden="true">↓</span></button></div>}
       </>}
       {!loading && !error && !filtered.length && <div className="runs-feed-empty">
         <span aria-hidden="true">{records.length ? '◇' : '↗'}</span>
@@ -200,6 +219,7 @@ export function RunsFeed({ records, likes, onToggleLike, onOpen, onBack, loading
         <p>{!records.length ? 'Complete a run in Arcade, Testnet or Agent Play, then choose SAVE RUN.' : likedOnly ? 'Like a run with its heart button, or adjust your filters.' : 'Try another collection, token ID, or environment.'}</p>
         <div>{!!records.length && <button type="button" onClick={resetFilters}>CLEAR FILTERS</button>}<button type="button" onClick={onBack}>BACK TO AGENT PLAY <span aria-hidden="true">↗</span></button></div>
       </div>}
+      {(visible < filtered.length || hasMore) && <div className="runs-feed-more"><button type="button" disabled={loading || loadingMore} onClick={() => void showMoreRuns()}>{loadingMore ? 'LOADING RUNS…' : <>LOAD MORE RUNS <span aria-hidden="true">↓</span></>}</button></div>}
       <p className="runs-feed-note">Short gameplay previews · full saved replays. Likes stay on this browser.</p>
     </section>
   );

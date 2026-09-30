@@ -53,6 +53,7 @@ function App() {
   const recordsRequest=useRef<Promise<void>|null>(null);
   const paginationStarted=useRef(false);
   const [nextCursor,setNextCursor]=useState<string|null>(null);
+  const nextCursorRef=useRef<string|null>(null);
   const [loadingMore,setLoadingMore]=useState(false), pagingRef=useRef(false);
   const [source,setSource] = useState<Source>('local');
   const sourceRef=useRef(source);sourceRef.current=source;
@@ -158,6 +159,9 @@ function App() {
     return ()=>{cancelled=true;clearTimeout(timer);setCheckingFriend(false);};
     // Readiness emissions deliberately do not restart this bounded attempt.
   },[source,tn?.account,tn?.chainId,collection,tokenId,playing,busy,tn?.busy]);
+  function updateRecordsCursor(cursor:string|null) {
+    nextCursorRef.current=cursor;setNextCursor(cursor);
+  }
   function loadRecords():Promise<void> {
     if(recordsRequest.current)return recordsRequest.current;
     if(pagingRef.current)return Promise.resolve();
@@ -167,18 +171,22 @@ function App() {
         setRecords(previous=>PUBLIC_SITE?[...fresh,...previous.filter(r=>!fresh.some(n=>n.id===r.id))]:fresh);
         // If a full page of new runs arrived, traverse from its cursor to fill
         // the gap instead of leaving those runs unreachable until a reload.
-        if(!paginationStarted.current||gap)setNextCursor(result.nextCursor??result.cursor??null);setRecordsError('');}
+        if(!paginationStarted.current||gap)updateRecordsCursor(result.nextCursor??result.cursor??null);setRecordsError('');}
       catch(e){setRecordsError(err(e));throw e;}
       finally {recordsRequest.current=null;setRecordsLoading(false);}
     })();
     return recordsRequest.current;
   }
   async function moreRecords() {
-    if(pagingRef.current||!nextCursor)return;
-    if(recordsRequest.current){await recordsRequest.current.catch(()=>{});return;}
+    if(pagingRef.current||!nextCursorRef.current)return false;
     pagingRef.current=true;setLoadingMore(true);
-    try{const result=await request('/api/runs?cursor='+encodeURIComponent(nextCursor));setRecords(previous=>[...previous,...(result.runs as RunRecord[]).filter(r=>!previous.some(p=>p.id===r.id))]);paginationStarted.current=true;setNextCursor(result.nextCursor??result.cursor??null);setRecordsError('');}
-    catch(e){setRecordsError(err(e));}finally{pagingRef.current=false;setLoadingMore(false);}
+    try{
+      // Finish an in-flight refresh, then use its current cursor in this click.
+      if(recordsRequest.current)await recordsRequest.current.catch(()=>{});
+      const cursor=nextCursorRef.current;if(!cursor)return false;
+      const result=await request('/api/runs?cursor='+encodeURIComponent(cursor));setRecords(previous=>[...previous,...(result.runs as RunRecord[]).filter(r=>!previous.some(p=>p.id===r.id))]);paginationStarted.current=true;updateRecordsCursor(result.nextCursor??result.cursor??null);setRecordsError('');return true;
+    }
+    catch(e){setRecordsError(err(e));return false;}finally{pagingRef.current=false;setLoadingMore(false);}
   }
   function navigateCommunity(next:CommunityPage) {
     if(actionLock.current||tn?.busy)return;
@@ -430,7 +438,7 @@ function App() {
       <div id="agentic-panel" role="tabpanel" aria-labelledby="agentic-tab" hidden={view!=='agentic'}><AgenticPanel/></div>
       </div>
       {page==='leaderboard'&&<div id="leaderboard"><Leaderboard records={records} loading={recordsLoading} error={recordsError} onRetry={()=>{setRecordsLoading(true);void loadRecords().catch(()=>{});}} onOpen={setFeedRun} onBrowseFeed={openFeed} publicFeed={PUBLIC_SITE}/>{PUBLIC_SITE&&nextCursor&&<div className="feed-load-page"><button disabled={loadingMore} onClick={()=>void moreRecords()}>{loadingMore?'LOADING RUNS…':'LOAD OLDER RUNS ↓'}</button></div>}{likesError&&<p className="message" role="status">{likesError}</p>}</div>}
-      {page==='feed'&&<div id="runs-feed"><RunsFeed records={records} likes={likes} onToggleLike={toggleLike} onOpen={setFeedRun} onBack={backToPlay} previewsPaused={!!feedRun} publicFeed={PUBLIC_SITE} loading={recordsLoading} error={recordsError} onRetry={()=>{setRecordsLoading(true);void loadRecords().catch(()=>{});}}/>{PUBLIC_SITE&&nextCursor&&<div className="feed-load-page"><button disabled={loadingMore} onClick={()=>void moreRecords()}>{loadingMore?'LOADING RUNS…':'LOAD OLDER RUNS ↓'}</button></div>}{likesError&&<p className="message" role="status">{likesError}</p>}</div>}
+      {page==='feed'&&<div id="runs-feed"><RunsFeed records={records} likes={likes} onToggleLike={toggleLike} onOpen={setFeedRun} onBack={backToPlay} previewsPaused={!!feedRun} publicFeed={PUBLIC_SITE} loading={recordsLoading} error={recordsError} onRetry={()=>{setRecordsLoading(true);void loadRecords().catch(()=>{});}} hasMore={PUBLIC_SITE&&!!nextCursor} loadingMore={loadingMore} onLoadMore={moreRecords}/>{likesError&&<p className="message" role="status">{likesError}</p>}</div>}
     </main>
     {page!=='play'&&feedRun&&<ReplayModal record={feedRun} liked={likes.has(feedRun.id)} onToggleLike={()=>toggleLike(feedRun.id)} onClose={()=>setFeedRun(null)}/>}
   </div><SiteFooter/></>;

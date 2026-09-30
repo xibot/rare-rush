@@ -41,7 +41,7 @@ try {
     assert.equal(await page.locator('.rush-leaderboard').count(), 0, 'Best of the Rush only appears on the Leaderboard page');
     const heart = page.locator('.runs-feed-like').first();
     await heart.click(); assert.equal(await heart.getAttribute('aria-pressed'), 'true');
-    await page.getByRole('button', { name: 'LOAD OLDER RUNS ↓', exact: true }).click();
+    await page.getByRole('button', { name: 'LOAD MORE RUNS', exact: true }).click();
     await page.waitForFunction(() => document.querySelectorAll('.runs-feed-card').length === 2);
     await page.locator('.runs-feed-cover').first().click();
     await page.getByRole('dialog').waitFor();
@@ -106,6 +106,73 @@ try {
     assert.deepEqual(errors, []);
     await page.close();
     console.log(`${width}px: public feed, leaderboard thumbnails/popups, paging, local favorites, deep link, skill and proportions passed`);
+  }
+  // Exercise both the server cursor and the locally buffered cards through the
+  // same control. A fetched page must be visible after that one click.
+  for (const remotePages of [true, false]) {
+    const page = await browser.newPage({ viewport: { width: 1440, height: 1000 }, reducedMotion: 'reduce' });
+    const errors = [], listRequests = [], writes = [];
+    const pagingRecords = Array.from({ length: 25 }, (_, index) => ({ ...summary(records[0]),
+      id: (index + 10).toString(16).padStart(64, '0'), tokenId: String(index + 1), runId: String(index + 1),
+      createdAt: new Date(Date.parse('2026-09-24T12:00:00Z') - index * 1000).toISOString() }));
+    let failNextPage = remotePages, releasePage;
+    const pendingPage = new Promise(resolve => { releasePage = resolve; });
+    page.on('pageerror', error => errors.push(error.message));
+    await page.route('**/api/runs**', async route => {
+      const url = new URL(route.request().url());
+      if (route.request().method() !== 'GET') writes.push(route.request().method());
+      const id = url.pathname.split('/')[3];
+      if (id) return route.fulfill({ json: { ...pagingRecords.find(record => record.id === id), replay } });
+      const cursor = url.searchParams.get('cursor');
+      listRequests.push(cursor);
+      if (cursor === '12' && failNextPage) {
+        failNextPage = false;
+        return route.fulfill({ status: 503, json: { error: 'Temporary feed error. Try again.' } });
+      }
+      if (cursor === '12') await pendingPage;
+      const offset = Number(cursor || 0), end = remotePages ? offset + 12 : pagingRecords.length;
+      await route.fulfill({ json: { runs: pagingRecords.slice(offset, end), nextCursor: end < pagingRecords.length ? String(end) : null } });
+    });
+    try {
+      await page.goto(origin + '/runs-feed/');
+      await page.waitForFunction(() => document.querySelectorAll('.runs-feed-card').length === 12);
+      const more = page.getByRole('button', { name: 'LOAD MORE RUNS', exact: true });
+      assert.equal(await more.count(), 1, 'The feed has exactly one pagination control');
+      assert.equal(await page.getByRole('button', { name: /LOAD OLDER RUNS/ }).count(), 0);
+      if (remotePages) {
+        await more.click();
+        await page.getByRole('alert').filter({ hasText: 'Temporary feed error' }).waitFor();
+        assert.equal(await page.locator('.runs-feed-card').count(), 12, 'A failed page preserves existing cards');
+        assert.equal(await more.isEnabled(), true, 'The same load-more control retries a failed page');
+        assert.deepEqual(listRequests, [null, '12']);
+        await more.click();
+        const loading = page.getByRole('button', { name: 'LOADING RUNS…', exact: true });
+        await loading.waitFor();
+        assert.equal(await loading.isDisabled(), true, 'Pagination is disabled while its request is pending');
+        await loading.evaluate(button => { button.click(); button.click(); });
+        await page.evaluate(() => new Promise(resolve => requestAnimationFrame(resolve)));
+        assert.deepEqual(listRequests, [null, '12', '12'], 'Repeated clicks cannot start duplicate cursor requests');
+        assert.equal(await page.locator('.runs-feed-card').count(), 12, 'Existing cards stay visible while loading');
+        releasePage();
+      } else {
+        await more.click();
+      }
+      await page.waitForFunction(() => document.querySelectorAll('.runs-feed-card').length === 24);
+      assert.equal(await more.count(), 1, 'One click reveals the next twelve cards without an extra reveal step');
+      assert.equal(await page.getByRole('alert').count(), 0, 'A successful retry clears the page error');
+      await more.click();
+      await page.waitForFunction(() => document.querySelectorAll('.runs-feed-card').length === 25);
+      assert.equal(await more.count(), 0, 'Pagination disappears after the final run');
+      const runIds = await page.locator('.runs-feed-card').evaluateAll(cards => cards.map(card => card.dataset.runId));
+      assert.deepEqual(runIds, pagingRecords.map(record => record.id), 'Cards remain unique and correctly ordered across pages');
+      assert.deepEqual(listRequests, remotePages ? [null, '12', '12', '24'] : [null]);
+      assert.deepEqual(errors, []);
+      assert.deepEqual(writes, [], 'Loading more runs is read-only');
+      console.log(`${remotePages ? 'Server cursor' : 'Buffered cards'}: single-control 12 → 24 → 25 paging, exhaustion${remotePages ? ', failure retry and duplicate-request protection' : ''} passed`);
+    } finally {
+      releasePage();
+      await page.close();
+    }
   }
   for (const file of ['agent-play/index.html', 'runs-feed/index.html', 'leaderboard/index.html', 'agent-skill/SKILL.md']) {
     assert.ok((await readFile(new URL('../dist/' + file, import.meta.url), 'utf8')).length);
