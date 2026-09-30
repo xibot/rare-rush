@@ -60,7 +60,7 @@ export function ArcadeCabinet(props: ArcadeCabinetProps) {
       <div className="hud rush-run-hud">
         <div><span>{mode.label.toUpperCase()} · TIME</span><strong className={remaining < 15 ? 'urgent' : ''}>{String(Math.floor(remaining / 60)).padStart(2, '0')}<em>:</em>{String(remaining % 60).padStart(2, '0')}</strong></div>
         <div><span>DISTANCE</span><strong>{Math.floor(run.distance).toString().padStart(4, '0')}<small>m</small></strong></div>
-        <div className="token-hud"><span>COINS COLLECTED</span><strong>{run.coins}<small>✦</small></strong></div>
+        <div className="token-hud"><span>COINS</span><strong>{run.coins}<small>✦</small></strong></div>
         <div className="life-hud"><span>KEEP IT RARE</span><strong aria-label={`${run.hearts} hearts remaining`}>{[0, 1, 2].map(index => <b key={index} className={index >= run.hearts ? 'lost' : ''}>♥</b>)}</strong></div>
       </div>
       <div className="playfield">
