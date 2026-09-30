@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { createPublicClient, http } from 'viem';
-import { GENESIS_DEPLOYMENT, readGenesisPortrait } from './identity';
+import { createArcadePublicClient } from '../arcade-client.ts';
+import { readGenesisPortrait } from './identity';
 
 type PortraitJob = {
   id: bigint; controller: AbortController; started: boolean;
@@ -13,8 +13,7 @@ const cancelled = () => new Error('Portrait preview cancelled.');
 /** Public artwork only. This cache is deliberately separate from game-entry identity checks. */
 function createPortraitLoader() {
   // A separate read-only transport bounds preview requests without changing game verification.
-  const client = createPublicClient({ cacheTime: 0,
-    transport: http(GENESIS_DEPLOYMENT.rpcUrl, { timeout: 6_000, retryCount: 0 }) });
+  const client = createArcadePublicClient({ timeout: 6_000, retryCount: 0 });
   const cache = new Map<string, string>();
   const active = new Set<PortraitJob>();
   const queue: PortraitJob[] = [];

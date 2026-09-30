@@ -4,6 +4,7 @@ import { readFile, writeFile, mkdir, readdir, rename, stat } from 'node:fs/promi
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { resolve, extname, sep } from 'node:path';
 import { createHash } from 'node:crypto';
+import { privateRpcProxy } from '../server/private-rpc.ts';
 
 const here = fileURLToPath(new URL('.', import.meta.url));
 const repo = resolve(here, '..');
@@ -13,8 +14,6 @@ const port = Number(process.env.AGENT_PLAY_PORT || 4220);
 if (!Number.isInteger(port) || port < 1024 || port > 65535) throw new Error('Invalid local port.');
 const origin = `http://127.0.0.1:${port}`;
 const upstream = 'https://testnet.rarerush.app';
-const rpc = 'https://rpc.testnet.chain.robinhood.com';
-const rpcMethods = new Set(['eth_chainId','eth_blockNumber','eth_getCode','eth_call','eth_getBalance','eth_getLogs','eth_getBlockByNumber','eth_getTransactionCount','eth_getTransactionByHash','eth_getTransactionReceipt']);
 const nodePaths = [resolve(repo, 'testnet-app/node_modules')];
 await mkdir(out, { recursive: true });
 await mkdir(data, { recursive: true });
@@ -22,6 +21,8 @@ await build({entryPoints:[resolve(here,'index.tsx')],outdir:out,bundle:true,form
 await build({entryPoints:[resolve(here,'runner.ts')],outfile:resolve(out,'checker.mjs'),bundle:true,format:'esm',platform:'node',target:'node22',nodePaths,logLevel:'silent'});
 await writeFile(resolve(out,'index.html'),await readFile(resolve(here,'index.html')));
 if (process.argv.includes('--build-only')) process.exit(0);
+try { process.loadEnvFile(resolve(repo, '.env.rpc.local')); }
+catch (error) { if (error.code !== 'ENOENT') throw new Error('Could not load local RPC configuration.'); }
 const { checkAgentReplay } = await import(pathToFileURL(resolve(out,'checker.mjs')).href);
 const types = {'.html':'text/html; charset=utf-8','.js':'text/javascript; charset=utf-8','.css':'text/css; charset=utf-8','.woff2':'font/woff2'};
 const headers = {'Cache-Control':'no-store','X-Content-Type-Options':'nosniff','X-Frame-Options':'DENY','X-Robots-Tag':'noindex,nofollow','Referrer-Policy':'no-referrer'};
@@ -107,15 +108,19 @@ const server = createServer(async (req,res) => {
     if (req.headers.origin && req.headers.origin !== origin) return json(res,403,{error:'This preview only accepts its own local page.'});
     if (req.headers['sec-fetch-site'] === 'cross-site') return json(res,403,{error:'Cross-site requests are not allowed.'});
     if (req.method === 'POST' && (req.headers.origin !== origin || req.headers['content-type']?.split(';')[0] !== 'application/json')) return json(res,403,{error:'Use the local Agent Play page.'});
-    if (['/api/status','/api/rpc','/api/verify-run'].includes(pathname)) {
+    if (['/api/status','/api/rpc','/api/mainnet-rpc','/api/verify-run'].includes(pathname)) {
       const method = pathname === '/api/status' ? 'GET' : 'POST';
       if (req.method !== method) return json(res,405,{error:'Method not allowed.'});
       const payload = method === 'POST' ? await body(req) : undefined;
-      if(pathname==='/api/rpc') {
-        const calls=Array.isArray(payload)?payload:[payload];
-        if(!calls.length||calls.length>30||calls.some(c=>!c||c.jsonrpc!=='2.0'||!rpcMethods.has(c.method)||!Array.isArray(c.params??[]))) return json(res,403,{error:'Only supported Testnet reads are allowed.'});
+      if (pathname === '/api/rpc' || pathname === '/api/mainnet-rpc') {
+        const reply = await privateRpcProxy(new Request(origin + pathname, { method,
+          headers: { origin, 'Content-Type': 'application/json' }, body: JSON.stringify(payload) }),
+          pathname === '/api/rpc' ? 'testnet' : 'mainnet');
+        res.writeHead(reply.status, Object.fromEntries(reply.headers));
+        res.end(await reply.text());
+        return;
       }
-      const reply = await fetch(pathname==='/api/rpc'?rpc:upstream+pathname,{method,headers:{'Content-Type':'application/json','Origin':upstream,'Sec-Fetch-Site':'same-origin'},
+      const reply = await fetch(upstream+pathname,{method,headers:{'Content-Type':'application/json','Origin':upstream,'Sec-Fetch-Site':'same-origin'},
         ...(payload === undefined ? {} : {body:JSON.stringify(payload)}),signal:AbortSignal.timeout(45_000),redirect:'error'});
       const content = await reply.json();
       return json(res,reply.status,content);

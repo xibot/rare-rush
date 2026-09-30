@@ -1,6 +1,6 @@
-import { createPublicClient, http, type Address } from 'viem';
+import { type Address } from 'viem';
 import { readGenerationEligibility } from '@rarefriends/friendsdk/identity';
-import { GENERATION_SPRITE_MANIFEST } from '@rarefriends/friendsdk/sprites';
+import { createArcadePublicClient } from './arcade-client.ts';
 import { createArcadeEventReporter, EXCLUDED_ARCADE_WALLET, isArcadeAnalyticsOrigin, parseArcadeSignal } from './analytics';
 
 /** The SDK does not expose its wallet through GameClient. Read only the trusted
@@ -36,7 +36,7 @@ export function bindGenerationsAnalytics(root: HTMLElement) {
         const controller = new AbortController();
         const deadline = setTimeout(() => controller.abort(), 5_000);
         try {
-          const client = createPublicClient({ transport: http(GENERATION_SPRITE_MANIFEST.rpcUrl, { timeout: 4_000, retryCount: 0, fetchOptions: { signal: controller.signal } }) });
+          const client = createArcadePublicClient({ timeout: 4_000, retryCount: 0, signal: controller.signal });
           const identity = await readGenerationEligibility(client, current.friendId, current.wallet);
           if (controller.signal.aborted || session !== current || !current.frame.isConnected || identity.eligible !== true) return false;
           current.reporter.start(signal, current.wallet);

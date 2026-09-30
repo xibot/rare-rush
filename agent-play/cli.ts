@@ -2,7 +2,7 @@
 import { randomBytes } from 'node:crypto';
 import { resolve } from 'node:path';
 import { setImmediate } from 'node:timers/promises';
-import { createPublicClient, http, type EIP1193Provider } from 'viem';
+import { createPublicClient, custom, http, type EIP1193Provider } from 'viem';
 import { publishRun, type PublishedRun } from '../games/rare-rush/public-runs.ts';
 import { publicationPayloadHash, type ReplayPublication, type PublicRunArt } from '../shared/replay-publication.ts';
 import { GENESIS_DEPLOYMENT } from '../games/rare-rush/genesis/identity.ts';
@@ -227,7 +227,14 @@ export async function runJob(job: JobSpec, options: RunJobOptions): Promise<JobD
           chainId: 4663, address: job.wallet!.address, rpcUrl: job.rpcUrl ?? GENESIS_DEPLOYMENT.rpcUrl })
         : readonlyArcadeProvider(job));
       art = cleanArt(await (options.readArcade ?? loadArcadeFriend)(provider as ArcadeProvider,
-        job.wallet!.address, collectionId(job), job.tokenId));
+        job.wallet!.address, collectionId(job), job.tokenId, createPublicClient({ cacheTime: 0,
+          transport: custom({ request: async ({ method, params }) => {
+            if (!['eth_chainId', 'eth_blockNumber', 'eth_call'].includes(method)) {
+              throw new Error('The Arcade job read client only supports identity and artwork reads.');
+            }
+            return provider.request({ method, params } as never);
+          } }, { retryCount: 0 }),
+        })));
     }
     const old = lease.document.progress;
     if (Object.keys(old).length && (old.version !== 1 || old.kind !== 'simulation' || typeof old.seed !== 'string')) {

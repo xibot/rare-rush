@@ -1,8 +1,9 @@
-import { ContractFunctionExecutionError, ContractFunctionRevertedError, createPublicClient, custom, isAddress, zeroAddress, type Address } from 'viem';
+import { ContractFunctionExecutionError, ContractFunctionRevertedError, isAddress, zeroAddress, type Address } from 'viem';
 import { readGenerationEligibility } from '@rarefriends/friendsdk/identity';
 import { createGenerationSpriteReader, GENERATION_SPRITE_MANIFEST, type GenerationSprites } from '@rarefriends/friendsdk/sprites';
 import { createFriendWalletSession, type FriendWalletProvider, type FriendWalletSession } from '@rarefriends/friendsdk/wallet';
 import { readGenesisIdentity, GENESIS_DEPLOYMENT } from '../games/rare-rush/genesis/identity.ts';
+import { createArcadePublicClient, type ArcadeReadClient } from '../games/rare-rush/arcade-client.ts';
 import { DEFAULT_BODY_ID } from '../games/rare-rush/genesis/bodies.ts';
 
 export const ARCADE_CHAIN_ID = 4663;
@@ -71,12 +72,14 @@ export async function loadArcadeFriend(
   account: Address,
   collection: 0 | 1,
   tokenId: string,
+  readClient?: ArcadeReadClient,
 ): Promise<ArcadeFriend> {
   if (!isAddress(account) || sameAddress(account, zeroAddress)) throw new Error('Connect a valid wallet first.');
   if (collection !== 0 && collection !== 1) throw new Error('Choose Genesis or Generations.');
   const id = tokenNumber(tokenId);
   let invalidated = false;
-  const invalidate = () => { invalidated = true; };
+  const controller = new AbortController();
+  const invalidate = () => { invalidated = true; controller.abort(new Error('The wallet connection changed while loading.')); };
   const events = ['accountsChanged', 'chainChanged', 'disconnect'] as const;
   const listens = typeof provider.on === 'function' && typeof provider.removeListener === 'function';
   if (listens) for (const event of events) provider.on!(event, invalidate);
@@ -86,20 +89,9 @@ export async function loadArcadeFriend(
   try {
     await assertConnection(provider, account);
     assertActive();
-    // A public client over the selected wallet's RPC keeps all reads on its
-    // actual network. This boundary deliberately accepts only read methods.
-    const client = createPublicClient({
-      cacheTime: 0,
-      transport: custom({ request: async ({ method, params }) => {
-        if (!['eth_chainId', 'eth_blockNumber', 'eth_call'].includes(method)) {
-          throw new Error('The Arcade identity adapter only supports read-only RPC methods.');
-        }
-        assertActive();
-        const result = await provider.request({ method, params });
-        assertActive();
-        return result;
-      } }, { retryCount: 0 }),
-    });
+    // The wallet owns connection/signatures; our mainnet endpoint owns data reads.
+    // Headless callers inject their explicitly configured read client instead.
+    const client = readClient ?? createArcadePublicClient({ signal: controller.signal });
     let friend: ArcadeFriend;
     if (collection === 1) {
       const identity = await readGenesisIdentity(client, id, account);
@@ -131,6 +123,7 @@ export async function loadArcadeFriend(
     assertActive();
     return friend;
   } finally {
+    controller.abort();
     if (listens) for (const event of events) provider.removeListener!(event, invalidate);
   }
 }

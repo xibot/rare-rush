@@ -4,6 +4,7 @@ import { ENGINE_SOURCE_PATHS, engineVersionFromSources } from '../infra/testnet/
 import { buildGame } from '@rarefriends/friendsdk/build';
 import { createGameServer } from '@rarefriends/friendsdk/serve';
 import { createServer } from 'node:http';
+import { Readable } from 'node:stream';
 import { copyFile, mkdir, readFile, writeFile, realpath, stat, unlink, rm } from 'node:fs/promises';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -24,6 +25,7 @@ export async function buildRushSite({ outdir = path.join(project, 'dist'), watch
     absWorkingDir: project, entryPoints: {
       'replay-feed-runtime': 'server/replay-feed-runtime.mjs',
       'agent-testnet-proxy': 'server/agent-testnet-proxy.ts',
+      'private-rpc': 'server/private-rpc.ts',
     },
     outdir: 'server/generated', outExtension: { '.js': '.mjs' }, bundle: true,
     platform: 'node', format: 'esm', target: 'node22', packages: 'external',
@@ -46,6 +48,7 @@ export async function buildRushSite({ outdir = path.join(project, 'dist'), watch
     const gameHostHTML = await readFile(gameHostPath, 'utf8');
     if (!gameHostHTML.includes('</head>')) throw new Error('The SDK host HTML has no head for site chrome.');
     await writeFile(gameHostPath, gameHostHTML
+      .replace("connect-src 'self' https://rpc.mainnet.chain.robinhood.com", "connect-src 'self'")
       .replace('href="./runtime.css"', 'href="/generations/index.css"')
       .replace('<script src="./runtime.js"></script>', '<script type="module" src="/generations/index.js"></script>')
       .replace('</head>', '<link rel="icon" type="image/svg+xml" sizes="any" href="/favicon.svg"><script type="module" src="/host-navigation.js"></script></head>'));
@@ -143,6 +146,21 @@ export function createRushSiteServer(outdir) {
     ['/font-licenses.txt', ['font-licenses.txt', 'text/plain; charset=utf-8']],
   ]);
   return createServer(async (request, response) => {
+    const pathname = new URL(request.url, 'http://localhost').pathname;
+    if (['/api/mainnet-rpc', '/api/rpc', '/api/status', '/api/verify-run'].includes(pathname)) {
+      try {
+        const incoming = new Request(`http://${request.headers.host ?? 'localhost'}${pathname}`, {
+          method: request.method, headers: request.headers,
+          ...(!['GET', 'HEAD'].includes(request.method) ? { body: Readable.toWeb(request), duplex: 'half' } : {}),
+        });
+        const result = pathname === '/api/mainnet-rpc'
+          ? await (await import('../server/generated/private-rpc.mjs')).privateRpcProxy(incoming, 'mainnet')
+          : await (await import('../server/generated/agent-testnet-proxy.mjs')).agentTestnetProxy(incoming, pathname.split('/').at(-1));
+        response.writeHead(result.status, Object.fromEntries(result.headers));
+        response.end(Buffer.from(await result.arrayBuffer()));
+      } catch { response.writeHead(503, { 'Content-Type': 'application/json', 'Cache-Control': 'no-store' }).end('{"error":"Network reads are temporarily unavailable. Please retry."}'); }
+      return;
+    }
     if (!['GET', 'HEAD'].includes(request.method)) { response.writeHead(405).end(); return; }
     try {
       const url = new URL(request.url, 'http://localhost');
@@ -204,6 +222,9 @@ async function main() {
   if (!['dev', 'build'].includes(command)) throw new Error('Usage: node scripts/rush-site.mjs dev|build');
   const built = await buildRushSite({ watch: command === 'dev' });
   if (command === 'build') { console.log(`Built main site, community pages, and Arcade games in ${built.outdir}`); return; }
+  // Local secrets are runtime-only and excluded from Git, builds and uploads.
+  try { process.loadEnvFile(path.join(project, '.env.rpc.local')); }
+  catch (error) { if (error.code !== 'ENOENT') throw new Error('Could not load local RPC configuration.'); }
   const server = createRushSiteServer(built.outdir);
   server.listen(4173, '0.0.0.0', () => console.log('Rare Rush: http://localhost:4173/ · arcade: http://localhost:4173/arcade/'));
   const stop = () => { server.close(); void built.close().finally(() => process.exit(0)); };

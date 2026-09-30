@@ -2,8 +2,8 @@ import { createPublicClient, http, isAddress, zeroAddress, type PublicClient } f
 import { GENERATION_SPRITE_MANIFEST } from '@rarefriends/friendsdk/sprites';
 import { GENESIS_DEPLOYMENT } from './genesis/identity.ts';
 
-// Robinhood's public RPC rejects eth_getLogs ranges larger than ten million
-// blocks, including indexed owner queries. Never replace those with a scan.
+// Bound history ranges even with a private provider: indexed owner queries can
+// still have provider limits. Never replace these reads with a collection scan.
 export const ARCADE_LOG_BLOCK_LIMIT = 10_000_000n;
 const MAX_LOG_PAGES = 256;
 const MAX_TRANSFER_LOGS = 100_000;
@@ -63,7 +63,31 @@ export function withArcadeHistory<T extends Pick<PublicClient, 'getLogs'>>(clien
   } } as T;
 }
 
-export function createArcadePublicClient() {
+export const ARCADE_RPC_PATH = '/api/mainnet-rpc';
+export type ArcadeReadClient = ReturnType<typeof createPublicClient>;
+type ArcadeClientOptions = {
+  signal?: AbortSignal;
+  timeout?: number;
+  retryCount?: number;
+  fetchFn?: typeof fetch;
+};
+
+/** All browser chain reads stay on our server. Its private URL never enters a bundle. */
+export function createArcadePublicClient(options: ArcadeClientOptions = {}) {
+  if (typeof window === 'undefined') throw new Error('Headless Arcade callers must provide their configured read client.');
+  const rpcUrl = new URL(ARCADE_RPC_PATH, window.location.origin).href;
+  const transport = http(rpcUrl, { retryCount: options.retryCount ?? 1,
+    timeout: options.timeout ?? 12_000, batch: { wait: 10, batchSize: 20 },
+    ...(options.fetchFn ? { fetchFn: options.fetchFn } : {}),
+  });
   return withArcadeHistory(createPublicClient({ cacheTime: 0, pollingInterval: 1_000,
-    transport: http(GENERATION_SPRITE_MANIFEST.rpcUrl, { retryCount: 1, timeout: 8_000 }) }));
+    transport: config => {
+      const rpc = transport(config);
+      // Scope viem's batch scheduler to this signal, so cancelling one portrait
+      // or wallet inventory cannot cancel a different client's request batch.
+      const request = ((args: Parameters<typeof rpc.request>[0], requestOptions?: Parameters<typeof rpc.request>[1]) =>
+        rpc.request(args, options.signal ? { ...requestOptions, signal: options.signal } : requestOptions)) as typeof rpc.request;
+      return { ...rpc, request };
+    },
+  }), options.signal);
 }

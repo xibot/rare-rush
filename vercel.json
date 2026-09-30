@@ -81,6 +81,9 @@
     }
   ],
   "functions": {
+    "api/mainnet-rpc.mjs": {
+      "maxDuration": 60
+    },
     "api/status.mjs": {
       "maxDuration": 60
     },

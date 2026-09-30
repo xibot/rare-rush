@@ -1,16 +1,16 @@
-import { createPublicClient, custom, type Address } from 'viem';
-import { readOwnedFriends } from '@rarefriends/friendsdk/owned';
+import { type Address } from 'viem';
 import { createGenerationSpriteReader, spriteFrame } from '@rarefriends/friendsdk/sprites';
-import { readOwnedGenesis, readGenesisPortrait } from '../games/rare-rush/genesis/identity.ts';
-import { withArcadeHistory } from '../games/rare-rush/arcade-client.ts';
+import { readGenesisPortrait } from '../games/rare-rush/genesis/identity.ts';
+import { createArcadePublicClient, withArcadeHistory, type ArcadeReadClient } from '../games/rare-rush/arcade-client.ts';
+import { discoverArcadeInventory, readArcadeInventoryPage, type ArcadeInventory } from '../games/rare-rush/arcade-inventory.ts';
 import { ARCADE_CHAIN_ID, type ArcadeProvider } from './arcade.ts';
 
 export type ArcadeChoice = Readonly<{ tokenId: string; label: string }>;
-export type ArcadeLibrary = Readonly<{ friends: readonly ArcadeChoice[]; hiddenCount: number }>;
+export type ArcadeLibrary = Readonly<{ friends: readonly ArcadeChoice[]; hiddenCount: number; inventory: ArcadeInventory; nextCursor: number | null }>;
 
 /** A picker is a read-only snapshot. Starting a run still verifies ownership afresh. */
 async function withPickerClient<T>(provider: ArcadeProvider, account: Address, signal: AbortSignal,
-  read: (client: ReturnType<typeof createPublicClient>, active: AbortSignal) => Promise<T>): Promise<T> {
+  read: (client: ArcadeReadClient, active: AbortSignal) => Promise<T>, readClient?: ArcadeReadClient): Promise<T> {
   const controller = new AbortController();
   const active = AbortSignal.any([signal, controller.signal, AbortSignal.timeout(25_000)]);
   const events = ['accountsChanged', 'chainChanged', 'disconnect'] as const;
@@ -25,8 +25,8 @@ async function withPickerClient<T>(provider: ArcadeProvider, account: Address, s
   });
   const request: ArcadeProvider['request'] = async args => {
     active.throwIfAborted();
-    if (!['eth_accounts', 'eth_chainId', 'eth_blockNumber', 'eth_call', 'eth_getLogs'].includes(args.method)) {
-      throw new Error('The Friend picker only supports read-only requests.');
+    if (!['eth_accounts', 'eth_chainId'].includes(args.method)) {
+      throw new Error('The Friend picker only uses the wallet to check its connection.');
     }
     const result = await provider.request(args);
     active.throwIfAborted();
@@ -42,7 +42,7 @@ async function withPickerClient<T>(provider: ArcadeProvider, account: Address, s
   try {
     return await Promise.race([cancelled, (async () => {
       await checkWallet();
-      const client = withArcadeHistory(createPublicClient({ cacheTime: 0, transport: custom({ request }, { retryCount: 0 }) }), active);
+      const client = readClient ? withArcadeHistory(readClient, active) : createArcadePublicClient({ signal: active });
       const result = await read(client, active);
       await checkWallet();
       return result;
@@ -55,20 +55,34 @@ async function withPickerClient<T>(provider: ArcadeProvider, account: Address, s
 }
 
 export async function loadArcadeLibrary(provider: ArcadeProvider, account: Address, collection: 0 | 1,
-  signal: AbortSignal): Promise<ArcadeLibrary> {
+  signal: AbortSignal, readClient?: ArcadeReadClient): Promise<ArcadeLibrary> {
   return withPickerClient(provider, account, signal, async (client, active) => {
-    const result = collection === 1
-      ? await readOwnedGenesis(client, account, { signal: active })
-      : await readOwnedFriends(client, account, { signal: active });
-    return { friends: result.friends.map(friend => ({ tokenId: String(friend.id),
+    const inventory = await discoverArcadeInventory(client, account, collection, { signal: active });
+    const page = await readArcadeInventoryPage(client, inventory, { signal: active });
+    return { friends: page.friends.map(friend => ({ tokenId: String(friend.id),
       label: `${collection === 1 ? 'Genesis' : 'Generations'} #${friend.id}` })),
-      hiddenCount: 'hiddenCount' in result && typeof result.hiddenCount === 'number' ? result.hiddenCount : 0 };
-  });
+      hiddenCount: page.hiddenCount, inventory, nextCursor: page.nextCursor };
+  }, readClient);
+}
+
+/** Continue a pinned inventory without downloading its transfer history again. */
+export async function loadMoreArcadeFriends(provider: ArcadeProvider, account: Address, collection: 0 | 1,
+  library: ArcadeLibrary, signal: AbortSignal, readClient?: ArcadeReadClient): Promise<ArcadeLibrary> {
+  if (library.inventory.account.toLowerCase() !== account.toLowerCase() || library.inventory.collection !== collection) {
+    throw new Error('Your wallet or collection changed. Refresh your Friends.');
+  }
+  if (library.nextCursor === null) return library;
+  return withPickerClient(provider, account, signal, async (client, active) => {
+    const page = await readArcadeInventoryPage(client, library.inventory, { signal: active, cursor: library.nextCursor! });
+    return { ...library, friends: [...library.friends, ...page.friends.map(friend => ({ tokenId: String(friend.id),
+      label: `${collection === 1 ? 'Genesis' : 'Generations'} #${friend.id}` }))],
+      hiddenCount: library.hiddenCount + page.hiddenCount, nextCursor: page.nextCursor };
+  }, readClient);
 }
 
 /** Artwork is decorative and cannot authorize a run. */
 export async function loadArcadePortrait(provider: ArcadeProvider, account: Address, collection: 0 | 1,
-  tokenId: string, signal: AbortSignal): Promise<string> {
+  tokenId: string, signal: AbortSignal, readClient?: ArcadeReadClient): Promise<string> {
   return withPickerClient(provider, account, signal, async (client, active) => {
     if (collection === 1) return readGenesisPortrait(client, BigInt(tokenId), { signal: active });
     const sprites = await createGenerationSpriteReader(client).read(BigInt(tokenId));
@@ -80,5 +94,5 @@ export async function loadArcadePortrait(provider: ArcadeProvider, account: Addr
       if (rows.slice(Math.max(0, y - 1), y + 2).some(row => row.slice(Math.max(0, x - 1), x + 2).includes('#'))) halo.push(square);
     }
     return `data:image/svg+xml;charset=utf-8,${encodeURIComponent(`<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16" shape-rendering="crispEdges"><path fill="#fff" d="${halo.join('')}"/><path fill="#000" d="${pixels.join('')}"/></svg>`)}`;
-  });
+  }, readClient);
 }

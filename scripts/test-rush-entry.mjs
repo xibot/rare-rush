@@ -5,7 +5,7 @@ import path from 'node:path';
 import { chromium } from 'playwright';
 import { buildRushSite, createRushSiteServer } from './rush-site.mjs';
 // Internal SDK read fixtures only. No identity fixture enters a public bundle.
-import { installFixture, createArtworkFixture } from '../node_modules/@rarefriends/friendsdk/scripts/browser-fixture.mjs';
+import { installMainnetFixture as installFixture, createArtworkFixture } from './mainnet-browser-fixture.mjs';
 
 const outdir = await mkdtemp(path.join(tmpdir(), 'rare-rush-entry-'));
 await mkdir('artifacts', { recursive: true });

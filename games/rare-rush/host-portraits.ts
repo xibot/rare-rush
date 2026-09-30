@@ -1,6 +1,6 @@
-import { createPublicClient, http } from 'viem';
+import { createArcadePublicClient } from './arcade-client.ts';
 import {
-  createGenerationSpriteReader, GENERATION_SPRITE_MANIFEST, spriteFrame,
+  createGenerationSpriteReader, spriteFrame,
   type GenerationSprites,
 } from '@rarefriends/friendsdk/sprites';
 
@@ -57,9 +57,7 @@ function portrait(sprites: GenerationSprites): string {
 
 async function readPortrait(tokenId: string, signal: AbortSignal): Promise<string> {
   // A per-job reader lets cancellation abort only this public-art request. No wallet transport.
-  const client = createPublicClient({ transport: http(GENERATION_SPRITE_MANIFEST.rpcUrl, {
-    retryCount: 0, timeout: 8_000, fetchOptions: { signal },
-  }) });
+  const client = createArcadePublicClient({ retryCount: 0, timeout: 8_000, signal });
   const reader = createGenerationSpriteReader(client);
   let abort = () => {};
   const cancelled = new Promise<never>((_, reject) => {

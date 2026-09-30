@@ -1,9 +1,8 @@
 /** Same-site bridge to the existing Testnet verifier. Signatures and its rules
  * remain authoritative; this host never holds a verifier key or sends a tx. */
+import { createPrivateRpcProxy, privateRpcProxy } from './private-rpc.ts';
 const TESTNET='https://testnet.rarerush.app';
-const RPC='https://rpc.testnet.chain.robinhood.com';
 const LIMIT=1_800_000;
-const reads=new Set(['eth_chainId','eth_blockNumber','eth_getCode','eth_call','eth_getBalance','eth_getLogs','eth_getBlockByNumber','eth_getTransactionCount','eth_getTransactionByHash','eth_getTransactionReceipt']);
 const windows=new Map<string,{count:number;until:number}>();
 const json=(status:number,error:string)=>Response.json({error},{status,headers:{'Cache-Control':'no-store','X-Content-Type-Options':'nosniff'}});
 async function limited(response:Request|Response,maximum=LIMIT){
@@ -14,7 +13,8 @@ async function limited(response:Request|Response,maximum=LIMIT){
   const body=new Uint8Array(bytes);let offset=0;for(const chunk of chunks){body.set(chunk,offset);offset+=chunk.length;}
   return JSON.parse(new TextDecoder().decode(body));
 }
-export async function agentTestnetProxy(request:Request,kind:'status'|'rpc'|'verify-run', fetcher:typeof fetch=fetch){
+export async function agentTestnetProxy(request:Request,kind:'status'|'rpc'|'verify-run', fetcher:typeof fetch=fetch, env?:Record<string,string|undefined>){
+  if(kind==='rpc')return (fetcher===fetch&&!env?privateRpcProxy:createPrivateRpcProxy({fetcher,env}))(request,'testnet');
   const method=kind==='status'?'GET':'POST';
   if(request.method!==method)return json(405,'Method not allowed.');
   const host=new URL(request.url).origin, origin=request.headers.get('origin');
@@ -26,11 +26,7 @@ export async function agentTestnetProxy(request:Request,kind:'status'|'rpc'|'ver
   if(window.count>=90||windows.size>=4096)return json(429,'Please wait a minute before trying again.');window.count++;windows.set(key,window);
   try{
     const payload=method==='POST'?await limited(request):undefined;
-    if(kind==='rpc'){
-      const calls=Array.isArray(payload)?payload:[payload];
-      if(!calls.length||calls.length>30||calls.some(c=>!c||c.jsonrpc!=='2.0'||!reads.has(c.method)||!Array.isArray(c.params??[])))return json(400,'Only supported Testnet reads are available.');
-    }
-    const reply=await fetcher(kind==='rpc'?RPC:TESTNET+'/api/'+kind,{method,redirect:'error',signal:AbortSignal.timeout(40_000),headers:{'Content-Type':'application/json','Origin':TESTNET,'Sec-Fetch-Site':'same-origin'},...(payload===undefined?{}:{body:JSON.stringify(payload)})});
+    const reply=await fetcher(TESTNET+'/api/'+kind,{method,redirect:'error',signal:AbortSignal.timeout(40_000),headers:{'Content-Type':'application/json','Origin':TESTNET,'Sec-Fetch-Site':'same-origin'},...(payload===undefined?{}:{body:JSON.stringify(payload)})});
     const result=await limited(reply,2_500_000);
     return Response.json(result,{status:reply.status,headers:{'Cache-Control':'no-store','X-Content-Type-Options':'nosniff'}});
   }catch{return json(503,'The Testnet connection is temporarily unavailable. Try again shortly.');}

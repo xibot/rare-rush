@@ -1,6 +1,7 @@
 import { createPublicClient, http, parseAbi } from 'viem';
 import deployment from '../testnet-app/src/shared/deployment.json' with { type: 'json' };
 import { ENGINE_VERSION } from '../shared/testnet-engine-version.ts';
+import { privateRpcUrl } from './private-rpc.ts';
 
 export const PUBLIC_TESTNET_GAME = deployment.contracts.game;
 export const PUBLIC_TESTNET_ENGINE_VERSION = ENGINE_VERSION;
@@ -37,7 +38,7 @@ export function createTestnetReplayBinding({ client, engineVersion = PUBLIC_TEST
   };
 }
 
-export function testnetReplayClient(rpcUrl = process.env.RUSH_TESTNET_RPC_URL || 'https://rpc.testnet.chain.robinhood.com') {
+export function testnetReplayClient(rpcUrl = privateRpcUrl('testnet')) {
   const url = new URL(rpcUrl);
   if (url.protocol !== 'https:' || url.username || url.password || url.hash) throw new Error('Invalid Testnet RPC configuration.');
   return createPublicClient({ transport: http(url.href, { timeout: 8000, retryCount: 0, batch: { wait: 10 } }), cacheTime: 0 });

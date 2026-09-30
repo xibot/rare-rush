@@ -3,10 +3,11 @@ import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { createRoot } from 'react-dom/client';
 import { createFriendWalletSession } from '@rarefriends/friendsdk/wallet';
 import { createArcadePublicClient } from '../arcade-client';
+import { discoverArcadeInventory, readArcadeInventoryPage, type ArcadeInventory, type InventoryFriend } from '../arcade-inventory';
 import { SiteHeader } from '../SiteHeader';
 import { SiteFooter } from '../SiteFooter';
 import { TokenCoin } from '../CanonicalArt';
-import { readGenesisEligibility, readGenesisIdentity, readOwnedGenesis } from './identity';
+import { readGenesisEligibility, readGenesisIdentity } from './identity';
 import { parseGenesisIdentity, type GenesisIdentity } from './protocol';
 import { GenesisPortrait, useGenesisPortraits } from './GenesisPortrait';
 import { createArcadeEventReporter, parseArcadeSignal } from '../analytics';
@@ -49,7 +50,10 @@ function GenesisHost() {
   const [wallet, setWallet] = useState(walletSession.getSnapshot);
   const portraits = useGenesisPortraits(wallet.status === 'connected' && wallet.account
     ? `${wallet.chainId}:${wallet.account.toLowerCase()}:${wallet.revision}` : null);
-  const [friends, setFriends] = useState<Awaited<ReturnType<typeof readOwnedGenesis>>['friends']>([]);
+  const [friends, setFriends] = useState<readonly InventoryFriend[]>([]);
+  const [inventory, setInventory] = useState<ArcadeInventory | null>(null);
+  const [nextCursor, setNextCursor] = useState<number | null>(null), [loadingMore, setLoadingMore] = useState(false);
+  const moreAbort = useRef<AbortController | null>(null);
   const [status, setStatus] = useState<'idle' | 'loading' | 'ready' | 'verifying' | 'playing'>('idle');
   const [error, setError] = useState(''), [refresh, setRefresh] = useState(0), [manualId, setManualId] = useState('');
   const [active, setActive] = useState<{ identity: GenesisIdentity; key: number; revision: number } | null>(null);
@@ -114,14 +118,36 @@ function GenesisHost() {
     const controller = new AbortController();
     if (wallet.status !== 'connected' || !wallet.account) return;
     const expected = { account: wallet.account, revision: wallet.revision };
-    setFriends([]); setError(''); setStatus('loading');
-    withDeadline(signal => readOwnedGenesis(publicClient, expected.account, { signal }), controller.signal).then(result => {
-      if (!controller.signal.aborted && sameWallet(expected)) { setFriends(result.friends); setStatus('ready'); }
+    setFriends([]); setInventory(null); setNextCursor(null); setLoadingMore(false); setError(''); setStatus('loading');
+    withDeadline(async signal => {
+      const snapshot = await discoverArcadeInventory(publicClient, expected.account, 1, { signal });
+      const result = await readArcadeInventoryPage(publicClient, snapshot, { signal });
+      return { snapshot, ...result };
+    }, controller.signal).then(result => {
+      if (!controller.signal.aborted && sameWallet(expected)) { setInventory(result.snapshot); setNextCursor(result.nextCursor); setFriends(result.friends); setStatus('ready'); }
     }).catch(() => {
       if (!controller.signal.aborted && sameWallet(expected)) { setStatus('ready'); setError('Could not load your Genesis collection. Retry, or verify a Genesis number below.'); }
     });
-    return () => controller.abort();
+    return () => { controller.abort(); moreAbort.current?.abort(); };
   }, [wallet.status, wallet.account, wallet.revision, refresh, publicClient]);
+
+  async function loadMore() {
+    const current = walletSession.getSnapshot();
+    if (!inventory || nextCursor === null || loadingMore || !current.account || current.status !== 'connected') return;
+    const expected = { account: current.account, revision: current.revision };
+    const controller = new AbortController(); moreAbort.current = controller;
+    setLoadingMore(true); setError('');
+    try {
+      const result = await withDeadline(signal => readArcadeInventoryPage(publicClient, inventory, { signal, cursor: nextCursor }), controller.signal);
+      if (!controller.signal.aborted && sameWallet(expected)) {
+        setFriends(previous => [...previous, ...result.friends]); setNextCursor(result.nextCursor);
+      }
+    } catch {
+      if (!controller.signal.aborted && sameWallet(expected)) setError('Could not load the next Genesis. Please retry. Your loaded Friends remain available.');
+    } finally {
+      if (!controller.signal.aborted && sameWallet(expected)) setLoadingMore(false);
+    }
+  }
 
   async function choose(id: bigint) {
     const current = walletSession.getSnapshot();
@@ -239,7 +265,7 @@ function GenesisHost() {
     {wallet.account && <div className="genesis-account"><span>{wallet.account.slice(0, 6)}…{wallet.account.slice(-4)}</span><button onClick={() => walletSession.disconnect()}>DISCONNECT</button></div>}
     {wallet.error && <p role="alert">{wallet.error}</p>}
   </div>
-  {wallet.status === 'connected' && <section className="owned-genesis" aria-label="Choose your Genesis"><div className="genesis-picker-heading"><h2>Your Genesis</h2><button disabled={status === 'loading' || status === 'verifying'} onClick={() => setRefresh(value => value + 1)}>REFRESH ↻</button></div>{status === 'loading' && <p role="status">Finding your original Friends…</p>}{status === 'verifying' && <p role="status">Checking ownership and loading original artwork…</p>}{status === 'ready' && !error && !friends.length && <p>No Genesis NFTs found in this wallet. Choose another wallet, or <a href="/play/">play with a hardwired Generations Friend</a>.</p>}{error && <p className="genesis-error" role="alert">{error}</p>}<div className="genesis-friends">{friends.map(friend => <button key={friend.id.toString()} disabled={status === 'verifying'} onClick={() => void choose(friend.id)}><GenesisPortrait id={friend.id} loader={portraits}/><span className="genesis-friend-name">{friend.label}</span><small>FREE ENTRY · 100×</small><b aria-hidden="true">↗</b></button>)}</div><form className="genesis-manual" onSubmit={event => { event.preventDefault(); if (/^(0|[1-9][0-9]{0,77})$/.test(manualId) && BigInt(manualId) < 1n << 256n) void choose(BigInt(manualId)); }}><label htmlFor="genesis-id">KNOW YOUR GENESIS NUMBER?</label><div><input id="genesis-id" inputMode="numeric" pattern="(0|[1-9][0-9]{0,77})" required maxLength={78} value={manualId} onChange={event => setManualId(event.target.value)} placeholder="e.g. 42"/><button disabled={status === 'verifying'} type="submit">VERIFY & PLAY ↗</button></div><small>We always verify that the connected wallet owns it.</small></form></section>}
+  {wallet.status === 'connected' && <section className="owned-genesis" aria-label="Choose your Genesis"><div className="genesis-picker-heading"><h2>Your Genesis</h2><button disabled={status === 'loading' || status === 'verifying'} onClick={() => setRefresh(value => value + 1)}>REFRESH ↻</button></div>{status === 'loading' && <p role="status">Finding your original Friends…</p>}{status === 'verifying' && <p role="status">Checking ownership and loading original artwork…</p>}{status === 'ready' && !error && !friends.length && <p>No Genesis NFTs found in this wallet. Choose another wallet, or <a href="/play/">play with a hardwired Generations Friend</a>.</p>}{error && <p className="genesis-error" role="alert">{error}</p>}<div className="genesis-friends">{friends.map(friend => <button key={friend.id.toString()} disabled={status === 'verifying'} onClick={() => void choose(friend.id)}><GenesisPortrait id={friend.id} loader={portraits}/><span className="genesis-friend-name">{friend.label}</span><small>FREE ENTRY · 100×</small><b aria-hidden="true">↗</b></button>)}</div>{nextCursor !== null && <button className="genesis-primary" disabled={loadingMore || status === 'verifying'} onClick={() => void loadMore()}>{loadingMore ? 'LOADING FRIENDS…' : 'MORE FRIENDS ↓'}</button>}<form className="genesis-manual" onSubmit={event => { event.preventDefault(); if (/^(0|[1-9][0-9]{0,77})$/.test(manualId) && BigInt(manualId) < 1n << 256n) void choose(BigInt(manualId)); }}><label htmlFor="genesis-id">KNOW YOUR GENESIS NUMBER?</label><div><input id="genesis-id" inputMode="numeric" pattern="(0|[1-9][0-9]{0,77})" required maxLength={78} value={manualId} onChange={event => setManualId(event.target.value)} placeholder="e.g. 42"/><button disabled={status === 'verifying'} type="submit">VERIFY & PLAY ↗</button></div><small>We always verify that the connected wallet owns it.</small></form></section>}
   <p className="genesis-caption">Genesis ownership is verified on Robinhood Chain before entry and before each run. Your original Genesis portrait gets a random Generations body for each run. All rewards are simulated. Playing needs no activation payment, transaction, or signature. Publishing a replay requires a wallet signature.</p></main></div><SiteFooter/></>;
 }
 

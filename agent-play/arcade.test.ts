@@ -1,9 +1,13 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { decodeFunctionData, encodeAbiParameters, parseAbi, type Address, type Hex } from 'viem';
+import { createPublicClient, custom, decodeFunctionData, encodeAbiParameters, parseAbi, type Address, type Hex } from 'viem';
 import { GENERATION_SPRITE_MANIFEST } from '@rarefriends/friendsdk/sprites';
 import { GENESIS_DEPLOYMENT } from '../games/rare-rush/genesis/identity.ts';
-import { loadArcadeFriend, type ArcadeProvider } from './arcade.ts';
+import { loadArcadeFriend as readArcadeFriend, type ArcadeProvider } from './arcade.ts';
+
+const readClients = new WeakMap<ArcadeProvider, ReturnType<typeof createPublicClient>>();
+const loadArcadeFriend = (provider: ArcadeProvider, account: Address, collection: 0 | 1, tokenId: string) =>
+  readArcadeFriend(provider, account, collection, tokenId, readClients.get(provider));
 
 const account = '0x1111111111111111111111111111111111111111' as Address;
 const other = '0x2222222222222222222222222222222222222222' as Address;
@@ -48,7 +52,15 @@ function mock(options: { owner?: Address; generation?: number; chain?: string; i
       }
     },
   };
+  const request = provider.request;
+  const client = createPublicClient({ cacheTime: 0, transport: custom({ request }, { retryCount: 0 }) });
+  provider.request = async args => {
+    assert.ok(['eth_accounts', 'eth_chainId'].includes(args.method), 'The wallet never supplies ownership or artwork data');
+    return request(args);
+  };
+  readClients.set(provider, client);
   return { provider, calls, listeners };
+
 }
 
 test('Arcade loads the owned Generations identity and its actual SDK frames', async () => {

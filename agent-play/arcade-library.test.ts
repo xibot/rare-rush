@@ -1,10 +1,20 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { decodeFunctionData, encodeAbiParameters, encodeEventTopics, parseAbi, type Address, type Hex } from 'viem';
-import { loadArcadeLibrary, loadArcadePortrait } from './arcade-library.ts';
-import { loadArcadeFriend, type ArcadeProvider } from './arcade.ts';
+import { createPublicClient, custom, decodeFunctionData, encodeAbiParameters, encodeEventTopics, parseAbi, type Address, type Hex } from 'viem';
+import { loadArcadeLibrary as readArcadeLibrary, loadArcadePortrait as readArcadePortrait } from './arcade-library.ts';
+import { loadArcadeFriend as readArcadeFriend, type ArcadeProvider } from './arcade.ts';
 import { GENESIS_DEPLOYMENT } from '../games/rare-rush/genesis/identity.ts';
 import { GENERATION_SPRITE_MANIFEST } from '@rarefriends/friendsdk/sprites';
+
+const fixtures = new WeakMap<ArcadeProvider, { request: ArcadeProvider['request'] }>();
+const clientFor = (provider: ArcadeProvider) => createPublicClient({ cacheTime: 0,
+  transport: custom({ request: args => fixtures.get(provider)!.request(args) }, { retryCount: 0 }) });
+const loadArcadeLibrary = (provider: ArcadeProvider, account: Address, collection: 0 | 1, signal: AbortSignal) =>
+  readArcadeLibrary(provider, account, collection, signal, clientFor(provider));
+const loadArcadePortrait = (provider: ArcadeProvider, account: Address, collection: 0 | 1, tokenId: string, signal: AbortSignal) =>
+  readArcadePortrait(provider, account, collection, tokenId, signal, clientFor(provider));
+const loadArcadeFriend = (provider: ArcadeProvider, account: Address, collection: 0 | 1, tokenId: string) =>
+  readArcadeFriend(provider, account, collection, tokenId, clientFor(provider));
 
 const account = '0x1111111111111111111111111111111111111111' as Address;
 const other = '0x2222222222222222222222222222222222222222' as Address;
@@ -70,7 +80,14 @@ function fixture(collection: 0 | 1) {
       }
     },
   };
-  return { state, calls, listeners, provider };
+  const rpc = { request: provider.request };
+  const connectionRequest = provider.request;
+  provider.request = async args => {
+    assert.ok(['eth_accounts', 'eth_chainId'].includes(args.method), 'The wallet never supplies NFT data');
+    return connectionRequest(args);
+  };
+  fixtures.set(provider, rpc);
+  return { state, calls, listeners, provider, rpc };
 }
 const signal = () => new AbortController().signal;
 
@@ -84,7 +101,7 @@ test('picker finds both Genesis NFTs and only playable Generations from wallet-f
   }
 });
 
-test('wallet-backed picker loads both collections through RPC block-range limits', async () => {
+test('server-backed picker loads both collections through RPC block-range limits', async () => {
   for (const collection of [0, 1] as const) {
     const f = fixture(collection);
     f.state.block = 76_094_632n; f.state.maxLogBlocks = 10_000_000n;
@@ -112,10 +129,10 @@ test('empty wallet is a valid empty result, RPC errors and truncated history are
 test('picker cancels pending reads on wallet changes and explicit cancellation', async () => {
   for (const event of ['accountsChanged', 'chainChanged', 'disconnect', 'abort'] as const) {
     const f = fixture(0), controller = new AbortController();
-    const request = f.provider.request;
+    const request = f.rpc.request;
     let started!: () => void;
     const waiting = new Promise<void>(resolve => { started = resolve; });
-    f.provider.request = async args => {
+    f.rpc.request = async args => {
       if (args.method === 'eth_getLogs') { started(); return new Promise(() => {}); }
       return request(args);
     };
@@ -152,8 +169,8 @@ test('manual nonexistent ID has clear mainnet guidance; RPC failure is not misre
   const f = fixture(0); f.state.missing = true;
   await assert.rejects(loadArcadeFriend(f.provider, account, 0, '1'), /Generations #1 does not exist.*Testnet NFT IDs are separate/);
   f.state.missing = false;
-  const request = f.provider.request;
-  f.provider.request = async args => { if (args.method === 'eth_call') throw new Error('HTTP request failed'); return request(args); };
+  const request = f.rpc.request;
+  f.rpc.request = async args => { if (args.method === 'eth_call') throw new Error('HTTP request failed'); return request(args); };
   await assert.rejects(loadArcadeFriend(f.provider, account, 0, '42'), error => {
     assert.match((error as Error).message, /Could not check/);
     assert.doesNotMatch((error as Error).message, /does not exist/); return true;

@@ -113,7 +113,7 @@ test('unknown proxy routes and wrong proxy methods are rejected without upstream
   for (const method of ['eth_sendTransaction', 'eth_sendRawTransaction', 'eth_sign', 'personal_sign', 'wallet_switchEthereumChain']) {
     const denied = await request('/api/rpc', { method: 'POST', headers: { Origin: origin, 'Content-Type': 'application/json' },
       body: JSON.stringify({ jsonrpc: '2.0', id: 1, method, params: [] }) });
-    assert.equal(denied.response.status, 403, `${method} must never reach the proxy`);
+    assert.equal(denied.response.status, 400, `${method} must never reach the proxy`);
   }
   const status = await request('/api/status', { method: 'POST', headers: { Origin: origin, 'Content-Type': 'application/json' }, body: '{}' });
   assert.equal(status.response.status, 405);

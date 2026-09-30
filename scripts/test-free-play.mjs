@@ -200,7 +200,32 @@ try {
     await page.getByRole('button', { name: new RegExp(`^${difficulty} difficulty$`, 'i') }).click();
     await page.getByRole('button', { name: 'How to play', exact: true }).click();
     await page.getByText('JUMP / DOUBLE JUMP', { exact: true }).waitFor();
+    const help = page.getByRole('dialog', { name: 'HOW TO RUSH', exact: true });
+    assert.equal(await help.evaluate(element => element.matches(':modal')), true,
+      'Help opens in the browser top layer, outside the scrolling game grid');
+    const helpBounds = await help.boundingBox();
+    assert(helpBounds && helpBounds.x >= 8 && helpBounds.y >= 8
+      && helpBounds.x + helpBounds.width <= width - 8
+      && helpBounds.y + helpBounds.height <= height - 8,
+      'The help popup and its close button fit fully inside the viewport');
+    assert(Math.abs(helpBounds.x + helpBounds.width / 2 - width / 2) < 2
+      && Math.abs(helpBounds.y + helpBounds.height / 2 - height / 2) < 2,
+      'Help remains centered on desktop and phone');
+    assert.equal(await help.locator('.free-play-help-body').evaluate(element =>
+      getComputedStyle(element).overflowY === 'auto' && element.scrollHeight > element.clientHeight), true,
+      'Long instructions scroll within the popup');
+    assert.equal(await page.evaluate(() => document.body.style.overflow), 'hidden');
+    await page.keyboard.press('Tab');
+    assert.equal(await help.evaluate(element => element.contains(document.activeElement)), true,
+      'Keyboard focus stays in the open modal');
+    await page.screenshot({ path: path.join(artifacts, `${width}-help.png`) });
     await assertFreeUI(root);
+    await page.keyboard.press('Escape');
+    assert.equal(await help.count(), 0, 'Escape closes help');
+    assert.equal(await page.getByRole('button', { name: 'How to play', exact: true }).evaluate(element =>
+      element === document.activeElement), true, 'Closing help restores the trigger focus');
+    assert.notEqual(await page.evaluate(() => document.body.style.overflow), 'hidden');
+    await page.getByRole('button', { name: 'How to play', exact: true }).click();
     await page.getByRole('button', { name: /^Close/ }).click();
     await page.screenshot({ path: path.join(artifacts, `${width}-ready.png`), fullPage: true });
     await page.getByRole('button', { name: /LET’S RUSH/ }).click();

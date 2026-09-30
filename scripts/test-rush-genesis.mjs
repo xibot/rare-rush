@@ -11,7 +11,6 @@ const account = '0x1111111111111111111111111111111111111111';
 const other = '0x2222222222222222222222222222222222222222';
 const tba = '0x3333333333333333333333333333333333333333';
 const contract = '0x116EaA62241751E0c98dA43d458600c6C17cD361';
-const rpc = 'https://rpc.mainnet.chain.robinhood.com';
 const abi = parseAbi([
   'function balanceOf(address account) view returns (uint256)',
   'function ownerOf(uint256 tokenId) view returns (address)',
@@ -60,10 +59,10 @@ try {
     }, { account, chainId });
     await page.route('**/*', async route => {
       const url = new URL(route.request().url());
-      if (url.origin === origin || url.protocol === 'data:') return route.continue();
-      if (url.origin !== rpc) { state.unexpected.push(url.href); return route.abort(); }
+      if (url.origin === origin && url.pathname !== '/api/mainnet-rpc' || url.protocol === 'data:') return route.continue();
+      if (url.origin !== origin || url.pathname !== '/api/mainnet-rpc') { state.unexpected.push(url.href); return route.abort(); }
       if (route.request().method() === 'OPTIONS') return route.fulfill({ status: 204, headers: { 'access-control-allow-origin': '*', 'access-control-allow-headers': '*' } });
-      const call = route.request().postDataJSON();
+      const respond = async call => {
       state.requests.push(call);
       let result;
       if (call.method === 'eth_chainId') result = '0x1237';
@@ -77,11 +76,14 @@ try {
           if (state.ownerDelayAt === state.ownerReads) await new Promise(resolve => setTimeout(resolve, 11_000));
           if (state.ownerGate) await state.ownerGate;
         }
-        if (state.failed) return route.fulfill({ json: { jsonrpc: '2.0', id: call.id, error: { code: -32603, message: 'Test RPC unavailable' } }, headers: { 'access-control-allow-origin': '*' } });
+        if (state.failed) return { jsonrpc: '2.0', id: call.id, error: { code: -32603, message: 'Test RPC unavailable' } };
         const value = { balanceOf: decoded.args[0].toString().toLowerCase() === state.owner.toLowerCase() ? 1n : 0n, ownerOf: state.owner, tokenBoundAccount: tba, tokenURI: uri }[decoded.functionName];
         result = encodeFunctionResult({ abi, functionName: decoded.functionName, result: value });
       } else throw new Error(`Unexpected RPC: ${call.method}`);
-      return route.fulfill({ json: { jsonrpc: '2.0', id: call.id, result }, headers: { 'access-control-allow-origin': '*' } });
+      return { jsonrpc: '2.0', id: call.id, result };
+      };
+      const body = route.request().postDataJSON();
+      return route.fulfill({ json: Array.isArray(body) ? await Promise.all(body.map(respond)) : await respond(body) });
     });
     return { page, state, game: page.frameLocator('iframe') };
   }

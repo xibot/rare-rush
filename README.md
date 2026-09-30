@@ -85,6 +85,10 @@ The production build is written to `dist/`. Additional browser checks are docume
 
 For Testnet development, use the [Testnet setup guide](testnet-app/README.md).
 
+Wallet-connected Arcade and browser Autopilot use server-side private RPCs for ownership, artwork, balances and transaction-status reads. Set `RUSH_MAINNET_RPC_URL` and `RUSH_TESTNET_RPC_URL` as Vercel **Secrets** on the main site. Local `npm run dev` reads these from the ignored `.env.rpc.local` file. Endpoints must use HTTPS and match Robinhood mainnet (4663) or Testnet (46630); missing configuration fails safely without falling back to a public RPC. Free Play needs neither endpoint.
+
+Friend inventories load in small pages, with artwork fetched as cards become visible. Selecting a Friend still checks current ownership before play. The wallet handles account permissions, signatures and transaction submission; its own transaction network settings remain under the wallet's control. Headless agents can supply a read-only RPC through their job configuration.
+
 ## Explore the code
 
 Rare Rush uses **TypeScript, React, SVG rendering, and FriendSDK**. Testnet adds Solidity contracts and a server-side replay verifier.

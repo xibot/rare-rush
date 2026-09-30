@@ -2,6 +2,7 @@ import { parseArcadeNavigation } from './navigation';
 import { syncFriendPortraits, cleanupFriendPortraits } from './host-portraits';
 import { bindGenerationsAnalytics } from './host-analytics';
 import { bindGenerationsRunSaves } from './host-run-saves';
+import { bindGenerationsArtwork } from './host-art';
 import { createSdkSiteHeader } from './site-navigation';
 import { siteFooterMarkup } from '../../shared/site-footer';
 
@@ -11,10 +12,12 @@ function enhanceGenerationsEntry(): void {
   if (!root) return;
   const analytics = bindGenerationsAnalytics(root);
   let saves = bindGenerationsRunSaves(root);
+  let artwork = bindGenerationsArtwork(root);
 
   const update = () => {
     analytics.update();
     saves.update();
+    artwork.update();
     let pickerOpen = false;
     for (const frame of root.querySelectorAll<HTMLElement>('.rf-game-frame')) {
       let framePickerOpen = false;
@@ -66,8 +69,8 @@ function enhanceGenerationsEntry(): void {
   const observer = new MutationObserver(update);
   const observe = () => { observer.observe(root, { childList: true, characterData: true, subtree: true }); update(); };
   observe();
-  window.addEventListener('pagehide', () => { observer.disconnect(); cleanupFriendPortraits(); analytics.close(); saves.close(); window.removeEventListener('message', navigate); });
-  window.addEventListener('pageshow', event => { if (event.persisted) { analytics.restore(); saves = bindGenerationsRunSaves(root); window.addEventListener('message', navigate); observe(); } });
+  window.addEventListener('pagehide', () => { observer.disconnect(); cleanupFriendPortraits(); analytics.close(); saves.close(); artwork.close(); window.removeEventListener('message', navigate); });
+  window.addEventListener('pageshow', event => { if (event.persisted) { analytics.restore(); saves = bindGenerationsRunSaves(root); artwork = bindGenerationsArtwork(root); window.addEventListener('message', navigate); observe(); } });
 }
 
 if (window.self === window.top && /^\/play(?:\/|$)/.test(window.location.pathname)) {

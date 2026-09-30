@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import type { EIP1193Provider } from 'viem';
+import { decodeFunctionData, encodeFunctionResult, parseAbi, type EIP1193Provider } from 'viem';
 import { runCli, runJob } from './cli.ts';
 import { openJob, parseJob } from './jobs.ts';
 import { PROTOCOL_VERSION, advanceAgent, createAgentSession, exportAgentReplay, runSessionToEnd } from './runner.ts';
@@ -117,4 +117,30 @@ test('CLI has structured output, requires an explicit ID and never echoes arbitr
   assert.equal(lines.pop()!.includes('DO_NOT_LOG'), false);
   writeFileSync(file, JSON.stringify({ ...base, id: undefined }));
   assert.equal(await runCli(['run', '--job', file], defaults), 1);
+});
+
+
+test('headless Arcade keeps its configured read client without a browser origin or website transport', async t => {
+  const root = directory(t), methods: string[] = [];
+  const abi = parseAbi(['function ownerOf(uint256) view returns(address)',
+    'function tokenBoundAccount(uint256) view returns(address)', 'function tokenURI(uint256) view returns(string)']);
+  const portrait = 'data:image/svg+xml;base64,' + Buffer.from('<svg xmlns="http://www.w3.org/2000/svg"><path d="M0 0h1v1z"/></svg>').toString('base64');
+  const uri = 'data:application/json;base64,' + Buffer.from(JSON.stringify({ image: portrait })).toString('base64');
+  const readProvider = { request: async ({ method, params }) => {
+    methods.push(method);
+    if (method === 'eth_accounts') return [address];
+    if (method === 'eth_chainId') return '0x1237';
+    if (method === 'eth_blockNumber') return '0x100';
+    assert.equal(method, 'eth_call', 'This job never signs or spends');
+    const [{ data }, block] = params;
+    assert.equal(block, '0x100');
+    const { functionName } = decodeFunctionData({ abi, data });
+    return encodeFunctionResult({ abi, functionName, result: functionName === 'tokenURI' ? uri : address });
+  } } as EIP1193Provider;
+  const job = parseJob({ ...base, mode: 'arcade', wallet: { address } });
+  const result = await runJob(job, { directory: root, provider: readProvider, seed: () => seed });
+  assert.equal(result.status, 'completed');
+  assert.equal(result.record?.art?.portraitUrl, portrait);
+  assert.ok(methods.includes('eth_call'));
+  assert.ok(methods.every(method => ['eth_chainId', 'eth_accounts', 'eth_blockNumber', 'eth_call'].includes(method)));
 });

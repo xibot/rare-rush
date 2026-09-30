@@ -1,9 +1,11 @@
 import { useEffect, useRef, useState } from 'react';
 import type { GameComponentProps } from '@rarefriends/friendsdk/runtime';
 import type { GameClient } from '@rarefriends/friendsdk/game';
-import { createFriendReader, type GenerationSprites } from '@rarefriends/friendsdk/sprites';
+import { type GenerationSprites } from '@rarefriends/friendsdk/sprites';
+import { requestArcadeArt } from './art-bridge';
 import { useRunAudio, RunAudioControls } from './audio/useRunAudio';
 import { GameMenu } from '@rarefriends/friendsdk/frame';
+import { FreePlayMenu } from './free-play/FreePlayMenu';
 import { createRun, FIXED_STEP, type RunState } from './twist/engine';
 import { DirectionScene } from './twist/DirectionScene';
 import { headingFor } from './twist/presentation';
@@ -75,6 +77,7 @@ function Runner({ friendId, client, paused, genesis, guest, onNavigate = request
 
   useEffect(() => {
     let cancelled = false;
+    const artworkRequest = new AbortController();
     mounted.current = true; startingRef.current = false; setStarting(false);
     setLoaded(false); setError(''); setSprites(null); setScreen('ready'); setUserPaused(false); setPanel(null); setDifficulty('normal');
     const savedBests = guest ? readFreePlayBests() : null;
@@ -88,7 +91,7 @@ function Runner({ friendId, client, paused, genesis, guest, onNavigate = request
       if (guest) return guest.collection === 'generations' ? guest.sprites : null;
       if (genesis) return null;
       if (!client) throw new Error('Connect through the FriendSDK game host.');
-      const [snapshot, art] = await Promise.all([client.read(), createFriendReader().read(friendId)]);
+      const [snapshot, art] = await Promise.all([client.read(), requestArcadeArt(friendId, artworkRequest.signal)]);
       if (snapshot.friendId !== friendId) throw new Error('Selected Friend changed. Choose your Friend again.');
       if (client.mode !== 'preview') throw new Error('Rare Rush currently supports the simulated economy only.');
       return art;
@@ -97,7 +100,7 @@ function Runner({ friendId, client, paused, genesis, guest, onNavigate = request
       if (cancelled) return;
       setSprites(art); setLoaded(true);
     }).catch(cause => { if (!cancelled) setError(cause instanceof Error ? cause.message : 'Could not load your Friend.'); });
-    return () => { cancelled = true; mounted.current = false; active.current = false; saving.current?.abort(); };
+    return () => { cancelled = true; artworkRequest.abort(); mounted.current = false; active.current = false; saving.current?.abort(); };
   }, [friendId, client, retry, genesis?.portraitUrl, guest]);
 
   useEffect(() => {
@@ -254,6 +257,7 @@ function Runner({ friendId, client, paused, genesis, guest, onNavigate = request
   const friendCenter = run.player.x + run.player.w / 2;
   const friendHeight = run.player.slide ? 30 : 60 * growth;
   const hasCharacter = Boolean(sprites || portraitUrl);
+  const Menu = guest ? FreePlayMenu : GameMenu;
   const renderCharacter = (frame: number, walking = false) => portraitUrl
     ? <GenesisRunnerSprite portraitUrl={portraitUrl} bodyId={genesisBodyId} frame={frame} walking={walking && !reduced && !freeze}/>
     : sprites ? <Sprite sprites={sprites} frame={frame} walking={walking}/> : null;
@@ -316,7 +320,7 @@ function Runner({ friendId, client, paused, genesis, guest, onNavigate = request
     </div>
     {guest && <div className="free-play-status">HUMAN RUN <span>·</span> {bestsPersistent ? 'PERSONAL BESTS ON THIS BROWSER' : 'SESSION BESTS · STORAGE UNAVAILABLE'}</div>}
     {error && loaded && <div className="error-toast" role="alert">{error}</div>}
-    {panel && <GameMenu title={panel === 'rules' ? 'HOW TO RUSH' : 'TOKEN LAB · SIMULATION'} onClose={() => { setPanel(null); if (running && !userPaused) requestAnimationFrame(() => stage.current?.focus()); }}>
+    {panel && <Menu title={panel === 'rules' ? 'HOW TO RUSH' : 'TOKEN LAB · SIMULATION'} onClose={() => { setPanel(null); if (running && !userPaused) requestAnimationFrame(() => stage.current?.focus()); }}>
       {panel === 'rules' ? <div className="rules-panel"><p>Choose your difficulty before a run. Three hearts, an endless world, and a best score for each mode.</p><dl><dt>PICK YOUR CHALLENGE</dt><dd>{guest ? 'Easy: 120 seconds with roomy obstacles. Normal: 90 seconds with mixed obstacles. Degen: 60 seconds with tougher combinations and wider coin scatter.' : 'Easy: 120 seconds, roomy obstacles and 0.75× rewards. Normal: 90 seconds, mixed obstacles and 1× rewards. Degen: 60 seconds, tougher combinations, wider coin scatter and 2× rewards.'} Difficulty stays locked until the run ends.</dd>{portraitUrl && <><dt>A NEW BODY EACH RUN</dt><dd>Your original Genesis face gets one of 36 Generations bodies at the start of each run. It stays with you until the run ends. Bodies are cosmetic: movement, collision rules and rewards stay the same.</dd></>}<dt>JUMP / DOUBLE JUMP</dt><dd>Space, ↑ or W. On phone, tap JUMP or the world. Tap again in the air for a double jump.</dd><dt>SLIDE</dt><dd>Hold ↓, S or SLIDE to duck under the floating bridges. Release to stand up.</dd><dt>SET YOUR PACE</dt><dd>Hold the direction you are running to speed up, or the opposite direction to slow down. On phone, hold FAST or SLOW. Release to return to cruising speed.</dd><dt>FOLLOW THE TWIST</dt><dd>Every run starts sideways. A ceiling intake can pull you up, or a break in the floor can drop you into free fall. Hold ← / → (LEFT / RIGHT on phone) to steer through the shaft. Your Friend spins continuously. A shaft can sometimes send you out running left; jump and slide return on the horizontal track.</dd><dt>COLLECT & GROW</dt><dd>Every bear coin grows your Friend, up to 1.75× size. An obstacle hit shrinks it by 0.35×, down to its starting size. A shield protects your size too. You can still squeeze under bridges.</dd><dt>{guest ? 'CHASE THE BONUS COIN' : 'CHASE THE 10× COIN'}</dt><dd>Giant bear coins fly in from ahead at surprise intervals, sometimes in a pair. {guest ? 'Chase them for coins and keep your chain growing.' : 'They are twice the size and earn 10× your difficulty’s current coin reward, up to the remaining emission cap.'} Jump, double jump, or use a magnet to catch them. Each still counts as one coin for growth and chains.</dd><dt>CHAIN YOUR COINS</dt><dd>Collect coins in a row to grow your score multiplier to ×5. Getting hit breaks your chain.</dd><dt>POWER UP</dt><dd>S shields you from a hit. M attracts nearby coins. Crystals and crates cost a heart.</dd><dt>TAKE A BREAK</dt><dd>Press P or Escape to pause. Switching tabs pauses your run. Music and sound effects controls are at the top.</dd></dl><p className="fine-print">{guest ? 'Free Play uses sample artwork. Play as often as you like; personal bests stay in this browser when storage is available. Connecting later starts a separate wallet run. Public replay saving requires a wallet-signed run with your own eligible Friend.' : <>{genesis ? 'Genesis runs are free and earn 100× demo token rewards. ' : 'Each run costs 1 simulated RF. All fees enter the simulated prize pool. '} Coins earn demo $RUSH at the selected difficulty rate; combo boosts score only. Rewards are banked on timeout or your third hit. Reloading or switching Friends resets this session.</>}</p></div> : <div className="economy-panel">
         <p>Early coins earn more. Every 10,000 simulated pickups halves the reward. Try a later chapter of the economy.</p>
         <div className="lab-stat"><span>NEXT COIN · {mode.label.toUpperCase()} · {mode.rewardLabel}{genesis ? ' · GENESIS 100×' : ''}</span><strong>{formatToken(nextCoinReward(e, run.difficulty, 1, collection))}<small> demo $RUSH</small></strong></div>
@@ -326,6 +330,6 @@ function Runner({ friendId, client, paused, genesis, guest, onNavigate = request
         <p className="fine-print">The counter is local to this session, not live player activity. No RF is charged and no token is minted. The pool has no payout yet. $RUSH is a working name, with no monetary value or RF redemption promise.</p>
         <div className="future-note"><b>PLANNED FOR LIVE PLAY</b><p>Verified onchain rewards · a $RUSH / $RAREFRIENDS liquidity pair · prize distribution. These need additional integrations and a finalized economy.</p></div>
       </div>}
-    </GameMenu>}
+    </Menu>}
   </section>;
 }

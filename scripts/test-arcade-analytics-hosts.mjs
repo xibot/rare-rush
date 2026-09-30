@@ -5,7 +5,7 @@ import path from 'node:path';
 import { chromium } from 'playwright';
 import { decodeFunctionData, encodeFunctionResult, encodeEventTopics, parseAbi, zeroAddress } from 'viem';
 import { buildRushSite, createRushSiteServer } from './rush-site.mjs';
-import { installFixture, createArtworkFixture } from '../node_modules/@rarefriends/friendsdk/scripts/browser-fixture.mjs';
+import { installMainnetFixture as installFixture, createArtworkFixture } from './mainnet-browser-fixture.mjs';
 
 // Real shipped hosts/game bundles, isolated wallet/RPC responses and a routed
 // production URL. Every analytics POST is intercepted: no public stats change.
@@ -13,7 +13,6 @@ const origin = 'https://rarerush.app';
 const account = '0x1111111111111111111111111111111111111111';
 const excluded = '0x6fd155b9d52f80e8a73a8a2537268602978486e2';
 const contract = '0x116EaA62241751E0c98dA43d458600c6C17cD361';
-const rpc = 'https://rpc.mainnet.chain.robinhood.com';
 const abi = parseAbi(['function balanceOf(address account) view returns(uint256)', 'function ownerOf(uint256 tokenId) view returns(address)', 'function tokenBoundAccount(uint256 tokenId) view returns(address)', 'function tokenURI(uint256 tokenId) view returns(string)', 'event Transfer(address indexed from,address indexed to,uint256 indexed tokenId)']);
 const portrait = 'data:image/svg+xml;base64,' + Buffer.from('<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 8 8"><rect width="8" height="8" fill="white"/><path d="M1 1h6v6H1z" fill="black"/></svg>').toString('base64');
 const uri = 'data:application/json;base64,' + Buffer.from(JSON.stringify({ name: 'Genesis #1', image: portrait })).toString('base64');
@@ -29,6 +28,7 @@ async function routeSite(page, localOrigin, events) {
   // checked local build server is fetched; no request can reach the live site.
   await page.route(`${origin}/**`, async route => {
     const request = route.request(), url = new URL(request.url());
+    if (url.pathname === '/api/mainnet-rpc') return route.fallback();
     if (url.pathname === '/api/arcade-events') {
       assert.equal(request.headers().origin, origin);
       const body = request.postDataJSON(); events.push(body);
@@ -65,8 +65,8 @@ async function installGenesisFixture(page, player) {
   }, player);
   await page.route('**/*', async route => {
     const url = new URL(route.request().url());
-    if (url.origin === origin || url.protocol === 'data:') return route.continue();
-    if (url.origin !== rpc) { errors.push(url.href); return route.abort(); }
+    if (url.origin === origin && url.pathname !== '/api/mainnet-rpc' || url.protocol === 'data:') return route.continue();
+    if (url.origin !== origin || url.pathname !== '/api/mainnet-rpc') { errors.push(url.href); return route.abort(); }
     if (route.request().method() === 'OPTIONS') return route.fulfill({ status: 204, headers: { 'access-control-allow-origin': '*', 'access-control-allow-headers': '*' } });
     const respond = call => {
       let result;
@@ -91,7 +91,7 @@ try {
   built = await buildRushSite({ outdir }); server = createRushSiteServer(outdir);
   await new Promise(resolve => server.listen(0, '127.0.0.1', resolve));
   const localOrigin = `http://127.0.0.1:${server.address().port}`;
-  browser = await chromium.launch({ headless: true, ...(process.env.PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH ? { executablePath: process.env.PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH } : {}) });
+  browser = await chromium.launch({ headless: true, ...(process.env.RUSH_BROWSER_CHANNEL ? { channel: process.env.RUSH_BROWSER_CHANNEL } : {}), ...(process.env.PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH ? { executablePath: process.env.PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH } : {}) });
   const artworkCall = await createArtworkFixture();
   const page = await browser.newPage({ viewport: { width: 1440, height: 1100 } }), events = [], errors = [];
   page.on('pageerror', error => errors.push(error.message));

@@ -1,6 +1,6 @@
-import { createPublicClient, http, type Address } from 'viem';
+import { type Address } from 'viem';
 import { readGenerationEligibility } from '@rarefriends/friendsdk/identity';
-import { GENERATION_SPRITE_MANIFEST } from '@rarefriends/friendsdk/sprites';
+import { createArcadePublicClient } from './arcade-client.ts';
 import { publishRun, RunPublicationError, runPublicationMessage, type PublicationProvider } from './public-runs.ts';
 import { RUN_SAVE_MAX_BYTES, type ArcadeRunCapture } from './run-save-bridge.ts';
 
@@ -108,7 +108,7 @@ export function bindGenerationsRunSaves(root: HTMLElement) {
     };
     return { ...selected, collection: 0, assertActive, provider: () => providers.matching(selected.player),
       verify: async () => {
-        const client = createPublicClient({ transport: http(GENERATION_SPRITE_MANIFEST.rpcUrl, { timeout: 12_000, retryCount: 0 }) });
+        const client = createArcadePublicClient({ timeout: 12_000, retryCount: 0 });
         const friend = await readGenerationEligibility(client, BigInt(selected.tokenId), selected.player);
         if (!friend.ownedByPlayer || !friend.eligible) throw new RunPublicationError('This wallet no longer owns an eligible selected Friend.');
       } };

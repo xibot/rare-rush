@@ -11,7 +11,7 @@ import { createReplayFeed } from '../server/replay-feed.mjs';
 
 // Isolated synthetic wallet, local build and in-memory feed only. No live RPC,
 // wallet, publication or transaction is possible in this browser test.
-const origin = 'https://rarerush.app', rpc = 'https://rpc.mainnet.chain.robinhood.com';
+const origin = 'https://rarerush.app';
 const signer = privateKeyToAccount(`0x${'1'.padStart(64, '0')}`), player = signer.address;
 const addresses = { genesis: '0x116EaA62241751E0c98dA43d458600c6C17cD361', generations: '0x14C49e6118F46525dE9ab41a51cBAA3c6EBF181D' };
 const abi = parseAbi(['function balanceOf(address) view returns(uint256)', 'function ownerOf(uint256) view returns(address)',
@@ -25,7 +25,7 @@ try {
   built = await buildRushSite({ outdir }); server = createRushSiteServer(outdir);
   await new Promise(resolve => server.listen(0, '127.0.0.1', resolve));
   const local = `http://127.0.0.1:${server.address().port}`, artwork = await createArtworkFixture();
-  browser = await chromium.launch({ headless: true, ...(process.env.PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH ? { executablePath: process.env.PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH } : {}) });
+  browser = await chromium.launch({ headless: true, ...(process.env.RUSH_BROWSER_CHANNEL ? { channel: process.env.RUSH_BROWSER_CHANNEL } : {}), ...(process.env.PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH ? { executablePath: process.env.PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH } : {}) });
   for (const { collection, actor } of ['human', 'autopilot'].flatMap(actor => ['genesis', 'generations'].map(collection => ({ collection, actor })))) {
     const page = await browser.newPage({ viewport: { width: 1440, height: 1100 } });
     const errors = [], violations = [], records = new Map(), posts = [];
@@ -61,7 +61,6 @@ try {
           return { jsonrpc: '2.0', id: call.id, result };
         };
     page.on('pageerror', error => errors.push(error.message));
-    await page.exposeFunction('readFixtureRpc', async call => (await answer(call)).result);
     await page.exposeFunction('signFixturePublication', typed => signer.signTypedData(typed));
     await page.addInitScript(({ player, authorized }) => {
       if (window.parent !== window) return;
@@ -71,7 +70,6 @@ try {
         if (method === 'eth_accounts') return window.fixtureWallet.authorized ? [player] : [];
         if (method === 'eth_requestAccounts') { window.fixtureWallet.authorized = true; return [player]; }
         if (method === 'eth_chainId') return '0x1237';
-        if (['eth_call', 'eth_blockNumber', 'eth_getLogs'].includes(method)) return window.readFixtureRpc({ method, params });
         if (method === 'eth_signTypedData_v4') {
           if (window.fixtureWallet.reject) throw Object.assign(new Error('User rejected'), { code: 4001 });
           return window.signFixturePublication(JSON.parse(params[1]));
@@ -90,6 +88,10 @@ try {
       try {
         const request = route.request(), url = new URL(request.url());
         if (url.origin === origin) {
+          if (url.pathname === '/api/mainnet-rpc') {
+            const body = request.postDataJSON();
+            return route.fulfill({ json: Array.isArray(body) ? await Promise.all(body.map(answer)) : await answer(body) });
+          }
           if (url.pathname === '/api/status') return route.fulfill({ json: { ready: false } });
           if (url.pathname === '/api/arcade-events') return route.fulfill({ json: { accepted: true, receipt: 'fixture-receipt' } });
           if (url.pathname === '/api/runs' || url.pathname.startsWith('/api/runs/')) {
@@ -100,11 +102,7 @@ try {
           const response = await route.fetch({ url: new URL(url.pathname + url.search, local).href });
           return route.fulfill({ response });
         }
-        assert.equal(url.origin, rpc, 'Every external request is intercepted');
-        const headers = { 'access-control-allow-origin': '*', 'access-control-allow-headers': '*' };
-        if (request.method() === 'OPTIONS') return route.fulfill({ status: 204, headers });
-        const body = request.postDataJSON();
-        return route.fulfill({ headers, json: Array.isArray(body) ? await Promise.all(body.map(answer)) : await answer(body) });
+        throw new Error(`Unexpected external browser request: ${url.href}`);
       } catch (error) { violations.push(error.message); await route.abort(); }
     });
     let game;

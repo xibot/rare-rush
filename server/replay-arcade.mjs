@@ -1,6 +1,7 @@
 import { createPublicClient, http, parseAbi } from 'viem';
 import { GENERATION_SPRITE_MANIFEST } from '@rarefriends/friendsdk/sprites';
 import { GENESIS_DEPLOYMENT } from '../games/rare-rush/genesis/identity.ts';
+import { privateRpcUrl } from './private-rpc.ts';
 
 const abi = parseAbi(['function ownerOf(uint256 tokenId) view returns(address)', 'function generation(uint256 tokenId) view returns(uint256)']);
 
@@ -19,7 +20,7 @@ export function createArcadeReplayBinding({ client } = {}) {
   };
 }
 
-export function arcadeReplayClient(rpcUrl = process.env.RUSH_MAINNET_RPC_URL || GENESIS_DEPLOYMENT.rpcUrl) {
+export function arcadeReplayClient(rpcUrl = privateRpcUrl('mainnet')) {
   const url = new URL(rpcUrl);
   if (url.protocol !== 'https:' || url.username || url.password || url.hash) throw new Error('Invalid Arcade RPC configuration.');
   return createPublicClient({ transport: http(url.href, { timeout: 8000, retryCount: 0, batch: { wait: 10 } }), cacheTime: 0 });
