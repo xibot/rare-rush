@@ -400,8 +400,8 @@ export function App() {
     })}>ADD FRIEND</button>
   </div></details>;
   const runSummary = run && <>
-    <span className="eyebrow">{run.status==='claimed'?'MINT CONFIRMED':run.status==='abandoned'?'RUN CLOSED':expired?'CLAIM WINDOW CLOSED':run.status==='survived'?'TIMER BEATEN. RUSH EARNED.':run.status==='lost'?'DOWN, BUT STILL RARE.':'YOUR RUN IS SAVED'}</span>
-    <h2>{run.status==='claimed'?'KEEP IT RARE.':run.status==='survived'?'CLAIM YOUR RUSH.':run.status==='lost'?'NEXT RUN. BIGGER RUSH.':run.status==='abandoned'||expired?'READY FOR THE NEXT?':'READY TO RUSH?'}</h2>
+    <span className="eyebrow">{run.status==='claimed'?'MINT CONFIRMED':run.status==='abandoned'?'RUN CLOSED':expired?'CLAIM WINDOW CLOSED':run.status==='survived'?'TIMER BEATEN. $RARERUSH EARNED.':run.status==='lost'?'DOWN, BUT STILL RARE.':'YOUR RUN IS SAVED'}</span>
+    <h2>{run.status==='claimed'?'KEEP IT RARE.':run.status==='survived'?'CLAIM YOUR $RARERUSH':run.status==='lost'?'NEXT RUN. BIGGER RUSH.':run.status==='abandoned'||expired?'READY FOR THE NEXT?':'READY TO RUSH?'}</h2>
     {!dashboard&&stats?.status==='finished'&&<div className="result-score">{stats.score.toLocaleString()}<span>POINTS</span></div>}
     {stats&&<div className="result-stats"><span><b>{Math.floor(stats.distance)}m</b>DISTANCE</span><span><b>{stats.coins}</b>COINS</span><span><b>{stats.hearts}</b>HEARTS</span></div>}
     {completedReplay&&<div className="run-save">
