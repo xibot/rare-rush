@@ -40,13 +40,17 @@ export async function buildRushSite({ outdir = path.join(project, 'dist'), watch
       const html = await readFile(filenamePath, 'utf8');
       await writeFile(filenamePath, html.replace(/<title>[^<]*<\/title>/, '<title>Rare Rush | Generations Arcade</title>'));
     }
-    // Add site chrome to the SDK host without changing its runtime or sandbox document.
+    // Keep the SDK GameHost and sandbox; use its publicClient override to page
+    // owner-filtered history within the mainnet RPC's block-range limit.
     const gameHostPath = path.join(outdir, 'play/index.html');
     const gameHostHTML = await readFile(gameHostPath, 'utf8');
     if (!gameHostHTML.includes('</head>')) throw new Error('The SDK host HTML has no head for site chrome.');
-    await writeFile(gameHostPath, gameHostHTML.replace('</head>', '<link rel="icon" type="image/svg+xml" sizes="any" href="/favicon.svg"><script type="module" src="/host-navigation.js"></script></head>'));
+    await writeFile(gameHostPath, gameHostHTML
+      .replace('href="./runtime.css"', 'href="/generations/index.css"')
+      .replace('<script src="./runtime.js"></script>', '<script type="module" src="/generations/index.js"></script>')
+      .replace('</head>', '<link rel="icon" type="image/svg+xml" sizes="any" href="/favicon.svg"><script type="module" src="/host-navigation.js"></script></head>'));
     page = await context({
-      absWorkingDir: project, entryPoints: { landing: path.join(landing, 'index.tsx'), 'host-navigation': path.join(landing, '../host-navigation.ts'), 'docs/index': path.join(landing, '../docs/index.tsx'), 'pitch/index': path.join(landing, '../pitch/index.tsx'), 'genesis/index': path.join(landing, '../genesis/index.tsx'), 'genesis/child': path.join(landing, '../genesis/child.tsx'), 'community/index': path.join(landing, '../community/index.tsx'), 'free-play/index': path.join(landing, '../free-play/index.tsx') }, outdir,
+      absWorkingDir: project, entryPoints: { landing: path.join(landing, 'index.tsx'), 'host-navigation': path.join(landing, '../host-navigation.ts'), 'docs/index': path.join(landing, '../docs/index.tsx'), 'pitch/index': path.join(landing, '../pitch/index.tsx'), 'generations/index': path.join(landing, '../generations/index.tsx'), 'genesis/index': path.join(landing, '../genesis/index.tsx'), 'genesis/child': path.join(landing, '../genesis/child.tsx'), 'community/index': path.join(landing, '../community/index.tsx'), 'free-play/index': path.join(landing, '../free-play/index.tsx') }, outdir,
       bundle: true, platform: 'browser', format: 'esm', target: 'es2022', jsx: 'automatic', minify: true,
       loader: { '.woff2': 'file' }, assetNames: 'assets/[name]-[hash]', metafile: true,
       define: { 'process.env.NODE_ENV': '"production"', '__RUSH_PUBLIC_SITE__': 'true' }, logLevel: 'warning',
@@ -131,6 +135,8 @@ export function createRushSiteServer(outdir) {
     ['/genesis/', ['genesis/index.html', 'text/html; charset=utf-8']],
     ['/genesis/index.js', ['genesis/index.js', 'text/javascript; charset=utf-8']],
     ['/genesis/index.css', ['genesis/index.css', 'text/css; charset=utf-8']],
+    ['/generations/index.js', ['generations/index.js', 'text/javascript; charset=utf-8']],
+    ['/generations/index.css', ['generations/index.css', 'text/css; charset=utf-8']],
     ['/genesis/game.html', ['genesis/game.html', 'text/html; charset=utf-8']],
     ['/genesis/child.js', ['genesis/child.js', 'text/javascript; charset=utf-8']],
     ['/genesis/child.css', ['genesis/child.css', 'text/css; charset=utf-8']],

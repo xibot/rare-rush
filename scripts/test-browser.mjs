@@ -49,8 +49,8 @@ for (const [width, difficulty] of [[1100, 'normal'], [390, 'normal'], [360, 'nor
       const islandPresets = await game.locator('[data-island-preset]').evaluateAll(nodes => nodes.map(node => node.getAttribute('data-island-preset')));
       assert(new Set(islandPresets).size >= 4, 'Background should contain distinct canonical island designs');
       assert(await game.locator('[data-token-design="1"]').count() > 0, 'Pickups should use the official bear token artwork');
-      const enableMotion = game.getByRole('button', { name: 'FX OFF', exact: true });
-      if (await enableMotion.count()) await enableMotion.click();
+      assert.equal(await game.getByRole('button', { name: /^FX (ON|OFF)$/ }).count(), 0);
+      await page.emulateMedia({ reducedMotion: 'no-preference' });
       const firstIslandX = Number(await game.locator('[data-island-slot="0"]').getAttribute('x'));
       await page.locator('.rf-game-frame').screenshot({ path: `artifacts/${label}-start.png` });
       const overflow = await game.locator('.rare-rush').evaluate(el => el.scrollWidth > el.clientWidth);

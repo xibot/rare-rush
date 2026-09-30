@@ -15,7 +15,8 @@ try {
   server = createRushSiteServer(outdir);
   await new Promise(resolve => server.listen(0, '127.0.0.1', resolve));
   const origin = `http://127.0.0.1:${server.address().port}`;
-  browser = await chromium.launch({ headless: true });
+  browser = await chromium.launch({ headless: true,
+    ...(process.env.RUSH_BROWSER_CHANNEL ? { channel: process.env.RUSH_BROWSER_CHANNEL } : {}) });
   const artworkCall = await createArtworkFixture();
   for (const [width, height] of [[1440, 1000], [390, 844], [360, 640]]) {
     const page = await browser.newPage({ viewport: { width, height } });

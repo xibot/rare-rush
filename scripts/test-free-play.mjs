@@ -90,6 +90,8 @@ async function assertFits(page, root, state) {
 }
 
 async function assertFreeUI(root) {
+  assert.equal(await root.getByRole('button', { name: /^FX (ON|OFF)$/ }).count(), 0,
+    'Free Play has no manual visual FX switch that can snap the scenery mid-run');
   assert.equal(await root.locator('.run-save, .economy-panel').count(), 0,
     'Free Play must not mount saving, fee, or token-economy controls');
   assert.doesNotMatch(await root.innerText(), /SAVE RUN|TOKEN LAB|\$RUSH|demo RF|prize pool|\brewards?\b|\bfees?\b/i,

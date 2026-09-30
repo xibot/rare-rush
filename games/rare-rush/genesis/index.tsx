@@ -1,7 +1,8 @@
 import { parseArcadeNavigation } from '../navigation';
 import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { createRoot } from 'react-dom/client';
-import { createFriendPublicClient, createFriendWalletSession } from '@rarefriends/friendsdk/wallet';
+import { createFriendWalletSession } from '@rarefriends/friendsdk/wallet';
+import { createArcadePublicClient } from '../arcade-client';
 import { SiteHeader } from '../SiteHeader';
 import { SiteFooter } from '../SiteFooter';
 import { TokenCoin } from '../CanonicalArt';
@@ -44,7 +45,7 @@ function ArcadeChoice() {
 
 function GenesisHost() {
   const [walletSession] = useState(() => createFriendWalletSession());
-  const [publicClient] = useState(() => createFriendPublicClient());
+  const [publicClient] = useState(() => createArcadePublicClient());
   const [wallet, setWallet] = useState(walletSession.getSnapshot);
   const portraits = useGenesisPortraits(wallet.status === 'connected' && wallet.account
     ? `${wallet.chainId}:${wallet.account.toLowerCase()}:${wallet.revision}` : null);

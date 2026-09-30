@@ -20,8 +20,7 @@ for (const device of cases) {
       const start = game.getByRole('button', { name: /LET’S RUSH/ });
       await start.waitFor();
       await game.getByRole('button', { name: `${device.difficulty} difficulty`, exact: false }).click();
-      const enableMotion = game.getByRole('button', { name: 'FX OFF', exact: true });
-      if (await enableMotion.count()) await enableMotion.click();
+      await page.emulateMedia({ reducedMotion: 'no-preference' });
 
       // Observe rendered DOM only. No engine, wallet, or economy state is changed.
       await root.evaluate(element => {

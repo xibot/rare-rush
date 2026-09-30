@@ -24,8 +24,8 @@ const portrait = `data:image/svg+xml;base64,${Buffer.from('<svg xmlns="http://ww
 const metadata = `data:application/json;base64,${Buffer.from(JSON.stringify({ image: portrait })).toString('base64')}`;
 function fixture(collection: 0 | 1) {
   const address = collection === 1 ? GENESIS_DEPLOYMENT.contract : GENERATION_SPRITE_MANIFEST.generations;
-  const state = { account, chain: '0x1237', owner: account, balance: 2n, noLogs: false, logError: false, missing: false };
-  const calls: { method: string; name?: string; id?: bigint }[] = [];
+  const state = { account, chain: '0x1237', block: 99n, owner: account, balance: 2n, noLogs: false, logError: false, missing: false, maxLogBlocks: null as bigint | null };
+  const calls: { method: string; name?: string; id?: bigint; from?: bigint; to?: bigint }[] = [];
   const listeners = new Map<string, Set<(...args: unknown[]) => void>>();
   const provider: ArcadeProvider = {
     on(event, listener) { if (!listeners.has(event)) listeners.set(event, new Set()); listeners.get(event)!.add(listener); },
@@ -34,15 +34,17 @@ function fixture(collection: 0 | 1) {
       calls.push({ method });
       if (method === 'eth_chainId') return state.chain;
       if (method === 'eth_accounts') return [state.account];
-      if (method === 'eth_blockNumber') return '0x63';
+      if (method === 'eth_blockNumber') return `0x${state.block.toString(16)}`;
       if (method === 'eth_getLogs') {
         const [filter] = params as [{ address: string; topics: (string | null)[]; fromBlock: string; toBlock: string }];
         assert.equal(filter.address.toLowerCase(), address.toLowerCase());
-        assert.equal(filter.toBlock, '0x63');
-        assert.equal(filter.fromBlock, '0x0');
+        const from = BigInt(filter.fromBlock), to = BigInt(filter.toBlock);
+        calls.at(-1)!.from = from; calls.at(-1)!.to = to;
+        assert.ok(from >= 0n && to <= state.block);
+        if (state.maxLogBlocks !== null && to - from + 1n > state.maxLogBlocks) throw new Error('query exceeds RPC block range limit');
         assert.ok(filter.topics[1]?.endsWith(account.slice(2)) || filter.topics[2]?.endsWith(account.slice(2)), 'Only indexed wallet history');
         if (state.logError) throw new Error('RPC history unavailable');
-        if (state.noLogs || filter.topics[1]) return [];
+        if (state.noLogs || filter.topics[1] || from > 48n || to < 48n) return [];
         return [42n, 43n].map((id, index) => ({ address, blockNumber: '0x30', logIndex: `0x${index}`, transactionIndex: '0x0',
           blockHash: `0x${'aa'.repeat(32)}`, transactionHash: `0x${'bb'.repeat(32)}`, removed: false, data: '0x',
           topics: encodeEventTopics({ abi, eventName: 'Transfer', args: { from: other, to: account, tokenId: id } }) }));
@@ -51,7 +53,7 @@ function fixture(collection: 0 | 1) {
       const [call, block] = params as [{ to: string; data: Hex }, string];
       const { functionName, args } = decodeFunctionData({ abi, data: call.data });
       calls.at(-1)!.name = functionName; calls.at(-1)!.id = args[0] as bigint;
-      if (!['familyOf', 'seedOf', 'frames'].includes(functionName)) assert.equal(block, '0x63');
+      if (!['familyOf', 'seedOf', 'frames'].includes(functionName)) assert.equal(block, `0x${state.block.toString(16)}`);
       switch (functionName) {
         case 'balanceOf': return encodeAbiParameters([{ type: 'uint256' }], [state.balance]);
         case 'ownerOf': {
@@ -79,6 +81,19 @@ test('picker finds both Genesis NFTs and only playable Generations from wallet-f
     assert.equal(result.hiddenCount, collection === 1 ? 0 : 1);
     assert.ok([...f.listeners.values()].every(set => !set.size));
     assert.ok(!f.calls.some(call => call.name === 'frames' || call.name === 'tokenURI'), 'Artwork loads separately');
+  }
+});
+
+test('wallet-backed picker loads both collections through RPC block-range limits', async () => {
+  for (const collection of [0, 1] as const) {
+    const f = fixture(collection);
+    f.state.block = 76_094_632n; f.state.maxLogBlocks = 10_000_000n;
+    const result = await loadArcadeLibrary(f.provider, account, collection, signal());
+    assert.deepEqual(result.friends.map(friend => friend.tokenId), collection === 1 ? ['42', '43'] : ['42']);
+    const pages = f.calls.filter(call => call.method === 'eth_getLogs');
+    assert.equal(pages.length, 16);
+    assert.ok(pages.every(page => page.to! - page.from! + 1n <= 10_000_000n));
+    assert.ok([...f.listeners.values()].every(set => !set.size));
   }
 });
 

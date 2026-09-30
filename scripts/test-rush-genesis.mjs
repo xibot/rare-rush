@@ -34,7 +34,8 @@ try {
   server = createRushSiteServer(outdir);
   await new Promise(resolve => server.listen(0, '127.0.0.1', resolve));
   const origin = `http://127.0.0.1:${server.address().port}`;
-  browser = await chromium.launch({ headless: true });
+  browser = await chromium.launch({ headless: true,
+    ...(process.env.RUSH_BROWSER_CHANNEL ? { channel: process.env.RUSH_BROWSER_CHANNEL } : {}) });
   async function fixture(width = 1100, height = 820, chainId = '0x1237') {
     const page = await browser.newPage({ viewport: { width, height } });
     const state = { owner: account, ownerReads: 0, requests: [], errors: [], unexpected: [], ownerGate: null, ownerDelayAt: 0, failed: false };
@@ -123,6 +124,7 @@ try {
     await page.locator('iframe').waitFor({ state: 'detached' });
     await friendCard.waitFor();
     assert.equal(page.url(), `${origin}/genesis/`, 'Arcade BACK restores the Genesis NFT selector');
+    await friendCard.scrollIntoViewIfNeeded();
     assert.equal(await friendCard.locator('img').getAttribute('src'), portrait, 'Returning preserves the original NFT portrait');
     assert.deepEqual(await page.evaluate(() => window.testWallet.methods), beforeBackMethods, 'Returning to the Genesis selector never reconnects the wallet');
     await page.screenshot({ path: `artifacts/genesis-${width}-back-to-friends.png`, fullPage: true });
@@ -136,7 +138,17 @@ try {
     }
     assert.match(await game.locator('.entry-note').innerText(), /FREE ENTRY/);
     assert.equal(await game.locator('.rare-rush').evaluate(el => el.scrollWidth > el.clientWidth), false);
-    assert(await game.locator('.start-card').evaluate(el => el.getBoundingClientRect().bottom <= document.querySelector('.arcade-bottom').getBoundingClientRect().top));
+    // Compact cabinets intentionally scroll their start panel. Check that the
+    // controls can be reached inside the field without the footer covering them.
+    for (const selector of ['.difficulty-picker', '.start-card .primary']) {
+      const control = game.locator(selector);
+      await control.scrollIntoViewIfNeeded();
+      assert(await control.evaluate(el => {
+        const bounds = el.getBoundingClientRect();
+        return bounds.top >= document.querySelector('.start-screen').getBoundingClientRect().top
+          && bounds.bottom <= document.querySelector('.arcade-bottom').getBoundingClientRect().top;
+      }), `${selector} is reachable above the game footer`);
+    }
     await page.screenshot({ path: `artifacts/genesis-${width}-ready.png` });
     const spriteBody = game.locator('.world-svg [data-genesis-body]');
     assert.equal(await spriteBody.count(), 1, 'Genesis has a body in the ready screen');
@@ -159,8 +171,9 @@ try {
     await game.getByRole('button', { name: 'Close TOKEN LAB · SIMULATION', exact: true }).click();
     await game.getByRole('button', { name: /KEEP RUNNING/ }).click();
     assert.equal(await spriteBody.getAttribute('data-genesis-body'), firstBody, 'Token Lab keeps the assigned body');
-    const motion = game.getByRole('button', { name: 'FX ON', exact: true });
-    if (await motion.count()) await motion.click();
+    assert.equal(await game.getByRole('button', { name: /^FX (ON|OFF)$/ }).count(), 0);
+    await page.emulateMedia({ reducedMotion: 'reduce' });
+    await game.locator('.rare-rush.reduce-motion').waitFor();
     const standingBottom = await spriteBody.evaluate(el => el.getBoundingClientRect().bottom);
     if (width < 500) { const bounds = await game.getByRole('button', { name: 'Hold to slide' }).boundingBox(); await page.mouse.move(bounds.x + bounds.width / 2, bounds.y + bounds.height / 2); await page.mouse.down(); }
     else { await game.locator('.world-svg').focus(); await page.keyboard.down('ArrowDown'); }
@@ -200,7 +213,7 @@ try {
     await home.click();
     await page.waitForURL(`${origin}/`);
     assert.equal(await page.locator('iframe').count(), 0, 'Genesis arcade logo navigates the top-level page home');
-    await page.getByRole('link', { name: /PLAY WITH YOUR FRIEND/i }).waitFor();
+    await page.locator('.landing-cta-wallet').waitFor();
     assert.deepEqual(state.errors, []); assert.deepEqual(state.unexpected, []);
     await page.close();
     console.log(`${width}px: verified Genesis picker, BACK/home navigation, isolated sandbox, artwork, 100× rewards, free entry and responsive layout passed`);

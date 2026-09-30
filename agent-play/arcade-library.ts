@@ -2,6 +2,7 @@ import { createPublicClient, custom, type Address } from 'viem';
 import { readOwnedFriends } from '@rarefriends/friendsdk/owned';
 import { createGenerationSpriteReader, spriteFrame } from '@rarefriends/friendsdk/sprites';
 import { readOwnedGenesis, readGenesisPortrait } from '../games/rare-rush/genesis/identity.ts';
+import { withArcadeHistory } from '../games/rare-rush/arcade-client.ts';
 import { ARCADE_CHAIN_ID, type ArcadeProvider } from './arcade.ts';
 
 export type ArcadeChoice = Readonly<{ tokenId: string; label: string }>;
@@ -41,7 +42,7 @@ async function withPickerClient<T>(provider: ArcadeProvider, account: Address, s
   try {
     return await Promise.race([cancelled, (async () => {
       await checkWallet();
-      const client = createPublicClient({ cacheTime: 0, transport: custom({ request }, { retryCount: 0 }) });
+      const client = withArcadeHistory(createPublicClient({ cacheTime: 0, transport: custom({ request }, { retryCount: 0 }) }), active);
       const result = await read(client, active);
       await checkWallet();
       return result;
