@@ -1,6 +1,6 @@
 # Rare Rush economy
 
-**All costs, token rewards, balances, historical participation, and prize-pool amounts are simulated.** No real token exists for this prototype. It does not mint, transfer, approve, swap, or spend onchain funds. Demo balances have no redemption value.
+**This document describes Arcade's simulated economy.** Arcade costs, token rewards, balances, historical participation, and prize-pool amounts are simulated. Arcade does not mint, transfer, approve, swap, or spend onchain funds, and demo balances have no redemption value. The separate [Testnet implementation](../infra/testnet/README.md) uses valueless test assets and real testnet transactions; its reward rules are distinct from these Arcade settings.
 
 The [Vibeathon rules](https://github.com/spokesz/rarefriends-vibeathon/) require simulated purchases and rewards. FriendSDK v0.1.2 supplies wallet connection and verified Generations Friend selection; it does not supply a skill-score reward, additional-currency, or persistence API. Genesis testers enter through a separate ownership-verifying host at `/genesis/`; the official FriendSDK Generations route remains `/play/`. The runner maintains its own session-local demo accounting. Its RF credit is separate from the wallet balance shown by the SDK. The SDK's required chance-game configuration is reference scaffolding, not this game's reward mechanism.
 
@@ -22,7 +22,9 @@ The [Vibeathon rules](https://github.com/spokesz/rarefriends-vibeathon/) require
 | RF accounting precision | 18 decimals; integer base units |
 | Maximum lifetime token issuance | 200,000 demo tokens |
 
-Collected tokens are credited immediately during a run and remain earned when the run ends. Arcade scores and combos do not multiply token issuance. Distance and pickups can still improve arcade scores after token emissions reach zero. Run-entry fees are consumed at entry; an unsuccessful or abandoned run does not refund its simulated fee. Prize-pool distribution is a future design, not a payout implemented by this prototype.
+The **COINS** counter counts physical pickups, including one pickup per flying bonus coin. Arcade displays calculated **demo $RARERUSH** separately from that count; Testnet displays its claim amount in **tRARERUSH**. Token multipliers do not multiply the COINS counter.
+
+Demo tokens are credited immediately during a run and remain earned when the run ends. Arcade scores and combos do not multiply token issuance. Distance and pickups can still improve arcade scores after token emissions reach zero. Run-entry fees are consumed at entry; an unsuccessful or abandoned run does not refund its simulated fee. Prize-pool distribution is a future design, not a payout implemented by Arcade.
 
 Flying bonus coins are twice the ordinary artwork size (60 versus 30 logical pixels). Their first wave spawns after 4–6 active seconds, followed by waves every 10–15 seconds while enough flight time remains, occasionally as a staggered pair. They move at 1.15× current world-scroll speed + 25 logical pixels/second. The 10× reward changes tokens only: each bonus still counts as one accepted pickup, one growth increment and one ordinary combo/score increment.
 
@@ -53,15 +55,15 @@ This limits supply; it does not by itself stabilize a market price or prevent au
 
 Changing a scenario resets the player's earned token balance, restores the 100 simulated RF credit, and resets the pool and run counter. Reloading also resets the runtime session. These counters are not shared between players, persisted, or backed by a global service. Browser values are not trustworthy mint authorization.
 
-**Genesis holders enter free** through the separate verified tester host at `/genesis/`, using their owned Genesis NFT and its original artwork on Robinhood mainnet (chain 4663). Ownership is checked before entry and before each run. Genesis-only wallets do not need a Generations NFT. The unchanged SDK route at `/play/` still requires a hardwired Generations NFT, generation 1 or higher, and is the official FriendSDK vibeathon route. See the [SDK identity and economy API](https://github.com/spokesz/friendsdk/blob/main/API.md).
+**Genesis holders enter free** through the separate verified tester host at `/genesis/`, using their owned Genesis NFT and its original artwork on Robinhood mainnet (chain 4663). Ownership is checked before entry and before each run. Genesis-only wallets do not need a Generations NFT. The `/play/` route uses SDK wallet connection with Rare Rush's paged Friend picker and still requires an owned, hardwired Generations NFT, generation 1 or higher. It remains the official FriendSDK Vibeathon route. See the [SDK identity and economy API](https://github.com/spokesz/friendsdk/blob/main/API.md).
 
 The active Genesis demo boost is **100× tokens per collected coin**, stacked with difficulty and the 10× flying bonus, then limited to the remaining shared issuance cap. It does not multiply physical pickups, growth, or arcade score. At the launch rate on Normal, it awards 1,000 demo tokens for an ordinary coin or 10,000 for a flying bonus. The public `/docs/` calculator calls the same `nextCoinReward` function as the game. Each identity still starts a fresh local ledger; “shared cap” means both collections follow one cap rule, not that browser sessions share global state. A 100× boost materially accelerates cap exhaustion, so the final supply and emission schedule need to be evaluated together before production.
 
-## Future real token integration
+## Future mainnet token integration
 
-The intended token would pair with RAREFRIENDS through separately funded liquidity. A pairing is not automatic backing, guaranteed redemption, or a guaranteed exchange rate. No pair, liquidity deposit, token contract, or trading feature is implemented here.
+The intended mainnet $RARERUSH token would pair with RAREFRIENDS through separately funded liquidity. A pairing is not automatic backing, guaranteed redemption, or a guaranteed exchange rate. Mainnet token issuance, liquidity and trading are not live.
 
-A future production system needs a trusted run service and custom contracts:
+A future mainnet production system needs a trusted run service and custom contracts:
 
 1. Issue unpredictable seeded run IDs bound to a verified wallet, Friend, difficulty, rules version, start time, and confirmed entry entitlement or fee receipt.
 2. Validate timed inputs against a deterministic simulation; do not trust client-reported score, pickups, duration, or reward totals. Reject duplicate sessions and apply rewarded-run limits. Replay validation alone does not distinguish a skilled human from a bot.
@@ -73,4 +75,4 @@ Server simulation still trusts its operator and signing infrastructure. Producti
 
 ## Decisions before production
 
-The demo values above are adjustable playtest parameters. Final token name, symbol, decimals, supply and halving schedule, actual entry fee, production Genesis eligibility, rewarded-run quotas, liquidity funding/ownership, prize distribution, claim expiry, treasury administration, and deployment remain future decisions. No live contract deployment, liquidity action, or real transaction is part of this implementation.
+The demo values above are adjustable playtest parameters. Final mainnet decimals, supply and halving schedule, actual entry fee, production Genesis eligibility, rewarded-run quotas, liquidity funding/ownership, prize distribution, claim expiry, treasury administration, and deployment remain to be finalized. This Arcade implementation does not deploy mainnet contracts, fund liquidity, or send game transactions.

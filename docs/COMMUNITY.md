@@ -12,6 +12,8 @@ Wallet-connected Arcade and Testnet result screens offer **SAVE RUN**. Publicati
 
 `GET /api/runs` returns lightweight newest-first summaries with an opaque `nextCursor` (12 per page, maximum 24). `GET /api/runs/:id` returns one saved replay and its artwork. Full input streams are fetched only for playback/previews. Shared links use `/runs-feed/?run=<id>`.
 
+The feed's **LOAD MORE RUNS** button fetches and displays the next runs in one click.
+
 The first release keeps hearts in the visitor’s browser storage. They are private favorites, not global votes or onchain transactions. **Best of the Rush** appears only on `/leaderboard/`, with a replay thumbnail and a modal viewer for each row. Its public best-per-Friend comparison covers the runs currently loaded by the visitor, not a complete global ranking.
 
 ## Storage and deployment
