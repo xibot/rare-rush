@@ -79,9 +79,14 @@ for (const [width, difficulty] of [[1100, 'normal'], [390, 'normal'], [360, 'nor
         observer.observe(el, { attributes: true, attributeFilter: ['data-growth'] });
       });
       await page.waitForTimeout(1400);
-      assert.notEqual(await game.locator('.token-hud strong').innerText(), '0✦', 'Opening coins should award demo tokens');
-      const openingCoins = Number((await game.locator('.run-score small').innerText()).match(/^\d+/)[0]);
-      assert.equal(parseFloat(await game.locator('.token-hud strong').innerText()), openingCoins * { easy: 7.5, normal: 10, degen: 20 }[difficulty], 'Actual rewards use the run difficulty');
+      const opening = await game.locator('.rare-rush').evaluate(root => ({
+        label: root.querySelector('.token-hud > span').textContent,
+        count: parseInt(root.querySelector('.token-hud strong').textContent.replaceAll(',', '')),
+        pickups: parseInt(root.querySelector('.run-score small').textContent),
+      }));
+      assert.equal(opening.label, 'COINS');
+      assert(opening.count > 0, 'Opening pickups increase the coin counter');
+      assert.equal(opening.count, opening.pickups, 'The HUD shows actual pickups, before reward multipliers');
       assert(Number(await game.locator('[data-character]').getAttribute('data-growth')) > 1, 'Opening coins grow the Friend');
       const growingTransform = await game.locator('[data-character]').getAttribute('transform');
       assert(Number(growingTransform.match(/scale\(([^ ]+)/)[1]) > 4, 'Growth must enlarge the rendered sprite');
@@ -161,7 +166,13 @@ for (const [width, difficulty] of [[1100, 'normal'], [390, 'normal'], [360, 'nor
       };
       const numeric = value => Number(value.replaceAll(',', ''));
       const bankedLedger = await readLedger();
-      assert(numeric(bankedLedger['Your collected demo $RUSH']) > 0, 'Transition tests preserve actual accumulated rewards');
+      const finalCoins = Number(await game.locator('.results-grid > div').nth(1).locator('b').innerText());
+      const finalBonuses = Number(await game.locator('.rare-rush').getAttribute('data-bonus-coins'));
+      const finalReward = (finalCoins + 9 * finalBonuses) * { easy: 7.5, normal: 10, degen: 20 }[difficulty];
+      assert.equal(parseFloat((await game.locator('.token-hud strong').innerText()).replaceAll(',', '')), finalCoins);
+      assert.equal(await game.locator('.results-grid > div').nth(2).locator('span').innerText(), 'DEMO $RARERUSH');
+      assert.equal(numeric((await game.locator('.results-grid > div').nth(2).locator('b').innerText()).replace('+', '')), finalReward);
+      assert.equal(numeric(bankedLedger['Your collected demo $RARERUSH']), finalReward, 'Results and the banked ledger preserve difficulty and bonus rewards');
       assert.equal(numeric(bankedLedger['Your demo RF']), 99);
       assert.equal(numeric(bankedLedger['Demo RF prize pool']), 1);
 

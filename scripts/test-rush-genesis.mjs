@@ -165,11 +165,14 @@ try {
     assert.equal(await spriteBody.getAttribute('data-genesis-body'), firstBody, 'Pause keeps the assigned body');
     const coins = Number((await game.locator('.run-score small').innerText()).match(/^\d+/)[0]);
     assert(coins > 0, 'Real game loop collects opening coins');
-    assert.equal(Number((await game.locator('.token-hud strong').innerText()).replaceAll(',', '').replace('✦', '')), coins * 1000);
+    assert.equal(await game.locator('.token-hud > span').innerText(), 'COINS');
+    assert.equal(Number((await game.locator('.token-hud strong').innerText()).replaceAll(',', '').replace('✦', '')), coins, 'Genesis HUD counts pickups without the 100× reward multiplier');
     await game.getByRole('button', { name: /TOKEN LAB/ }).click();
     const values = await game.locator('.ledger > div').evaluateAll(rows => Object.fromEntries(rows.map(row => [row.querySelector('dt').textContent, row.querySelector('dd').textContent])));
     assert.equal(values['Your demo RF'], '100', 'Genesis entry does not debit RF');
     assert.equal(values['Demo RF prize pool'], '0', 'Free entry does not invent a pool contribution');
+    const bonusCoins = Number(await game.locator('.rare-rush').getAttribute('data-bonus-coins'));
+    assert.equal(Number(values['Your collected demo $RARERUSH'].replaceAll(',', '')), (coins + 9 * bonusCoins) * 1000, 'The separate ledger preserves Genesis 100× rewards');
     await game.getByRole('button', { name: 'Close TOKEN LAB · SIMULATION', exact: true }).click();
     await game.getByRole('button', { name: /KEEP RUNNING/ }).click();
     assert.equal(await spriteBody.getAttribute('data-genesis-body'), firstBody, 'Token Lab keeps the assigned body');

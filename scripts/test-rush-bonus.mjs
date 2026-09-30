@@ -36,7 +36,8 @@ for (const device of cases) {
             screen: element.getAttribute('data-screen'),
             coins: parseInt(element.querySelector('.run-score small')?.textContent ?? '0'),
             bonus: Number(element.getAttribute('data-bonus-coins')),
-            reward: parseFloat((element.querySelector('.token-hud strong')?.textContent ?? '0').replaceAll(',', '')),
+            hudCoins: parseInt((element.querySelector('.token-hud strong')?.textContent ?? '0').replaceAll(',', '')),
+            notice: element.querySelector('.pickup-notice')?.textContent ?? '',
             growth: Number(character?.getAttribute('data-growth') ?? 1),
             renderedGrowth: scale,
             feet: top + (slide ? 30 : 60 * scale),
@@ -163,20 +164,24 @@ for (const device of cases) {
       const { before, after } = captures[0];
       assert.equal(after.bonus - before.bonus, 1);
       assert.equal(after.coins - before.coins, 1, 'One bonus is one pickup, not ten normal coins');
-      assert.equal(after.reward - before.reward, 10 * device.rate, 'The bonus pays ten times the mode reward');
+      assert.equal(after.hudCoins - before.hudCoins, 1, 'The HUD counts a bonus as one collected coin');
+      assert.equal(after.notice, `10× COIN! +${10 * device.rate}`, 'The bonus reward notification retains the ten-times mode reward');
       assert.equal(after.hearts, before.hearts, 'The measured collection is not mixed with damage');
       assert(before.growth < 1.7, 'Growth measurement is below the cap');
       assert(Math.abs(after.growth - before.growth - 0.035) < 0.001, 'A bonus adds one growth step');
-      assert.equal(after.reward, (after.coins + 9 * after.bonus) * device.rate, 'HUD total includes every normal and weighted bonus pickup exactly once');
+      assert.equal(after.hudCoins, after.coins, 'The HUD counts every normal and bonus pickup exactly once');
       await page.waitForTimeout(100);
       const animated = await read();
       assert(animated.renderedGrowth > before.renderedGrowth, 'The SVG transform visibly responds to the bonus growth');
       await page.locator('.rf-game-frame').screenshot({ path: `artifacts/${device.label}-bonus-collected.png` });
       await game.getByRole('button', { name: 'Pause game', exact: true }).click();
       const banked = await read();
-      assert.equal(banked.reward, (banked.coins + 9 * banked.bonus) * device.rate);
+      assert.equal(banked.hudCoins, banked.coins);
+      await game.getByRole('button', { name: /TOKEN LAB/ }).click();
+      const reward = Number((await game.locator('.ledger > div').filter({ hasText: 'Your collected demo $RARERUSH' }).locator('dd').innerText()).replaceAll(',', ''));
+      assert.equal(reward, (banked.coins + 9 * banked.bonus) * device.rate, 'The separate reward ledger includes normal and weighted bonus pickups exactly once');
       console.log(`${device.label}: canonical2x art, flight, pause and10x collection passed`, {
-        coins: after.coins, bonus: after.bonus, reward: after.reward,
+        coins: banked.coins, bonus: banked.bonus, reward,
         growthBefore: before.growth, growthAfter: after.growth,
       });
     },

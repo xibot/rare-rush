@@ -94,7 +94,7 @@ async function assertFreeUI(root) {
     'Free Play has no manual visual FX switch that can snap the scenery mid-run');
   assert.equal(await root.locator('.run-save, .economy-panel').count(), 0,
     'Free Play must not mount saving, fee, or token-economy controls');
-  assert.doesNotMatch(await root.innerText(), /SAVE RUN|TOKEN LAB|\$RUSH|demo RF|prize pool|\brewards?\b|\bfees?\b/i,
+  assert.doesNotMatch(await root.innerText(), /SAVE RUN|TOKEN LAB|\$(?:RARE)?RUSH|demo RF|prize pool|\brewards?\b|\bfees?\b/i,
     'The free runner should show its score and play controls without economy messaging');
 }
 

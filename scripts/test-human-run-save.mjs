@@ -160,6 +160,25 @@ try {
     const saved = [...records.entries()].find(([key]) => key.includes('/records/'))?.[1];
     assert(saved); assert.equal(saved.metrics.score, score); assert.equal(saved.metrics.verified, true);
     assert.equal(saved.actor, actor); assert.equal(saved.replay.finalTick, saved.metrics.ticks);
+    const hud = game.locator(actor === 'human' ? '.token-hud' : '.agent-stage-coins');
+    assert.equal(await hud.locator(':scope > span').innerText(), 'COINS');
+    assert.equal(parseInt((await hud.locator('strong').innerText()).replaceAll(',', '')), saved.metrics.coins, 'HUD shows the verified replay pickup count, not token rewards');
+    const resultsCoins = game.locator(actor === 'human' ? '.results-grid > div' : '.result-stats > span').nth(1).locator('b');
+    assert.equal(Number((await resultsCoins.innerText()).replaceAll(',', '')), saved.metrics.coins, 'Results keep the same raw coin count');
+    if (actor === 'human') {
+      const rewardCell = game.locator('.results-grid > div').nth(2);
+      assert.equal(await rewardCell.locator('span').innerText(), 'DEMO $RARERUSH');
+      const expectedReward = Math.min(200000, (saved.metrics.coins + 9 * saved.metrics.bonusCoins) * 20 * (collection === 'genesis' ? 100 : 1));
+      assert.equal(Number((await rewardCell.locator('b').innerText()).replace(/[+,]/g, '')), expectedReward, 'The separate simulated reward retains difficulty, collection, bonus and cap rules');
+      if (collection === 'generations') {
+        for (const width of [1440, 390]) {
+          await page.setViewportSize({ width, height: 1100 });
+          await rewardCell.scrollIntoViewIfNeeded();
+          assert(await rewardCell.evaluate(cell => cell.scrollWidth <= cell.clientWidth), 'The renamed reward fits its existing results cell');
+          await page.screenshot({ path: `/tmp/rarerush-coins-results-${width}.png` });
+        }
+      }
+    }
     if (collection === 'genesis') assert.equal(saved.art.portraitUrl, portrait);
     else { assert.equal(saved.art.sprites.frames.length, 64); assert(saved.art.sprites.frames.every(word => typeof word === 'string')); }
     const methods = await page.evaluate(() => window.fixtureWallet.requests);
