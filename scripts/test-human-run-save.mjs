@@ -123,7 +123,8 @@ try {
       await page.locator('.sources button').filter({ hasText: 'ARCADE' }).click();
       await page.locator('.collections button').filter({ hasText: collection === 'genesis' ? 'GENESIS' : 'GENERATIONS' }).click();
       await page.locator('.difficulties button').filter({ hasText: 'DEGEN' }).click();
-      await page.getByRole('button', { name: 'CONNECT WALLET', exact: true }).click();
+      const connect = page.getByRole('button', { name: 'CONNECT WALLET', exact: true });
+      if (await connect.count()) await connect.click();
       // Connecting invalidates stale IDs. Select a freshly discovered owned
       // Friend, and finish the async picker work before changing browser time.
       const choice = page.locator('.arcade-friend-card').filter({ hasText: collection === 'genesis' ? 'Genesis #1' : 'Generations #7730' });

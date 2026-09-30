@@ -73,6 +73,7 @@ function App() {
   const recordsRef=useRef(records);recordsRef.current=records;
   const [tn,setTn] = useState<TestnetState|null>(null), adapter=useRef<Adapter|null>(null);
   const [arcade,setArcade] = useState<Awaited<ReturnType<typeof connectArcade>>|null>(null), [arcadeArt,setArcadeArt] = useState<ArcadeFriend|null>(null);
+  const [arcadeWalletError,setArcadeWalletError] = useState<string|null>(null);
   const artRef=useRef<ArcadeFriend|null>(null);
   const [pendingHash,setPendingHash] = useState(''), [recoverId,setRecoverId] = useState('');
   const [checkingFriend,setCheckingFriend]=useState(false);
@@ -211,8 +212,21 @@ function App() {
       if(identity.current?.source==='testnet' && live.current.kind==='agent' && (next.account?.toLowerCase()!==identity.current.player?.toLowerCase()||next.chainId!==46630)) {stop();setNotice('Testnet wallet changed. Reconnect the original wallet to resume.');}
       setTn(next);
     },onError:e=>setError(err(e))});adapter.current=client;setTn(client.snapshot());
-    let revision=getArcadeSession().getSnapshot().revision;
-    const unsubscribe=getArcadeSession().subscribe(()=>{const next=getArcadeSession().getSnapshot();if(next.revision!==revision){revision=next.revision;invalidateArcade();if(identity.current?.source==='arcade'){stop();setNotice('Arcade wallet changed. Reconnect before resuming.');}}});
+    const arcadeSession=getArcadeSession();
+    let revision=arcadeSession.getSnapshot().revision;
+    const syncArcade=()=>{
+      const next=arcadeSession.getSnapshot();
+      if(next.revision!==revision){
+        revision=next.revision;invalidateArcade();
+        if(identity.current?.source==='arcade'){stop();setNotice('Arcade wallet changed. Reconnect the original wallet before resuming.');}
+      }
+      const provider=arcadeSession.getProvider();
+      // A chain/account event clears identity first. Adopt the SDK's fresh
+      // connection when its asynchronous read finishes, even at the same revision.
+      setArcade(next.account&&provider&&next.chainId!==null?Object.freeze({account:next.account,chainId:next.chainId,provider}):null);
+      setArcadeWalletError(next.error);
+    };
+    const unsubscribe=arcadeSession.subscribe(syncArcade);syncArcade();
     void loadRecords().catch(e=>setError(err(e)));
     const timer=setInterval(()=>setNow(Date.now()),1000);
     const libraryTimer=setInterval(()=>{if(!document.hidden)void loadRecords().catch(()=>{});},PUBLIC_SITE?30_000:5000);
@@ -280,7 +294,7 @@ function App() {
     raf=requestAnimationFrame(frame);
     const hidden=()=>{if(document.hidden && runningRef.current){stop();try{checkpoint();}catch(e){setError(err(e));}}};
     const unload=()=>{try{checkpoint();}catch{}};
-    const changed=()=>{invalidateArcade();if(identity.current?.source==='testnet'){stop();setNotice('Wallet changed. Reconnect before continuing this run.');}};
+    const changed=()=>{if(identity.current?.source==='testnet'){stop();setNotice('Wallet changed. Reconnect before continuing this run.');}};
     document.addEventListener('visibilitychange',hidden);window.addEventListener('pagehide',unload);
     const wallet=(window as any).ethereum;wallet?.on?.('accountsChanged',changed);wallet?.on?.('chainChanged',changed);wallet?.on?.('disconnect',changed);
     return()=>{cancelAnimationFrame(raf);document.removeEventListener('visibilitychange',hidden);window.removeEventListener('pagehide',unload);wallet?.removeListener?.('accountsChanged',changed);wallet?.removeListener?.('chainChanged',changed);wallet?.removeListener?.('disconnect',changed);};
@@ -388,10 +402,10 @@ function App() {
       <section ref={setupAnchor} className="setup" aria-label="Agent run setup">
         <div className="section-top"><span className="eyebrow">02 / SET UP YOUR RUN</span><span className="muted">→ ↑ ↓ ←</span></div>
         <div className="sources" role="group" aria-label="Game environment">{([{id:'local',label:'PREVIEW',copy:'No wallet · sample Friend'},{id:'arcade',label:'ARCADE',copy:'Your real Rare Friend · simulated rewards'},{id:'testnet',label:'TESTNET',copy:'Test Friend · play to mint'}] as const).map(m=><button key={m.id} disabled={frozen} aria-pressed={source===m.id} onClick={()=>chooseSource(m.id)}><b>{m.label}</b><small>{m.copy}</small></button>)}</div>
-        {source==='arcade'&&<div className="wallet-box arcade-wallet-panel" aria-label="Arcade wallet"><div className="wallet-heading"><div><span className="eyebrow">ROBINHOOD MAINNET · 4663</span><p>Play with the Genesis or Generations NFT held by your wallet.<br/>Ownership and artwork are read from Robinhood mainnet.</p></div><div className="inline-actions"><button className={!arcade?.account?'wallet-connect':undefined} disabled={running||!!busy} onClick={()=>void act('Connecting Arcade wallet…',async()=>{setArcade(await connectArcade());})}>{arcade?.account?short(arcade.account):'CONNECT WALLET'}</button>{arcade?.account&&<button disabled={frozen||!validId(tokenId)} onClick={()=>void act('Checking your Friend…',async()=>{setArcadeArt(await loadArcadeFriend(arcade.provider,arcade.account,collection,tokenId));setNotice('Ownership confirmed. Ready for Arcade.');})}>CHECK FRIEND ↗</button>}</div></div>{arcadeArt&&<p className="lime small">✓ {arcadeArt.label} · OWNERSHIP CHECKED</p>}<p className="muted small">Arcade play requests no spending approval or game transaction.</p></div>}
+        {source==='arcade'&&<div className="wallet-box arcade-wallet-panel" aria-label="Arcade wallet"><div className="wallet-heading"><div><span className="eyebrow">ROBINHOOD MAINNET · 4663</span><p>Play with the Genesis or Generations NFT held by your wallet.<br/>Ownership and artwork are read from Robinhood mainnet.</p></div><div className="inline-actions"><button className={!arcade?.account?'wallet-connect':undefined} disabled={running||!!busy} onClick={()=>void act('Connecting Arcade wallet…',async()=>{setArcade(await connectArcade());})}>{arcade?.account?short(arcade.account):'CONNECT WALLET'}</button>{arcade?.account&&arcade.chainId===4663&&<button disabled={frozen||!validId(tokenId)} onClick={()=>void act('Checking your Friend…',async()=>{setArcadeArt(await loadArcadeFriend(arcade.provider,arcade.account,collection,tokenId));setNotice('Ownership confirmed. Ready for Arcade.');})}>CHECK FRIEND ↗</button>}</div></div>{arcade?.account&&arcade.chainId!==4663&&<div className="arcade-network-state"><p className="muted small" role="status">Your wallet is on another network. Switch to Robinhood mainnet to choose your Rare Friends for Arcade.</p><div className="inline-actions"><button className="wallet-connect" disabled={frozen} onClick={()=>void act('Switching to Robinhood mainnet…',async()=>{await getArcadeSession().switchNetwork();})}>SWITCH TO ROBINHOOD ↗</button><button disabled={frozen} onClick={()=>void act('Checking wallet network…',async()=>{await getArcadeSession().refresh();})}>CHECK NETWORK ↻</button></div></div>}{arcadeWalletError&&<p className="arcade-picker-error small" role="alert">{arcadeWalletError}</p>}{arcadeArt&&<p className="lime small">✓ {arcadeArt.label} · OWNERSHIP CHECKED</p>}<p className="muted small">Arcade play requests no spending approval or game transaction.</p></div>}
         <div className="setup-grid"><div>
           <label className="field-title">CHOOSE YOUR COLLECTION</label><div className="choices collections">{([1,0] as const).map(c=><button key={c} aria-pressed={collection===c} disabled={frozen} onClick={()=>{if(c===collection)return;friendSelections.current[`${source}:${collection}`]=tokenId;setTokenId(friendSelections.current[`${source}:${c}`]??(source==='local'?'1':''));adapter.current?.cancelFriendCheck();setCollection(c);setArcadeArt(null);setError('');setNotice('');}}><b>{c===1?'GENESIS':'GENERATIONS'}</b><small>{c===1?'THE ORIGINAL FRIENDS':'THE NEXT GENERATION'}</small></button>)}</div>
-          {source==='arcade'&&arcade?.account&&<ArcadeFriendPicker key={`${arcade.account}:${collection}`} provider={arcade.provider} account={arcade.account} collection={collection} selectedId={tokenId} disabled={frozen} onSelect={id=>{setTokenId(id);setArcadeArt(null);setError('');setNotice('');}}/>}
+          {source==='arcade'&&arcade?.account&&arcade.chainId===4663&&<ArcadeFriendPicker key={`${arcade.account}:${collection}`} provider={arcade.provider} account={arcade.account} collection={collection} selectedId={tokenId} disabled={frozen} onSelect={id=>{setTokenId(id);setArcadeArt(null);setError('');setNotice('');}}/>}
           {source==='testnet'&&<TestnetFriendPicker key={`${tn?.account??'disconnected'}:${collection}`} account={tn?.account??null} chainId={tn?.chainId??null} collection={collection} balance={collection===1?tn?.balances?.genesis:tn?.balances?.generations} selectedId={tokenId} disabled={frozen} onSelect={id=>{adapter.current?.cancelFriendCheck();setTokenId(id);setArcadeArt(null);setError('');setNotice('');}} onConnect={()=>void act('Connecting Testnet wallet…',async()=>{await testnetRead(()=>adapter.current!.connect());})} onSwitch={()=>void act('Switching network…',async()=>{await testnetRead(()=>adapter.current!.switchChain());})}/>}
           {source==='arcade'&&!arcade?.account&&<p className="arcade-picker-connect muted small">Connect your wallet above to choose from your Rare Friends.</p>}
           {source!=='local'&&tokenId&&<p className="lime small arcade-selected-friend">SELECTED · {collection===1?'GENESIS':'GENERATIONS'} #{tokenId}</p>}
